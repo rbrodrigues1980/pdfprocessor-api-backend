@@ -324,7 +324,8 @@ public class ConsolidationUseCase {
         List<String> meses = Arrays.asList("01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12");
         log.debug("Meses configurados: {} (mês 13 não é uma coluna separada)", meses);
 
-        // Mapear referências "YYYY-13" para o mês do documento usando o índice da página
+        // Mapear referências "YYYY-13" para o mês do documento usando o índice da
+        // página
         // no array mesesDetectados
         Map<PayrollEntry, String> entryToAdjustedRef = new HashMap<>();
         int entriesMonth13Count = 0;
@@ -335,12 +336,14 @@ public class ConsolidationUseCase {
             String normalizedRef = entry.getValue();
             String adjustedRef = null;
 
-            // PRIORIDADE 1: Sempre usar mesPagamento quando disponível (independente da referência)
+            // PRIORIDADE 1: Sempre usar mesPagamento quando disponível (independente da
+            // referência)
             // Se a entry tem mesPagamento, SEMPRE usar ele em vez da referencia
             String mesPagamento = payrollEntry.getMesPagamento();
             if (mesPagamento != null && mesPagamento.matches("\\d{4}-\\d{2}")) {
                 adjustedRef = mesPagamento;
-                log.info("Entry {} (rubrica {}) - Ref original: {}, mesPagamento: {} -> usando mesPagamento (ignorando referencia)",
+                log.info(
+                        "Entry {} (rubrica {}) - Ref original: {}, mesPagamento: {} -> usando mesPagamento (ignorando referencia)",
                         payrollEntry.getId(), payrollEntry.getRubricaCodigo(), normalizedRef, mesPagamento);
             }
 
@@ -352,7 +355,7 @@ public class ConsolidationUseCase {
                 // PRIORIDADE 2: Tentar descobrir de outras entries da mesma página
                 Integer pagina = payrollEntry.getPagina();
                 String documentoId = payrollEntry.getDocumentoId();
-                
+
                 if (pagina != null && documentoId != null) {
                     // Buscar todas as entries da mesma página e documento
                     List<PayrollEntry> entriesMesmaPagina = entries.stream()
@@ -360,16 +363,17 @@ public class ConsolidationUseCase {
                             .filter(e -> pagina.equals(e.getPagina()))
                             .filter(e -> e.getReferencia() != null)
                             .collect(Collectors.toList());
-                    
-                    log.debug("Entry {} (rubrica {}) - Página {}: encontradas {} entries na mesma página", 
+
+                    log.debug("Entry {} (rubrica {}) - Página {}: encontradas {} entries na mesma página",
                             payrollEntry.getId(), payrollEntry.getRubricaCodigo(), pagina, entriesMesmaPagina.size());
-                    
-                    // Tentar encontrar o mês a partir de entries com referência normal (não "XX-13")
+
+                    // Tentar encontrar o mês a partir de entries com referência normal (não
+                    // "XX-13")
                     for (PayrollEntry e : entriesMesmaPagina) {
                         String refOriginal = e.getReferencia();
                         if (refOriginal != null && !refOriginal.matches("\\d{4}-13")) {
                             String refParaUsar = null;
-                            
+
                             // Primeiro, tentar usar a referência original se já estiver no formato YYYY-MM
                             if (refOriginal.matches("\\d{4}-\\d{2}")) {
                                 refParaUsar = refOriginal;
@@ -377,17 +381,19 @@ public class ConsolidationUseCase {
                                 // Se não, normalizar
                                 refParaUsar = referenceNormalizer.normalize(refOriginal);
                             }
-                            
+
                             if (refParaUsar != null && refParaUsar.matches("\\d{4}-\\d{2}")) {
                                 String[] partes = refParaUsar.split("-");
                                 String anoExtraido = partes[0];
                                 String mesExtraido = partes[1];
-                                
+
                                 // Verificar se o ano corresponde e o mês não é 13
                                 if (ano.equals(anoExtraido) && !"13".equals(mesExtraido)) {
                                     adjustedRef = ano + "-" + mesExtraido;
-                                    log.info("Entry {} (rubrica {}) - Ref {} -> {} (Página: {}, Mês descoberto de outras entries: {})",
-                                            payrollEntry.getId(), payrollEntry.getRubricaCodigo(), normalizedRef, adjustedRef,
+                                    log.info(
+                                            "Entry {} (rubrica {}) - Ref {} -> {} (Página: {}, Mês descoberto de outras entries: {})",
+                                            payrollEntry.getId(), payrollEntry.getRubricaCodigo(), normalizedRef,
+                                            adjustedRef,
                                             pagina, mesExtraido);
                                     break;
                                 }
@@ -399,13 +405,15 @@ public class ConsolidationUseCase {
                 // Fallback: usar mês 11 (novembro)
                 if (adjustedRef == null) {
                     adjustedRef = ano + "-11";
-                    log.warn("Entry {} (rubrica {}) - Fallback para Novembro: Ref {} -> {} (mesPagamento não disponível)",
+                    log.warn(
+                            "Entry {} (rubrica {}) - Fallback para Novembro: Ref {} -> {} (mesPagamento não disponível)",
                             payrollEntry.getId(), payrollEntry.getRubricaCodigo(), normalizedRef, adjustedRef);
                 }
                 entriesMonth13Ajustadas++;
             }
 
-            // Se ainda não tem adjustedRef, usar a referência normalizada (fallback quando não tem mesPagamento)
+            // Se ainda não tem adjustedRef, usar a referência normalizada (fallback quando
+            // não tem mesPagamento)
             if (adjustedRef == null) {
                 adjustedRef = normalizedRef;
                 log.debug("Entry {} (rubrica {}) - Usando referencia normalizada: {} (mesPagamento não disponível)",
@@ -451,13 +459,16 @@ public class ConsolidationUseCase {
                     double valorAnterior = valoresPorReferencia.getOrDefault(adjustedRef, 0.0);
                     double valorNovo = valorAnterior + valor;
                     valoresPorReferencia.put(adjustedRef, valorNovo);
-                    
+
                     // Log detalhado para rubricas problemáticas ou para ano 2016 mês 04
-                    if (codigo.equals("4364") || codigo.equals("4459") || codigo.equals("3362") || codigo.equals("3394")) {
-                        log.info("Rubrica {} - Entry {} (ref original: {}, ref ajustada: {}) - Valor: {} -> Total acumulado: {}",
+                    if (codigo.equals("4364") || codigo.equals("4459") || codigo.equals("3362")
+                            || codigo.equals("3394")) {
+                        log.info(
+                                "Rubrica {} - Entry {} (ref original: {}, ref ajustada: {}) - Valor: {} -> Total acumulado: {}",
                                 codigo, entry.getId(), entry.getReferencia(), adjustedRef, valor, valorNovo);
                     } else if (adjustedRef != null && adjustedRef.startsWith("2016-04")) {
-                        log.info("Rubrica {} - Entry {} (ref original: {}, ref ajustada: {}) - Valor: {} -> Total acumulado: {}",
+                        log.info(
+                                "Rubrica {} - Entry {} (ref original: {}, ref ajustada: {}) - Valor: {} -> Total acumulado: {}",
                                 codigo, entry.getId(), entry.getReferencia(), adjustedRef, valor, valorNovo);
                     } else {
                         log.trace("Rubrica {} - Ref {} recebe valor {}", codigo, adjustedRef, valor);
@@ -471,46 +482,6 @@ public class ConsolidationUseCase {
             log.info("Rubrica {} possui valores em {} referências diferentes",
                     codigo, valoresPorReferencia.size());
             log.info("Rubrica {} - Valores por referência: {}", codigo, valoresPorReferencia);
-
-            // Verificar se há entries com referência original "YYYY-13" em múltiplos meses
-            boolean temReferencia13Multipla = false;
-            Set<String> anosCom13 = new HashSet<>();
-            for (PayrollEntry entry : rubricaEntries) {
-                String refOriginal = entry.getReferencia();
-                if (refOriginal != null && refOriginal.matches("\\d{4}-13")) {
-                    String ano = refOriginal.split("-")[0];
-                    anosCom13.add(ano);
-                }
-            }
-            
-            // Contar quantos meses diferentes têm valores para cada ano com "YYYY-13"
-            for (String ano : anosCom13) {
-                long mesesComValor13 = valoresPorReferencia.keySet().stream()
-                        .filter(ref -> ref.startsWith(ano + "-"))
-                        .filter(ref -> {
-                            // Verificar se há entry original com "YYYY-13" que foi mapeada para este mês
-                            return rubricaEntries.stream()
-                                    .anyMatch(e -> {
-                                        String refOrig = e.getReferencia();
-                                        if (refOrig != null && refOrig.equals(ano + "-13")) {
-                                            String adjustedRef = entryToAdjustedRef.get(e);
-                                            return adjustedRef != null && adjustedRef.equals(ref);
-                                        }
-                                        return false;
-                                    });
-                        })
-                        .count();
-                
-                if (mesesComValor13 > 1) {
-                    temReferencia13Multipla = true;
-                    log.info("Rubrica {} - Ano {} tem referência 'YYYY-13' em {} meses diferentes", 
-                            codigo, ano, mesesComValor13);
-                    break;
-                } else if (mesesComValor13 == 1) {
-                    log.info("Rubrica {} - Ano {} tem referência 'YYYY-13' em apenas 1 mês (será usado no total)", 
-                            codigo, ano);
-                }
-            }
 
             // Preencher meses faltantes com zero para cada ano
             log.debug("Preenchendo meses faltantes com zero para rubrica {}", codigo);
@@ -531,75 +502,50 @@ public class ConsolidationUseCase {
                     codigo, mesesComValor, allYears.size() * meses.size(), valoresCompletos);
 
             // Calcular total da rubrica
-            // Primeiro, calcular o total normalmente (soma de todos os valores)
-            double totalRubrica = valoresCompletos.values().stream()
-                    .mapToDouble(Double::doubleValue)
-                    .sum();
-            log.info("Rubrica {} - Total inicial (soma de todos os valores): R$ {}", codigo, totalRubrica);
-            
-            // Se tem referência "YYYY-13" em múltiplos meses, subtrair os valores dos meses que não são o último
-            if (temReferencia13Multipla) {
-                log.info("Rubrica {} - Tem referência YYYY-13 múltipla, ajustando total", codigo);
-                
-                // Para cada ano com "YYYY-13" múltiplo, encontrar o último mês e subtrair os outros
-                for (String year : anosCom13) {
-                    log.info("Rubrica {} - Processando ano {} com referência YYYY-13 múltipla", codigo, year);
-                    
-                    // Encontrar todos os meses que têm valores de "YYYY-13" para este ano
-                    List<String> mesesCom13 = new ArrayList<>();
-                    for (PayrollEntry entry : rubricaEntries) {
-                        String refOrig = entry.getReferencia();
-                        if (refOrig != null && refOrig.equals(year + "-13")) {
-                            String adjustedRef = entryToAdjustedRef.get(entry);
-                            if (adjustedRef != null && adjustedRef.startsWith(year + "-")) {
-                                if (!mesesCom13.contains(adjustedRef)) {
-                                    mesesCom13.add(adjustedRef);
-                                    log.info("Rubrica {} - Entry {} mapeada de {} para {} - Valor: {}", 
-                                            codigo, entry.getId(), refOrig, adjustedRef, entry.getValor());
-                                }
-                            }
-                        }
+            // Calcular total da rubrica
+            double totalRubrica = 0.0;
+
+            for (String year : allYears) {
+                // Verificar ocorrências de YYYY-13 neste ano
+                long mesesComValor13 = meses.stream()
+                        .filter(mes -> valoresCompletos.getOrDefault(year + "-" + mes, 0.0) > 0)
+                        .filter(mes -> {
+                            String ref = year + "-" + mes;
+                            // Verificar se alguma entry YYYY-13 foi mapeada para este mês
+                            return rubricaEntries.stream().anyMatch(e -> {
+                                String original = e.getReferencia();
+                                String adjusted = entryToAdjustedRef.get(e);
+                                return original != null && original.equals(year + "-13") &&
+                                        adjusted != null && adjusted.equals(ref);
+                            });
+                        })
+                        .count();
+
+                // Regra de Negócio: Se tem múltiplos meses com YYYY-13 (ex: Fev e Nov),
+                // o total do ano deve ser apenas o valor do ÚLTIMO mês (geralmente Nov), não a
+                // soma.
+                if (mesesComValor13 > 1) {
+                    String ultimoMesComValor = meses.stream() // meses está ordenado 01..12
+                            .filter(mes -> valoresCompletos.getOrDefault(year + "-" + mes, 0.0) > 0)
+                            .reduce((first, second) -> second) // pega o último
+                            .orElse(null);
+
+                    if (ultimoMesComValor != null) {
+                        double valorUltimo = valoresCompletos.get(year + "-" + ultimoMesComValor);
+                        totalRubrica += valorUltimo;
+                        log.info("Rubrica {} - Ano {} tem YYYY-13 múltiplo. Total ajustado para valor do mês {} ({})",
+                                codigo, year, ultimoMesComValor, valorUltimo);
                     }
-                    
-                    log.info("Rubrica {} - Ano {}: meses encontrados com YYYY-13: {}", codigo, year, mesesCom13);
-                    
-                    // Se encontrou múltiplos meses com "YYYY-13", identificar o último e subtrair os outros
-                    if (mesesCom13.size() > 1) {
-                        // Ordenar por mês (maior primeiro) e pegar o primeiro (último mês)
-                        String ultimoMes = mesesCom13.stream()
-                                .sorted((a, b) -> {
-                                    int mesA = Integer.parseInt(a.split("-")[1]);
-                                    int mesB = Integer.parseInt(b.split("-")[1]);
-                                    return Integer.compare(mesB, mesA); // Ordem decrescente
-                                })
-                                .findFirst()
-                                .orElse(null);
-                        
-                        if (ultimoMes != null) {
-                            log.info("Rubrica {} - Último mês identificado para ano {}: {}", codigo, year, ultimoMes);
-                            
-                            // Subtrair os valores dos meses que não são o último
-                            for (String mes : mesesCom13) {
-                                if (!mes.equals(ultimoMes)) {
-                                    Double valorMes = valoresCompletos.getOrDefault(mes, 0.0);
-                                    if (valorMes > 0) {
-                                        totalRubrica -= valorMes;
-                                        log.info("Rubrica {} - Subtraindo valor do mês {} (não é o último): R$ {} -> Total parcial: R$ {}", 
-                                                codigo, mes, valorMes, totalRubrica);
-                                    }
-                                }
-                            }
-                        }
-                    } else if (mesesCom13.size() == 1) {
-                        // Se só tem um mês com "YYYY-13", não precisa subtrair nada
-                        log.info("Rubrica {} - Ano {} tem apenas 1 mês com YYYY-13, não precisa ajustar", codigo, year);
-                    }
+                } else {
+                    // Soma normal para outros casos
+                    double somaAno = meses.stream()
+                            .mapToDouble(mes -> valoresCompletos.getOrDefault(year + "-" + mes, 0.0))
+                            .sum();
+                    totalRubrica += somaAno;
                 }
-                
-                log.info("Rubrica {} - Total final após ajuste (referência 13 múltipla): R$ {}", codigo, totalRubrica);
-            } else {
-                log.debug("Rubrica {} - Total calculado (sem referência 13 múltipla): R$ {}", codigo, totalRubrica);
             }
+
+            log.info("Rubrica {} - Total Final: {}", codigo, totalRubrica);
 
             ConsolidationRow row = ConsolidationRow.builder()
                     .codigo(codigo)

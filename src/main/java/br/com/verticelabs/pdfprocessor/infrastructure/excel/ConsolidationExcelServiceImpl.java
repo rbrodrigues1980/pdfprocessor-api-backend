@@ -309,6 +309,24 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
 
         // Filtrar valores apenas do ano atual
         for (ConsolidationRow rubrica : consolidatedResponse.getRubricas()) {
+
+            // Verificar se a rubrica tem valores neste ano
+            boolean temValorNoAno = false;
+            for (int mes = 1; mes <= 12; mes++) {
+                String mesStr = String.format("%02d", mes);
+                String referencia = ano + "-" + mesStr;
+                Double valor = rubrica.getValores().getOrDefault(referencia, 0.0);
+                if (Math.abs(valor) > 0.001) {
+                    temValorNoAno = true;
+                    break;
+                }
+            }
+
+            // Se não tiver valor em nenhum mês do ano, não exibir a linha
+            if (!temValorNoAno) {
+                continue;
+            }
+
             Row row = sheet.createRow(rowNum++);
             int colNum = 0;
 
@@ -394,10 +412,9 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
         // Se tiver valores APENAS em FEV e NOV (rubrica com referência YYYY-13)
         // O total deve ser NOV - FEV
         if (valorFev > 0 && valorNov > 0) {
-            double totalNovMenosFev = valorNov - valorFev;
-            log.info("Rubrica {} ano {}: Total = NOV ({}) - FEV ({}) = {} (regra YYYY-13)",
-                    rubrica.getCodigo(), ano, valorNov, valorFev, totalNovMenosFev);
-            return totalNovMenosFev;
+            log.info("Rubrica {} ano {}: Total = NOV ({}) (regra YYYY-13 - último valor)",
+                    rubrica.getCodigo(), ano, valorNov);
+            return valorNov;
         }
 
         // Caso contrário (só tem valor em FEV ou só em NOV, ou zeros), retorna a soma
@@ -511,6 +528,28 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
         int rowNum = startRow;
 
         for (ConsolidationRow rubrica : consolidatedResponse.getRubricas()) {
+
+            // Verificar se a rubrica tem valores em algum dos anos
+            boolean temValorGeral = false;
+            for (String ano : anos) {
+                for (int mes = 1; mes <= 12; mes++) {
+                    String mesStr = String.format("%02d", mes);
+                    String referencia = ano + "-" + mesStr;
+                    Double valor = rubrica.getValores().getOrDefault(referencia, 0.0);
+                    if (Math.abs(valor) > 0.001) {
+                        temValorGeral = true;
+                        break;
+                    }
+                }
+                if (temValorGeral)
+                    break;
+            }
+
+            // Se não tiver valor em nenhum ano, não exibir a linha
+            if (!temValorGeral) {
+                continue;
+            }
+
             Row row = sheet.createRow(rowNum++);
             int colNum = 0;
 

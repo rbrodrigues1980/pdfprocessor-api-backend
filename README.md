@@ -1,5 +1,10 @@
 # PDF Processor API Backend
 
+![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.3.5-brightgreen)
+![Reactive](https://img.shields.io/badge/Architecture-Reactive-blue)
+![WebFlux](https://img.shields.io/badge/Stack-WebFlux-purple)
+
+
 Bem-vindo ao projeto **PDF Processor API Backend**! Este projeto foi refatorado para seguir os princípios da **Clean Architecture**, oferecendo uma estrutura robusta, escalável e testável para processamento de documentos e autenticação segura.
 
 ## 🚀 Tecnologias Utilizadas
@@ -173,5 +178,6 @@ O sistema possui suporte completo a **multi-tenancy**, permitindo isolamento tot
 ---
 
 Bom código! 🚀
-#   p d f p r o c e s s o r - a p i - b a c k e n d  
+#   p d f p r o c e s s o r - a p i - b a c k e n d 
+ 
  
