@@ -813,6 +813,18 @@ public class DocumentProcessUseCase {
                                 "Imposto retido RRA", incomeTaxInfo.getImpostoRetidoRRA(), referencia));
                     }
 
+                    // --- CAMPOS EXCLUSIVOS 2017+ (DESCONTO SIMPLIFICADO) ---
+
+                    if (incomeTaxInfo.getDescontoSimplificado() != null) {
+                        entries.add(createEntry(tenantId, document.getId(), "IR_DESCONTO_SIMPLIFICADO",
+                                "Desconto Simplificado", incomeTaxInfo.getDescontoSimplificado(), referencia));
+                    }
+
+                    if (incomeTaxInfo.getAliquotaEfetiva() != null) {
+                        entries.add(createEntry(tenantId, document.getId(), "IR_ALIQUOTA_EFETIVA",
+                                "Alíquota efetiva (%)", incomeTaxInfo.getAliquotaEfetiva(), referencia));
+                    }
+
                     log.info("Criadas {} entries para declaração de IR", entries.size());
 
                     // Salvar entries

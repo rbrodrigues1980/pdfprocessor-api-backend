@@ -81,9 +81,9 @@ public class IncomeTaxDeclarationServiceImpl implements IncomeTaxDeclarationServ
 
         // Padrão para "Saldo de imposto a pagar" - aceita quebras de linha entre label
         // e valor
-        // (PDF pode ter duas colunas: label na primeira, valor na segunda)
+        // 2016: "SALDO DE IMPOSTO A PAGAR" / 2017+: "SALDO IMPOSTO A PAGAR" (sem "DE")
         private static final Pattern SALDO_IMPOSTO_PAGAR_PATTERN = Pattern.compile(
-                        "(?i)saldo\\s+de\\s+imposto\\s+a\\s+pagar[\\s\\r\\n:]*[R$\\s]*([\\d]{1,3}(?:[.]?[\\d]{3})*[,][\\d]{2})",
+                        "(?i)saldo\\s+(?:de\\s+)?imposto\\s+a\\s+pagar[\\s\\r\\n:]*[R$\\s]*([\\d]{1,3}(?:[.]?[\\d]{3})*[,][\\d]{2})",
                         Pattern.CASE_INSENSITIVE | Pattern.MULTILINE);
 
         // ==========================================
@@ -91,10 +91,11 @@ public class IncomeTaxDeclarationServiceImpl implements IncomeTaxDeclarationServ
         // ==========================================
 
         // Rendimentos Tributáveis - TOTAL
-        // Usa . para aceitar qualquer encoding de caracteres acentuados
-        // Busca "RENDIMENTOS TRIBUTÁVEIS" ... "TOTAL" ... Valor
+        // 2016: "RENDIMENTOS TRIBUTÁVEIS...TOTAL 246.993,81"
+        // 2017+: "TOTAL DE RENDIMENTOS TRIBUTÁVEIS 99.867,36"
+        // Usa alternativa para ambos os formatos
         private static final Pattern RENDIMENTOS_TRIBUTAVEIS_TOTAL_PATTERN = Pattern.compile(
-                        "(?i)rendimentos\\s+tribut.veis.*?total\\s+([\\d]{1,3}(?:[.]?[\\d]{3})*[,][\\d]{2})",
+                        "(?i)(?:rendimentos\\s+tribut.veis.*?total|total\\s+de\\s+rendimentos\\s+tribut.veis)\\s+([\\d]{1,3}(?:[.]?[\\d]{3})*[,][\\d]{2})",
                         Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
 
         // Deduções - TOTAL
@@ -198,8 +199,10 @@ public class IncomeTaxDeclarationServiceImpl implements IncomeTaxDeclarationServ
                         Pattern.CASE_INSENSITIVE);
 
         // Imposto pago no exterior
+        // 2016: "Imposto pago no exterior 0,00"
+        // 2017+: "0,00Imposto pago no exterior" (valor antes do label!)
         private static final Pattern IMPOSTO_PAGO_EXTERIOR_PATTERN = Pattern.compile(
-                        "(?i)imposto\\s+pago\\s+no\\s+exterior\\s+([\\d]{1,3}(?:[.]?[\\d]{3})*[,][\\d]{2})",
+                        "(?i)(?:imposto\\s+pago\\s+no\\s+exterior\\s+([\\d]{1,3}(?:[.]?[\\d]{3})*[,][\\d]{2})|([\\d]{1,3}(?:[.]?[\\d]{3})*[,][\\d]{2})\\s*imposto\\s+pago\\s+no\\s+exterior)",
                         Pattern.CASE_INSENSITIVE);
 
         // Imposto retido na fonte (Lei nº 11.033/2004)
@@ -210,6 +213,22 @@ public class IncomeTaxDeclarationServiceImpl implements IncomeTaxDeclarationServ
         // Imposto retido RRA
         private static final Pattern IMPOSTO_RETIDO_RRA_PATTERN = Pattern.compile(
                         "(?i)imposto\\s+retido\\s+RRA\\s+([\\d]{1,3}(?:[.]?[\\d]{3})*[,][\\d]{2})",
+                        Pattern.CASE_INSENSITIVE);
+
+        // ==========================================
+        // PADRÕES EXCLUSIVOS 2017+ (DESCONTO SIMPLIFICADO)
+        // ==========================================
+
+        // Desconto Simplificado
+        private static final Pattern DESCONTO_SIMPLIFICADO_PATTERN = Pattern.compile(
+                        "(?i)desconto\\s+simplificado\\s+([\\d]{1,3}(?:[.]?[\\d]{3})*[,][\\d]{2})",
+                        Pattern.CASE_INSENSITIVE);
+
+        // Aliquota efetiva (%)
+        // 2017: "Aliquota efetiva (%) 12,44" (valor depois)
+        // 2018+: "12,80Aliquota efetiva (%)" (valor antes)
+        private static final Pattern ALIQUOTA_EFETIVA_PATTERN = Pattern.compile(
+                        "(?i)(?:al.quota\\s+efetiva\\s*\\(?%?\\)?\\s*([\\d]{1,3}[,][\\d]{2})|([\\d]{1,3}[,][\\d]{2})\\s*al.quota\\s+efetiva)",
                         Pattern.CASE_INSENSITIVE);
 
         @Override
@@ -477,6 +496,15 @@ public class IncomeTaxDeclarationServiceImpl implements IncomeTaxDeclarationServ
                                                                                                         resumoPageText,
                                                                                                         IMPOSTO_RETIDO_RRA_PATTERN);
 
+                                                                                        // Campos exclusivos 2017+
+                                                                                        // (Desconto Simplificado)
+                                                                                        BigDecimal descontoSimplificado = extractValorMonetario(
+                                                                                                        resumoPageText,
+                                                                                                        DESCONTO_SIMPLIFICADO_PATTERN);
+                                                                                        BigDecimal aliquotaEfetiva = extractValorMonetario(
+                                                                                                        resumoPageText,
+                                                                                                        ALIQUOTA_EFETIVA_PATTERN);
+
                                                                                         log.info(
                                                                                                         "Informações extraídas - Nome: {}, CPF: {}, Exercício: {}, Ano-Calendário: {}",
                                                                                                         nome, cpf,
@@ -525,6 +553,11 @@ public class IncomeTaxDeclarationServiceImpl implements IncomeTaxDeclarationServ
                                                                                                         impostoRetidoFonteLei11033,
                                                                                                         impostoRetidoRRA);
 
+                                                                                        log.info(
+                                                                                                        "Campos 2017+ - Desconto Simplificado: {}, Alíquota Efetiva: {}",
+                                                                                                        descontoSimplificado,
+                                                                                                        aliquotaEfetiva);
+
                                                                                         return new IncomeTaxInfo(nome,
                                                                                                         cpf,
                                                                                                         anoCalendario,
@@ -563,7 +596,10 @@ public class IncomeTaxDeclarationServiceImpl implements IncomeTaxDeclarationServ
                                                                                                         impostoComplementar,
                                                                                                         impostoPagoExterior,
                                                                                                         impostoRetidoFonteLei11033,
-                                                                                                        impostoRetidoRRA);
+                                                                                                        impostoRetidoRRA,
+                                                                                                        // Campos 2017+
+                                                                                                        descontoSimplificado,
+                                                                                                        aliquotaEfetiva);
                                                                                 });
                                                         })
                                                         .onErrorResume(e -> {
@@ -617,28 +653,39 @@ public class IncomeTaxDeclarationServiceImpl implements IncomeTaxDeclarationServ
 
         /**
          * Extrai um valor monetário do texto usando um padrão específico.
+         * Suporta padrões com múltiplos grupos (alternativas) - pega o primeiro grupo
+         * não nulo.
          */
         private BigDecimal extractValorMonetario(String text, Pattern pattern) {
                 Matcher matcher = pattern.matcher(text);
                 if (matcher.find()) {
-                        String valorStr = matcher.group(1);
-                        log.debug("Valor encontrado (string): {} (padrão: {})", valorStr, pattern.pattern());
-
-                        // Converter para Double, tratando formato brasileiro (ponto como separador de
-                        // milhar, vírgula como decimal)
-                        try {
-                                // Remove pontos (separadores de milhar) and replace comma with dot
-                                String valorNormalizado = valorStr.replace(".", "").replace(",", ".");
-                                BigDecimal valor = new BigDecimal(valorNormalizado);
-                                log.debug("Valor convertido: {}", valor);
-                                return valor;
-                        } catch (NumberFormatException e) {
-                                log.warn("Erro ao converter valor: {}", valorStr, e);
-                                return null;
+                        // Procurar o primeiro grupo que não seja nulo (para padrões com alternativas)
+                        String valorStr = null;
+                        for (int i = 1; i <= matcher.groupCount(); i++) {
+                                if (matcher.group(i) != null) {
+                                        valorStr = matcher.group(i);
+                                        break;
+                                }
                         }
-                } else {
-                        log.debug("Nenhum valor encontrado para o padrão: {}", pattern.pattern());
+
+                        if (valorStr != null) {
+                                log.debug("Valor encontrado (string): {} (padrão: {})", valorStr, pattern.pattern());
+
+                                // Converter para Double, tratando formato brasileiro (ponto como separador de
+                                // milhar, vírgula como decimal)
+                                try {
+                                        // Remove pontos (separadores de milhar) and replace comma with dot
+                                        String valorNormalizado = valorStr.replace(".", "").replace(",", ".");
+                                        BigDecimal valor = new BigDecimal(valorNormalizado);
+                                        log.debug("Valor convertido: {}", valor);
+                                        return valor;
+                                } catch (NumberFormatException e) {
+                                        log.warn("Erro ao converter valor: {}", valorStr, e);
+                                        return null;
+                                }
+                        }
                 }
+                log.debug("Nenhum valor encontrado para o padrão: {}", pattern.pattern());
                 return null;
         }
 
@@ -678,18 +725,20 @@ public class IncomeTaxDeclarationServiceImpl implements IncomeTaxDeclarationServ
 
         /**
          * Extrai "Saldo de imposto a pagar" usando estratégia alternativa:
-         * Busca o texto "SALDO DE IMPOSTO A PAGAR" e procura pelo valor nas linhas
+         * Busca o texto "SALDO (DE) IMPOSTO A PAGAR" e procura pelo valor nas linhas
          * próximas.
          * Útil quando o PDF tem duas colunas e o valor está na segunda coluna.
+         * 
+         * Suporta: 2016 "SALDO DE IMPOSTO A PAGAR" / 2017+ "SALDO IMPOSTO A PAGAR"
          * 
          * Estratégia: Busca o label e depois procura pelo PRIMEIRO valor monetário
          * próximo,
          * que é o mais provável de estar diretamente relacionado ao label.
          */
         private BigDecimal extractSaldoImpostoPagarAlternativo(String text) {
-                // Buscar a posição do texto "SALDO DE IMPOSTO A PAGAR"
+                // Buscar a posição do texto "SALDO (DE) IMPOSTO A PAGAR" - "DE" é opcional
                 Pattern labelPattern = Pattern.compile(
-                                "(?i)saldo\\s+de\\s+imposto\\s+a\\s+pagar",
+                                "(?i)saldo\\s+(?:de\\s+)?imposto\\s+a\\s+pagar",
                                 Pattern.CASE_INSENSITIVE);
 
                 Matcher labelMatcher = labelPattern.matcher(text);
