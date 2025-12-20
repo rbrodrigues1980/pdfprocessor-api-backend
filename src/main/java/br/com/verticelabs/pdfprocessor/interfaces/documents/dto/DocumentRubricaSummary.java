@@ -1,5 +1,6 @@
 package br.com.verticelabs.pdfprocessor.interfaces.documents.dto;
 
+import java.math.BigDecimal;
 import lombok.Builder;
 import lombok.Data;
 
@@ -8,6 +9,5 @@ import lombok.Data;
 public class DocumentRubricaSummary {
     private String codigo;
     private Long quantidade;
-    private Double total;
+    private BigDecimal total;
 }
-

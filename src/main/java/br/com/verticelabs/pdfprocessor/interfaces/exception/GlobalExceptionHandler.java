@@ -28,8 +28,13 @@ public class GlobalExceptionHandler {
             RubricaNotFoundException.class,
             NoEntriesFoundException.class
     })
-    public ResponseEntity<ApiErrorResponse> handleNotFoundException(RuntimeException ex, ServerHttpRequest request) {
-        return createErrorResponse(HttpStatus.NOT_FOUND, ex.getMessage(), request);
+    public Mono<ResponseEntity<ApiErrorResponse>> handleNotFoundException(RuntimeException ex,
+            ServerHttpRequest request,
+            ServerHttpResponse response) {
+        if (response.isCommitted()) {
+            return Mono.empty();
+        }
+        return Mono.just(createErrorResponse(HttpStatus.NOT_FOUND, ex.getMessage(), request));
     }
 
     @ExceptionHandler({
@@ -40,8 +45,13 @@ public class GlobalExceptionHandler {
             ExcelGenerationException.class,
             IllegalArgumentException.class
     })
-    public ResponseEntity<ApiErrorResponse> handleBadRequestException(RuntimeException ex, ServerHttpRequest request) {
-        return createErrorResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
+    public Mono<ResponseEntity<ApiErrorResponse>> handleBadRequestException(RuntimeException ex,
+            ServerHttpRequest request,
+            ServerHttpResponse response) {
+        if (response.isCommitted()) {
+            return Mono.empty();
+        }
+        return Mono.just(createErrorResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), request));
     }
 
     @ExceptionHandler({
@@ -49,9 +59,12 @@ public class GlobalExceptionHandler {
             InvalidRefreshTokenException.class,
             Invalid2FACodeException.class
     })
-    public ResponseEntity<ApiErrorResponse> handleUnauthorizedException(RuntimeException ex,
-            ServerHttpRequest request) {
-        return createErrorResponse(HttpStatus.UNAUTHORIZED, ex.getMessage(), request);
+    public Mono<ResponseEntity<ApiErrorResponse>> handleUnauthorizedException(RuntimeException ex,
+            ServerHttpRequest request, ServerHttpResponse response) {
+        if (response.isCommitted()) {
+            return Mono.empty();
+        }
+        return Mono.just(createErrorResponse(HttpStatus.UNAUTHORIZED, ex.getMessage(), request));
     }
 
     @ExceptionHandler({
@@ -60,13 +73,21 @@ public class GlobalExceptionHandler {
             RubricaDuplicadaException.class,
             InvalidStatusTransitionException.class
     })
-    public ResponseEntity<ApiErrorResponse> handleConflictException(RuntimeException ex, ServerHttpRequest request) {
-        return createErrorResponse(HttpStatus.CONFLICT, ex.getMessage(), request);
+    public Mono<ResponseEntity<ApiErrorResponse>> handleConflictException(RuntimeException ex,
+            ServerHttpRequest request,
+            ServerHttpResponse response) {
+        if (response.isCommitted()) {
+            return Mono.empty();
+        }
+        return Mono.just(createErrorResponse(HttpStatus.CONFLICT, ex.getMessage(), request));
     }
 
     @ExceptionHandler(WebExchangeBindException.class)
-    public ResponseEntity<ApiErrorResponse> handleValidationException(WebExchangeBindException ex,
-            ServerHttpRequest request) {
+    public Mono<ResponseEntity<ApiErrorResponse>> handleValidationException(WebExchangeBindException ex,
+            ServerHttpRequest request, ServerHttpResponse response) {
+        if (response.isCommitted()) {
+            return Mono.empty();
+        }
         Map<String, String> errors = new HashMap<>();
         ex.getBindingResult().getAllErrors().forEach((error) -> {
             String fieldName = ((FieldError) error).getField();
@@ -74,7 +95,7 @@ public class GlobalExceptionHandler {
             errors.put(fieldName, errorMessage);
         });
 
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+        return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiErrorResponse.builder()
                         .timestamp(LocalDateTime.now())
                         .status(HttpStatus.BAD_REQUEST.value())
@@ -82,7 +103,7 @@ public class GlobalExceptionHandler {
                         .message("Validation error")
                         .path(request.getPath().value())
                         .errors(errors)
-                        .build());
+                        .build()));
     }
 
     @ExceptionHandler(Exception.class)

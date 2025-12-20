@@ -68,9 +68,9 @@ public class DocumentSummaryUseCase {
                     List<PayrollEntry> entriesDaRubrica = entry.getValue();
 
                     Long quantidade = (long) entriesDaRubrica.size();
-                    Double total = entriesDaRubrica.stream()
-                            .mapToDouble(e -> e.getValor() != null ? e.getValor() : 0.0)
-                            .sum();
+                    java.math.BigDecimal total = entriesDaRubrica.stream()
+                            .map(e -> e.getValor() != null ? e.getValor() : java.math.BigDecimal.ZERO)
+                            .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
 
                     return DocumentRubricaSummary.builder()
                             .codigo(codigo)
@@ -90,4 +90,3 @@ public class DocumentSummaryUseCase {
                 .build();
     }
 }
-

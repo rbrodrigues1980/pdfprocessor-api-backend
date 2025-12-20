@@ -18,6 +18,7 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.io.ByteArrayOutputStream;
+import java.math.BigDecimal;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -203,7 +204,8 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
         label1.setCellStyle(totalStyle);
 
         Cell value1 = row1.createCell(2); // Coluna C
-        value1.setCellValue(saldoImpostoPagarEntry.getValor());
+        // Usar doubleValue() para POI
+        value1.setCellValue(saldoImpostoPagarEntry.getValor().doubleValue());
         value1.setCellStyle(totalStyle);
 
         // Linha 2: "Imposto Pago (novo calculo)" | (vazio)
@@ -315,8 +317,8 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
             for (int mes = 1; mes <= 12; mes++) {
                 String mesStr = String.format("%02d", mes);
                 String referencia = ano + "-" + mesStr;
-                Double valor = rubrica.getValores().getOrDefault(referencia, 0.0);
-                if (Math.abs(valor) > 0.001) {
+                BigDecimal valor = rubrica.getValores().getOrDefault(referencia, BigDecimal.ZERO);
+                if (valor.abs().compareTo(new BigDecimal("0.001")) > 0) {
                     temValorNoAno = true;
                     break;
                 }
@@ -342,33 +344,34 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
 
             // Valores dos meses (01 a 12) - valores com ref "YYYY-13" já estão nos meses
             // corretos
-            double somaTotal = 0.0;
+            BigDecimal somaTotal = BigDecimal.ZERO;
             for (int mes = 1; mes <= 12; mes++) {
                 String mesStr = String.format("%02d", mes);
                 String referencia = ano + "-" + mesStr;
-                Double valor = rubrica.getValores().getOrDefault(referencia, 0.0);
+                BigDecimal valor = rubrica.getValores().getOrDefault(referencia, BigDecimal.ZERO);
 
                 // Log para debug (apenas para rubricas problemáticas)
                 if (rubrica.getCodigo().equals("4364") || rubrica.getCodigo().equals("4459")) {
-                    if (valor > 0 || (mes == 11 || mes == 12)) {
+                    if (valor.compareTo(BigDecimal.ZERO) > 0 || (mes == 11 || mes == 12)) {
                         log.debug("Excel - Rubrica {} - Mês {} (ref: {}): valor = {}",
                                 rubrica.getCodigo(), mesStr, referencia, valor);
                     }
                 }
 
                 Cell valorCell = row.createCell(colNum++);
-                valorCell.setCellValue(valor);
+                // POI setCellValue aceita double
+                valorCell.setCellValue(valor.doubleValue());
                 valorCell.setCellStyle(numberStyle);
 
-                somaTotal += valor;
+                somaTotal = somaTotal.add(valor);
             }
 
             // Calcular Total: se tiver valor em FEV (02) e NOV (11), faz NOV - FEV
             // Caso contrário, soma simples
-            double totalRubrica = calcularTotalRubricaAno(rubrica, ano, somaTotal);
+            BigDecimal totalRubrica = calcularTotalRubricaAno(rubrica, ano, somaTotal);
 
             Cell totalCell = row.createCell(colNum);
-            totalCell.setCellValue(totalRubrica);
+            totalCell.setCellValue(totalRubrica.doubleValue());
             totalCell.setCellStyle(numberStyle);
         }
 
@@ -382,12 +385,12 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
      * FEV.
      * Para rubricas normais (com valores em outros meses), retorna a soma simples.
      */
-    private double calcularTotalRubricaAno(ConsolidationRow rubrica, String ano, double somaSimples) {
+    private BigDecimal calcularTotalRubricaAno(ConsolidationRow rubrica, String ano, BigDecimal somaSimples) {
         String refFev = ano + "-02";
         String refNov = ano + "-11";
 
-        Double valorFev = rubrica.getValores().getOrDefault(refFev, 0.0);
-        Double valorNov = rubrica.getValores().getOrDefault(refNov, 0.0);
+        BigDecimal valorFev = rubrica.getValores().getOrDefault(refFev, BigDecimal.ZERO);
+        BigDecimal valorNov = rubrica.getValores().getOrDefault(refNov, BigDecimal.ZERO);
 
         // Verificar se tem valores em outros meses além de FEV e NOV
         boolean temValorOutrosMeses = false;
@@ -397,8 +400,8 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
             }
             String mesStr = String.format("%02d", mes);
             String referencia = ano + "-" + mesStr;
-            Double valor = rubrica.getValores().getOrDefault(referencia, 0.0);
-            if (valor > 0) {
+            BigDecimal valor = rubrica.getValores().getOrDefault(referencia, BigDecimal.ZERO);
+            if (valor.compareTo(BigDecimal.ZERO) > 0) {
                 temValorOutrosMeses = true;
                 break;
             }
@@ -411,7 +414,7 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
 
         // Se tiver valores APENAS em FEV e NOV (rubrica com referência YYYY-13)
         // O total deve ser NOV - FEV
-        if (valorFev > 0 && valorNov > 0) {
+        if (valorFev.compareTo(BigDecimal.ZERO) > 0 && valorNov.compareTo(BigDecimal.ZERO) > 0) {
             log.info("Rubrica {} ano {}: Total = NOV ({}) (regra YYYY-13 - último valor)",
                     rubrica.getCodigo(), ano, valorNov);
             return valorNov;
@@ -444,30 +447,30 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
         for (int mes = 1; mes <= 12; mes++) {
             String mesStr = String.format("%02d", mes);
             String referencia = ano + "-" + mesStr;
-            Double totalMes = consolidatedResponse.getTotaisMensais().getOrDefault(referencia, 0.0);
+            BigDecimal totalMes = consolidatedResponse.getTotaisMensais().getOrDefault(referencia, BigDecimal.ZERO);
 
             Cell totalMesCell = totalRow.createCell(colNum++);
-            totalMesCell.setCellValue(totalMes);
+            totalMesCell.setCellValue(totalMes.doubleValue());
             totalMesCell.setCellStyle(totalStyle);
         }
 
         // Total geral do ano: soma dos totais das rubricas (com regra NOV - FEV
         // aplicada)
-        double totalGeralAno = 0.0;
+        BigDecimal totalGeralAno = BigDecimal.ZERO;
         for (ConsolidationRow rubrica : consolidatedResponse.getRubricas()) {
             // Calcular a soma simples para este ano
-            double somaAno = 0.0;
+            BigDecimal somaAno = BigDecimal.ZERO;
             for (int mes = 1; mes <= 12; mes++) {
                 String mesStr = String.format("%02d", mes);
                 String referencia = ano + "-" + mesStr;
-                somaAno += rubrica.getValores().getOrDefault(referencia, 0.0);
+                somaAno = somaAno.add(rubrica.getValores().getOrDefault(referencia, BigDecimal.ZERO));
             }
             // Aplicar a regra NOV - FEV se necessário
-            totalGeralAno += calcularTotalRubricaAno(rubrica, ano, somaAno);
+            totalGeralAno = totalGeralAno.add(calcularTotalRubricaAno(rubrica, ano, somaAno));
         }
 
         Cell totalGeralCell = totalRow.createCell(colNum);
-        totalGeralCell.setCellValue(totalGeralAno);
+        totalGeralCell.setCellValue(totalGeralAno.doubleValue());
         totalGeralCell.setCellStyle(totalStyle);
 
         return startRow + 1;
@@ -535,8 +538,8 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
                 for (int mes = 1; mes <= 12; mes++) {
                     String mesStr = String.format("%02d", mes);
                     String referencia = ano + "-" + mesStr;
-                    Double valor = rubrica.getValores().getOrDefault(referencia, 0.0);
-                    if (Math.abs(valor) > 0.001) {
+                    BigDecimal valor = rubrica.getValores().getOrDefault(referencia, BigDecimal.ZERO);
+                    if (valor.abs().compareTo(new BigDecimal("0.001")) > 0) {
                         temValorGeral = true;
                         break;
                     }
@@ -565,30 +568,30 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
 
             // Valores de todos os meses de todos os anos (01 a 12) - valores com ref
             // "YYYY-13" já estão nos meses corretos
-            double totalGeralRubrica = 0.0;
+            BigDecimal totalGeralRubrica = BigDecimal.ZERO;
             for (String ano : anos) {
-                double somaAno = 0.0;
+                BigDecimal somaAno = BigDecimal.ZERO;
                 for (int mes = 1; mes <= 12; mes++) {
                     String mesStr = String.format("%02d", mes);
                     String referencia = ano + "-" + mesStr;
-                    Double valor = rubrica.getValores().getOrDefault(referencia, 0.0);
+                    BigDecimal valor = rubrica.getValores().getOrDefault(referencia, BigDecimal.ZERO);
 
                     Cell valorCell = row.createCell(colNum++);
-                    valorCell.setCellValue(valor);
+                    valorCell.setCellValue(valor.doubleValue());
                     valorCell.setCellStyle(numberStyle);
 
-                    somaAno += valor;
+                    somaAno = somaAno.add(valor);
                 }
 
                 // Calcular total do ano: se tiver valor em FEV e NOV, faz NOV - FEV
-                double totalAno = calcularTotalRubricaAno(rubrica, ano, somaAno);
-                totalGeralRubrica += totalAno;
+                BigDecimal totalAno = calcularTotalRubricaAno(rubrica, ano, somaAno);
+                totalGeralRubrica = totalGeralRubrica.add(totalAno);
             }
 
             // Total geral da rubrica (soma dos totais de cada ano, com regra NOV - FEV
             // aplicada)
             Cell totalCell = row.createCell(colNum);
-            totalCell.setCellValue(totalGeralRubrica);
+            totalCell.setCellValue(totalGeralRubrica.doubleValue());
             totalCell.setCellStyle(numberStyle);
         }
 
@@ -620,35 +623,35 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
             for (int mes = 1; mes <= 12; mes++) {
                 String mesStr = String.format("%02d", mes);
                 String referencia = ano + "-" + mesStr;
-                Double totalMes = consolidatedResponse.getTotaisMensais().getOrDefault(referencia, 0.0);
+                BigDecimal totalMes = consolidatedResponse.getTotaisMensais().getOrDefault(referencia, BigDecimal.ZERO);
 
                 Cell totalMesCell = totalRow.createCell(colNum++);
-                totalMesCell.setCellValue(totalMes);
+                totalMesCell.setCellValue(totalMes.doubleValue());
                 totalMesCell.setCellStyle(totalStyle);
             }
         }
 
         // Total geral consolidado: soma dos totais das rubricas (com regra NOV - FEV
         // aplicada)
-        double totalGeralConsolidado = 0.0;
+        BigDecimal totalGeralConsolidado = BigDecimal.ZERO;
         for (ConsolidationRow rubrica : consolidatedResponse.getRubricas()) {
-            double totalRubrica = 0.0;
+            BigDecimal totalRubrica = BigDecimal.ZERO;
             for (String ano : anos) {
                 // Calcular a soma simples para este ano
-                double somaAno = 0.0;
+                BigDecimal somaAno = BigDecimal.ZERO;
                 for (int mes = 1; mes <= 12; mes++) {
                     String mesStr = String.format("%02d", mes);
                     String referencia = ano + "-" + mesStr;
-                    somaAno += rubrica.getValores().getOrDefault(referencia, 0.0);
+                    somaAno = somaAno.add(rubrica.getValores().getOrDefault(referencia, BigDecimal.ZERO));
                 }
                 // Aplicar a regra NOV - FEV se necessário
-                totalRubrica += calcularTotalRubricaAno(rubrica, ano, somaAno);
+                totalRubrica = totalRubrica.add(calcularTotalRubricaAno(rubrica, ano, somaAno));
             }
-            totalGeralConsolidado += totalRubrica;
+            totalGeralConsolidado = totalGeralConsolidado.add(totalRubrica);
         }
 
         Cell totalGeralCell = totalRow.createCell(colNum);
-        totalGeralCell.setCellValue(totalGeralConsolidado);
+        totalGeralCell.setCellValue(totalGeralConsolidado.doubleValue());
         totalGeralCell.setCellStyle(totalStyle);
 
         return startRow + 1;

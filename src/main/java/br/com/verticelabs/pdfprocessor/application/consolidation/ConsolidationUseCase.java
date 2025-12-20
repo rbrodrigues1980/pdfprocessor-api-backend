@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.math.BigDecimal;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -449,15 +450,16 @@ public class ConsolidationUseCase {
             String descricao = rubricaEntries.isEmpty() ? "" : rubricaEntries.get(0).getRubricaDescricao();
 
             // Mapa para somar valores por mês
-            Map<String, Double> valoresPorReferencia = new TreeMap<>();
+            Map<String, BigDecimal> valoresPorReferencia = new TreeMap<>();
 
             // Processar TODAS as entries (já ajustadas)
             for (PayrollEntry entry : rubricaEntries) {
                 String adjustedRef = entryToAdjustedRef.get(entry);
                 if (adjustedRef != null) {
-                    double valor = entry.getValor() != null ? entry.getValor() : 0.0;
-                    double valorAnterior = valoresPorReferencia.getOrDefault(adjustedRef, 0.0);
-                    double valorNovo = valorAnterior + valor;
+                    // Usar BigDecimal
+                    BigDecimal valor = entry.getValor() != null ? entry.getValor() : BigDecimal.ZERO;
+                    BigDecimal valorAnterior = valoresPorReferencia.getOrDefault(adjustedRef, BigDecimal.ZERO);
+                    BigDecimal valorNovo = valorAnterior.add(valor);
                     valoresPorReferencia.put(adjustedRef, valorNovo);
 
                     // Log detalhado para rubricas problemáticas ou para ano 2016 mês 04
@@ -485,14 +487,14 @@ public class ConsolidationUseCase {
 
             // Preencher meses faltantes com zero para cada ano
             log.debug("Preenchendo meses faltantes com zero para rubrica {}", codigo);
-            Map<String, Double> valoresCompletos = new TreeMap<>();
+            Map<String, BigDecimal> valoresCompletos = new TreeMap<>();
             int mesesComValor = 0;
             for (String year : allYears) {
                 for (String month : meses) {
                     String referencia = year + "-" + month;
-                    Double valor = valoresPorReferencia.getOrDefault(referencia, 0.0);
+                    BigDecimal valor = valoresPorReferencia.getOrDefault(referencia, BigDecimal.ZERO);
                     valoresCompletos.put(referencia, valor);
-                    if (valor > 0) {
+                    if (valor.compareTo(BigDecimal.ZERO) > 0) {
                         mesesComValor++;
                         log.debug("Rubrica {} - Mês {} tem valor: {}", codigo, referencia, valor);
                     }
@@ -502,13 +504,13 @@ public class ConsolidationUseCase {
                     codigo, mesesComValor, allYears.size() * meses.size(), valoresCompletos);
 
             // Calcular total da rubrica
-            // Calcular total da rubrica
-            double totalRubrica = 0.0;
+            BigDecimal totalRubrica = BigDecimal.ZERO;
 
             for (String year : allYears) {
                 // Verificar ocorrências de YYYY-13 neste ano
                 long mesesComValor13 = meses.stream()
-                        .filter(mes -> valoresCompletos.getOrDefault(year + "-" + mes, 0.0) > 0)
+                        .filter(mes -> valoresCompletos.getOrDefault(year + "-" + mes, BigDecimal.ZERO)
+                                .compareTo(BigDecimal.ZERO) > 0)
                         .filter(mes -> {
                             String ref = year + "-" + mes;
                             // Verificar se alguma entry YYYY-13 foi mapeada para este mês
@@ -526,22 +528,23 @@ public class ConsolidationUseCase {
                 // soma.
                 if (mesesComValor13 > 1) {
                     String ultimoMesComValor = meses.stream() // meses está ordenado 01..12
-                            .filter(mes -> valoresCompletos.getOrDefault(year + "-" + mes, 0.0) > 0)
+                            .filter(mes -> valoresCompletos.getOrDefault(year + "-" + mes, BigDecimal.ZERO)
+                                    .compareTo(BigDecimal.ZERO) > 0)
                             .reduce((first, second) -> second) // pega o último
                             .orElse(null);
 
                     if (ultimoMesComValor != null) {
-                        double valorUltimo = valoresCompletos.get(year + "-" + ultimoMesComValor);
-                        totalRubrica += valorUltimo;
+                        BigDecimal valorUltimo = valoresCompletos.get(year + "-" + ultimoMesComValor);
+                        totalRubrica = totalRubrica.add(valorUltimo);
                         log.info("Rubrica {} - Ano {} tem YYYY-13 múltiplo. Total ajustado para valor do mês {} ({})",
                                 codigo, year, ultimoMesComValor, valorUltimo);
                     }
                 } else {
                     // Soma normal para outros casos
-                    double somaAno = meses.stream()
-                            .mapToDouble(mes -> valoresCompletos.getOrDefault(year + "-" + mes, 0.0))
-                            .sum();
-                    totalRubrica += somaAno;
+                    BigDecimal somaAno = meses.stream()
+                            .map(mes -> valoresCompletos.getOrDefault(year + "-" + mes, BigDecimal.ZERO))
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+                    totalRubrica = totalRubrica.add(somaAno);
                 }
             }
 
@@ -565,15 +568,15 @@ public class ConsolidationUseCase {
 
         // Calcular totais mensais
         log.debug("Calculando totais mensais");
-        Map<String, Double> totaisMensais = new TreeMap<>();
+        Map<String, BigDecimal> totaisMensais = new TreeMap<>();
         for (String year : allYears) {
             for (String month : meses) {
                 String referencia = year + "-" + month;
-                double totalMes = rubricas.stream()
-                        .mapToDouble(row -> row.getValores().getOrDefault(referencia, 0.0))
-                        .sum();
+                BigDecimal totalMes = rubricas.stream()
+                        .map(row -> row.getValores().getOrDefault(referencia, BigDecimal.ZERO))
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
                 totaisMensais.put(referencia, totalMes);
-                if (totalMes > 0) {
+                if (totalMes.compareTo(BigDecimal.ZERO) > 0) {
                     log.trace("Total mensal {}: R$ {}", referencia, totalMes);
                 }
             }
@@ -582,9 +585,9 @@ public class ConsolidationUseCase {
 
         // Calcular total geral
         log.debug("Calculando total geral");
-        double totalGeral = rubricas.stream()
-                .mapToDouble(row -> row.getTotal() != null ? row.getTotal() : 0.0)
-                .sum();
+        BigDecimal totalGeral = rubricas.stream()
+                .map(row -> row.getTotal() != null ? row.getTotal() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
         log.info("Total geral calculado: R$ {}", totalGeral);
 
         ConsolidatedResponse response = ConsolidatedResponse.builder()

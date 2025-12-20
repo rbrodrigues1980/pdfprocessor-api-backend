@@ -17,10 +17,10 @@ import java.util.*;
 @Service
 @RequiredArgsConstructor
 public class PersonRubricasMatrixUseCase {
-    
+
     private final PersonRepository personRepository;
     private final PayrollEntryRepository entryRepository;
-    
+
     public Mono<PersonRubricasMatrixResponse> execute(String cpf) {
         return ReactiveSecurityContextHelper.isSuperAdmin()
                 .flatMap(isSuperAdmin -> {
@@ -35,9 +35,10 @@ public class PersonRubricasMatrixUseCase {
                         personMono = ReactiveSecurityContextHelper.getTenantId()
                                 .flatMap(tenantId -> personRepository.findByTenantIdAndCpf(tenantId, cpf));
                     }
-                    
+
                     return personMono
-                            .switchIfEmpty(Mono.error(new IllegalArgumentException("Pessoa não encontrada com CPF: " + cpf)))
+                            .switchIfEmpty(
+                                    Mono.error(new IllegalArgumentException("Pessoa não encontrada com CPF: " + cpf)))
                             .flatMap(person -> {
                                 // Buscar todos os documentos da pessoa
                                 List<String> documentoIds = person.getDocumentos();
@@ -49,12 +50,11 @@ public class PersonRubricasMatrixUseCase {
                                             person.getMatricula(),
                                             new HashMap<>(),
                                             new HashMap<>(),
-                                            0.0
-                                    ));
+                                            java.math.BigDecimal.ZERO));
                                 }
-                                
+
                                 log.debug("Buscando entries de {} documentos para pessoa {}", documentoIds.size(), cpf);
-                                
+
                                 // Buscar todas as entries de todos os documentos
                                 // Se SUPER_ADMIN, buscar sem filtrar por tenantId
                                 // Se não, usar o tenantId da pessoa encontrada
@@ -67,66 +67,70 @@ public class PersonRubricasMatrixUseCase {
                                     // Outros usuários: usar tenantId da pessoa encontrada
                                     String tenantId = person.getTenantId();
                                     entriesFlux = Flux.fromIterable(documentoIds)
-                                            .flatMap(documentId -> entryRepository.findByTenantIdAndDocumentoId(tenantId, documentId));
+                                            .flatMap(documentId -> entryRepository
+                                                    .findByTenantIdAndDocumentoId(tenantId, documentId));
                                 }
-                                
+
                                 return entriesFlux
                                         .collectList()
                                         .map(entries -> {
                                             log.debug("Encontradas {} entries para pessoa {}", entries.size(), cpf);
                                             // Agrupar por rubrica e referência (mês/ano)
                                             Map<String, Map<String, RubricaMatrixCell>> matrix = new HashMap<>();
-                                            Map<String, Double> rubricasTotais = new HashMap<>();
-                                            double totalGeral = 0.0;
-                                            
+                                            Map<String, java.math.BigDecimal> rubricasTotais = new HashMap<>();
+                                            java.math.BigDecimal totalGeral = java.math.BigDecimal.ZERO;
+
                                             for (PayrollEntry entry : entries) {
                                                 String rubricaCodigo = entry.getRubricaCodigo();
                                                 String referencia = entry.getReferencia();
-                                                Double valor = entry.getValor() != null ? entry.getValor() : 0.0;
-                                                
+                                                java.math.BigDecimal valor = entry.getValor() != null ? entry.getValor()
+                                                        : java.math.BigDecimal.ZERO;
+
                                                 // Inicializar mapa da rubrica se necessário
                                                 matrix.putIfAbsent(rubricaCodigo, new HashMap<>());
-                                                
+
                                                 // Adicionar valor à célula da matriz
                                                 Map<String, RubricaMatrixCell> rubricaMap = matrix.get(rubricaCodigo);
-                                                rubricaMap.putIfAbsent(referencia, new RubricaMatrixCell(referencia, 0.0, 0));
+                                                rubricaMap.putIfAbsent(referencia, new RubricaMatrixCell(referencia,
+                                                        java.math.BigDecimal.ZERO, 0));
                                                 RubricaMatrixCell cell = rubricaMap.get(referencia);
-                                                cell.valor += valor;
+                                                cell.valor = cell.valor.add(valor);
                                                 cell.quantidade += 1;
-                                                
+
                                                 // Atualizar total da rubrica
-                                                rubricasTotais.put(rubricaCodigo, 
-                                                        rubricasTotais.getOrDefault(rubricaCodigo, 0.0) + valor);
-                                                
+                                                rubricasTotais.put(rubricaCodigo,
+                                                        rubricasTotais
+                                                                .getOrDefault(rubricaCodigo, java.math.BigDecimal.ZERO)
+                                                                .add(valor));
+
                                                 // Atualizar total geral
-                                                totalGeral += valor;
+                                                totalGeral = totalGeral.add(valor);
                                             }
-                                            
+
                                             return new PersonRubricasMatrixResponse(
                                                     cpf,
                                                     person.getNome(),
                                                     person.getMatricula(),
                                                     matrix,
                                                     rubricasTotais,
-                                                    totalGeral
-                                            );
+                                                    totalGeral);
                                         });
                             });
                 });
     }
-    
+
     public static class PersonRubricasMatrixResponse {
         private final String cpf;
         private final String nome;
         private final String matricula;
         private final Map<String, Map<String, RubricaMatrixCell>> matrix; // rubricaCodigo -> referencia -> cell
-        private final Map<String, Double> rubricasTotais; // rubricaCodigo -> total
-        private final Double totalGeral;
-        
+        private final Map<String, java.math.BigDecimal> rubricasTotais; // rubricaCodigo -> total
+        private final java.math.BigDecimal totalGeral;
+
         public PersonRubricasMatrixResponse(String cpf, String nome, String matricula,
-                                           Map<String, Map<String, RubricaMatrixCell>> matrix,
-                                           Map<String, Double> rubricasTotais,
-                                           Double totalGeral) {
+                Map<String, Map<String, RubricaMatrixCell>> matrix,
+                Map<String, java.math.BigDecimal> rubricasTotais,
+                java.math.BigDecimal totalGeral) {
             this.cpf = cpf;
             this.nome = nome;
             this.matricula = matricula;
@@ -134,29 +138,53 @@ public class PersonRubricasMatrixUseCase {
             this.rubricasTotais = rubricasTotais;
             this.totalGeral = totalGeral;
         }
-        
-        public String getCpf() { return cpf; }
-        public String getNome() { return nome; }
-        public String getMatricula() { return matricula; }
-        public Map<String, Map<String, RubricaMatrixCell>> getMatrix() { return matrix; }
-        public Map<String, Double> getRubricasTotais() { return rubricasTotais; }
-        public Double getTotalGeral() { return totalGeral; }
+
+        public String getCpf() {
+            return cpf;
+        }
+
+        public String getNome() {
+            return nome;
+        }
+
+        public String getMatricula() {
+            return matricula;
+        }
+
+        public Map<String, Map<String, RubricaMatrixCell>> getMatrix() {
+            return matrix;
+        }
+
+        public Map<String, java.math.BigDecimal> getRubricasTotais() {
+            return rubricasTotais;
+        }
+
+        public java.math.BigDecimal getTotalGeral() {
+            return totalGeral;
+        }
     }
-    
+
     public static class RubricaMatrixCell {
         private final String referencia;
-        private double valor;
+        private java.math.BigDecimal valor;
         private int quantidade;
-        
-        public RubricaMatrixCell(String referencia, double valor, int quantidade) {
+
+        public RubricaMatrixCell(String referencia, java.math.BigDecimal valor, int quantidade) {
             this.referencia = referencia;
             this.valor = valor;
             this.quantidade = quantidade;
         }
-        
-        public String getReferencia() { return referencia; }
-        public double getValor() { return valor; }
-        public int getQuantidade() { return quantidade; }
+
+        public String getReferencia() {
+            return referencia;
+        }
+
+        public java.math.BigDecimal getValor() {
+            return valor;
+        }
+
+        public int getQuantidade() {
+            return quantidade;
+        }
     }
 }
-

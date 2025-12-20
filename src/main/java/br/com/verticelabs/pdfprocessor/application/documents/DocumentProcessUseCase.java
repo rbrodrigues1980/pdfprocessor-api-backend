@@ -19,7 +19,7 @@ import reactor.core.publisher.Mono;
 
 import java.io.ByteArrayInputStream;
 import java.time.Instant;
-import java.util.AbstractMap;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -465,7 +465,7 @@ public class DocumentProcessUseCase {
         }
 
         // Normalizar valor (obrigatório)
-        Double normalizedValue = normalizer.normalizeValue(parsedLine.getValorStr());
+        java.math.BigDecimal normalizedValue = normalizer.normalizeValue(parsedLine.getValorStr());
         if (normalizedValue == null) {
             log.warn("Não foi possível normalizar valor: {}. Entry não será criada.", parsedLine.getValorStr());
             return null;
@@ -485,7 +485,8 @@ public class DocumentProcessUseCase {
         if (mesPagamento != null && !mesPagamento.trim().isEmpty()) {
             normalizedMesPagamento = normalizer.normalizeReference(mesPagamento);
             if (normalizedMesPagamento == null) {
-                log.warn("Não foi possível normalizar mês de pagamento: {}. Entry será criada sem mês de pagamento.", mesPagamento);
+                log.warn("Não foi possível normalizar mês de pagamento: {}. Entry será criada sem mês de pagamento.",
+                        mesPagamento);
             }
         }
 
@@ -688,6 +689,130 @@ public class DocumentProcessUseCase {
                                 "Saldo de imposto a pagar", incomeTaxInfo.getSaldoImpostoPagar(), referencia));
                     }
 
+                    // --- NOVOS CAMPOS SALVOS ---
+
+                    if (incomeTaxInfo.getRendimentosTributaveis() != null) {
+                        entries.add(createEntry(tenantId, document.getId(), "IR_RENDIMENTOS_TRIBUTAVEIS",
+                                "Rendimentos Tributáveis", incomeTaxInfo.getRendimentosTributaveis(), referencia));
+                    }
+
+                    if (incomeTaxInfo.getDeducoes() != null) {
+                        entries.add(createEntry(tenantId, document.getId(), "IR_DEDUCOES",
+                                "Deduções Totais", incomeTaxInfo.getDeducoes(), referencia));
+                    }
+
+                    if (incomeTaxInfo.getImpostoRetidoFonteTitular() != null) {
+                        entries.add(createEntry(tenantId, document.getId(), "IR_IMPOSTO_RETIDO_FONTE",
+                                "Imposto Retido na Fonte (Titular)", incomeTaxInfo.getImpostoRetidoFonteTitular(),
+                                referencia));
+                    }
+
+                    if (incomeTaxInfo.getImpostoPagoTotal() != null) {
+                        entries.add(createEntry(tenantId, document.getId(), "IR_IMPOSTO_PAGO_TOTAL",
+                                "Total do Imposto Pago", incomeTaxInfo.getImpostoPagoTotal(), referencia));
+                    }
+
+                    if (incomeTaxInfo.getImpostoRestituir() != null) {
+                        entries.add(createEntry(tenantId, document.getId(), "IR_IMPOSTO_RESTITUIR",
+                                "Imposto a Restituir", incomeTaxInfo.getImpostoRestituir(), referencia));
+                    }
+
+                    // --- CAMPOS INDIVIDUAIS DE DEDUÇÕES ---
+
+                    if (incomeTaxInfo.getDeducoesContribPrevOficial() != null) {
+                        entries.add(createEntry(tenantId, document.getId(), "IR_DEDUCOES_CONTRIB_PREV_OFICIAL",
+                                "Contribuição à previdência oficial e complementar pública (limite patrocinador)",
+                                incomeTaxInfo.getDeducoesContribPrevOficial(), referencia));
+                    }
+
+                    if (incomeTaxInfo.getDeducoesContribPrevRRA() != null) {
+                        entries.add(createEntry(tenantId, document.getId(), "IR_DEDUCOES_CONTRIB_PREV_RRA",
+                                "Contribuição à previdência oficial (RRA)",
+                                incomeTaxInfo.getDeducoesContribPrevRRA(), referencia));
+                    }
+
+                    if (incomeTaxInfo.getDeducoesContribPrevCompl() != null) {
+                        entries.add(createEntry(tenantId, document.getId(), "IR_DEDUCOES_CONTRIB_PREV_COMPL",
+                                "Contribuição à previdência complementar/privada/Fapi",
+                                incomeTaxInfo.getDeducoesContribPrevCompl(), referencia));
+                    }
+
+                    if (incomeTaxInfo.getDeducoesDependentes() != null) {
+                        entries.add(createEntry(tenantId, document.getId(), "IR_DEDUCOES_DEPENDENTES",
+                                "Dependentes", incomeTaxInfo.getDeducoesDependentes(), referencia));
+                    }
+
+                    if (incomeTaxInfo.getDeducoesInstrucao() != null) {
+                        entries.add(createEntry(tenantId, document.getId(), "IR_DEDUCOES_INSTRUCAO",
+                                "Despesas com instrução", incomeTaxInfo.getDeducoesInstrucao(), referencia));
+                    }
+
+                    if (incomeTaxInfo.getDeducoesMedicas() != null) {
+                        entries.add(createEntry(tenantId, document.getId(), "IR_DEDUCOES_MEDICAS",
+                                "Despesas médicas", incomeTaxInfo.getDeducoesMedicas(), referencia));
+                    }
+
+                    if (incomeTaxInfo.getDeducoesPensaoJudicial() != null) {
+                        entries.add(createEntry(tenantId, document.getId(), "IR_DEDUCOES_PENSAO_JUDICIAL",
+                                "Pensão alimentícia judicial", incomeTaxInfo.getDeducoesPensaoJudicial(), referencia));
+                    }
+
+                    if (incomeTaxInfo.getDeducoesPensaoEscritura() != null) {
+                        entries.add(createEntry(tenantId, document.getId(), "IR_DEDUCOES_PENSAO_ESCRITURA",
+                                "Pensão alimentícia por escritura pública",
+                                incomeTaxInfo.getDeducoesPensaoEscritura(), referencia));
+                    }
+
+                    if (incomeTaxInfo.getDeducoesPensaoRRA() != null) {
+                        entries.add(createEntry(tenantId, document.getId(), "IR_DEDUCOES_PENSAO_RRA",
+                                "Pensão alimentícia judicial (RRA)",
+                                incomeTaxInfo.getDeducoesPensaoRRA(), referencia));
+                    }
+
+                    if (incomeTaxInfo.getDeducoesLivroCaixa() != null) {
+                        entries.add(createEntry(tenantId, document.getId(), "IR_DEDUCOES_LIVRO_CAIXA",
+                                "Livro caixa", incomeTaxInfo.getDeducoesLivroCaixa(), referencia));
+                    }
+
+                    // --- CAMPOS INDIVIDUAIS DE IMPOSTO PAGO ---
+
+                    if (incomeTaxInfo.getImpostoRetidoFonteDependentes() != null) {
+                        entries.add(createEntry(tenantId, document.getId(), "IR_IMPOSTO_RETIDO_FONTE_DEPENDENTES",
+                                "Imp. retido na fonte dos dependentes",
+                                incomeTaxInfo.getImpostoRetidoFonteDependentes(), referencia));
+                    }
+
+                    if (incomeTaxInfo.getCarneLeaoTitular() != null) {
+                        entries.add(createEntry(tenantId, document.getId(), "IR_CARNE_LEAO_TITULAR",
+                                "Carnê-Leão do titular", incomeTaxInfo.getCarneLeaoTitular(), referencia));
+                    }
+
+                    if (incomeTaxInfo.getCarneLeaoDependentes() != null) {
+                        entries.add(createEntry(tenantId, document.getId(), "IR_CARNE_LEAO_DEPENDENTES",
+                                "Carnê-Leão dos dependentes", incomeTaxInfo.getCarneLeaoDependentes(), referencia));
+                    }
+
+                    if (incomeTaxInfo.getImpostoComplementar() != null) {
+                        entries.add(createEntry(tenantId, document.getId(), "IR_IMPOSTO_COMPLEMENTAR",
+                                "Imposto complementar", incomeTaxInfo.getImpostoComplementar(), referencia));
+                    }
+
+                    if (incomeTaxInfo.getImpostoPagoExterior() != null) {
+                        entries.add(createEntry(tenantId, document.getId(), "IR_IMPOSTO_PAGO_EXTERIOR",
+                                "Imposto pago no exterior", incomeTaxInfo.getImpostoPagoExterior(), referencia));
+                    }
+
+                    if (incomeTaxInfo.getImpostoRetidoFonteLei11033() != null) {
+                        entries.add(createEntry(tenantId, document.getId(), "IR_IMPOSTO_RETIDO_FONTE_LEI_11033",
+                                "Imposto retido na fonte (Lei nº 11.033/2004)",
+                                incomeTaxInfo.getImpostoRetidoFonteLei11033(), referencia));
+                    }
+
+                    if (incomeTaxInfo.getImpostoRetidoRRA() != null) {
+                        entries.add(createEntry(tenantId, document.getId(), "IR_IMPOSTO_RETIDO_RRA",
+                                "Imposto retido RRA", incomeTaxInfo.getImpostoRetidoRRA(), referencia));
+                    }
+
                     log.info("Criadas {} entries para declaração de IR", entries.size());
 
                     // Salvar entries
@@ -747,7 +872,7 @@ public class DocumentProcessUseCase {
      * Cria uma PayrollEntry para declaração de IR.
      */
     private PayrollEntry createEntry(String tenantId, String documentoId, String rubricaCodigo,
-            String rubricaDescricao, Double valor, String referencia) {
+            String rubricaDescricao, java.math.BigDecimal valor, String referencia) {
         return PayrollEntry.builder()
                 .tenantId(tenantId)
                 .documentoId(documentoId)

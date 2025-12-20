@@ -3,6 +3,7 @@ package br.com.verticelabs.pdfprocessor.infrastructure.pdf;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -15,7 +16,7 @@ public class PdfNormalizer {
      * Ex: "1.385,66" -> 1385.66
      * Ex: "885,47" -> 885.47
      */
-    public Double normalizeValue(String valueStr) {
+    public BigDecimal normalizeValue(String valueStr) {
         if (valueStr == null || valueStr.trim().isEmpty()) {
             return null;
         }
@@ -23,12 +24,16 @@ public class PdfNormalizer {
         try {
             // Remove R$ e espaços
             String cleaned = valueStr.replaceAll("[R$\\s]", "").trim();
-            
-            // Remove pontos (separadores de milhar) e substitui vírgula por ponto
+
+            // Remove pontos (separadores de milhar) and replace comma with dot ONLY if we
+            // are doing manual parsing
+            // But for BigDecimal better to use specific replace to ensure standard format
+            // Brazilian format: 1.234,56 -> 1234.56
+
             cleaned = cleaned.replace(".", "").replace(",", ".");
-            
-            return Double.parseDouble(cleaned);
-        } catch (NumberFormatException e) {
+
+            return new BigDecimal(cleaned);
+        } catch (Exception e) {
             log.warn("Erro ao normalizar valor: {}", valueStr, e);
             return null;
         }
@@ -46,16 +51,16 @@ public class PdfNormalizer {
         }
 
         String cleaned = reference.trim();
-        
+
         // Se já está no formato YYYY-MM, retorna
         if (cleaned.matches("\\d{4}-\\d{2}")) {
             return cleaned;
         }
-        
+
         // Formato M/YYYY, MM/YYYY ou YYYY/MM, YYYY/M
         Pattern pattern1 = Pattern.compile("(\\d{1,2})/(\\d{4})"); // M/YYYY ou MM/YYYY
         Pattern pattern2 = Pattern.compile("(\\d{4})/(\\d{1,2})"); // YYYY/M ou YYYY/MM
-        
+
         Matcher matcher1 = pattern1.matcher(cleaned);
         if (matcher1.matches()) {
             String mes = matcher1.group(1);
@@ -66,7 +71,7 @@ public class PdfNormalizer {
             }
             return String.format("%s-%s", ano, mes);
         }
-        
+
         Matcher matcher2 = pattern2.matcher(cleaned);
         if (matcher2.matches()) {
             String ano = matcher2.group(1);
@@ -77,7 +82,7 @@ public class PdfNormalizer {
             }
             return String.format("%s-%s", ano, mes);
         }
-        
+
         log.warn("Formato de referência não reconhecido: {}", reference);
         return null;
     }
@@ -92,4 +97,3 @@ public class PdfNormalizer {
         return description.trim().replaceAll("\\s+", " ");
     }
 }
-
