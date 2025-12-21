@@ -20,7 +20,6 @@ import reactor.core.scheduler.Schedulers;
 import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -29,6 +28,7 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
 
     private final PayrollDocumentRepository documentRepository;
     private final PayrollEntryRepository entryRepository;
+    private final br.com.verticelabs.pdfprocessor.application.tributacao.IrTributacaoService tributacaoService;
 
     @Override
     public Mono<byte[]> generateConsolidationExcel(Person person, ConsolidatedResponse consolidatedResponse,
@@ -36,98 +36,111 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
         // Primeiro, buscar entries de IR para a pessoa
         return buscarEntriesIncomeTax(person)
                 .flatMap(incomeTaxEntries -> {
-                    return Mono.fromCallable(() -> {
-                        try (Workbook workbook = new XSSFWorkbook();
-                                ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-                            log.debug("Criando workbook Excel...");
+                    // Buscar tabelas de tributação para cada ano
+                    java.util.Set<String> anos = consolidatedResponse.getAnos();
+                    return buscarTabelasTributacao(anos)
+                            .flatMap(tabelasTributacao -> {
+                                return Mono.fromCallable(() -> {
+                                    try (Workbook workbook = new XSSFWorkbook();
+                                            ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+                                        log.debug("Criando workbook Excel...");
 
-                            // Criar estilos
-                            CellStyle headerStyle = createHeaderStyle(workbook);
-                            CellStyle numberStyle = createNumberStyle(workbook);
-                            CellStyle defaultStyle = createDefaultStyle(workbook);
-                            CellStyle totalStyle = createTotalStyle(workbook);
-                            CellStyle infoStyle = createInfoStyle(workbook);
+                                        // Criar estilos
+                                        CellStyle headerStyle = createHeaderStyle(workbook);
+                                        CellStyle numberStyle = createNumberStyle(workbook);
+                                        CellStyle defaultStyle = createDefaultStyle(workbook);
+                                        CellStyle totalStyle = createTotalStyle(workbook);
+                                        CellStyle infoStyle = createInfoStyle(workbook);
 
-                            // Ordenar anos em ordem crescente
-                            TreeSet<String> anosOrdenados = new TreeSet<>(consolidatedResponse.getAnos());
-                            log.info("Anos para criar abas: {} (ordem crescente)", anosOrdenados);
+                                        // Ordenar anos em ordem crescente
+                                        TreeSet<String> anosOrdenados = new TreeSet<>(consolidatedResponse.getAnos());
+                                        log.info("Anos para criar abas: {} (ordem crescente)", anosOrdenados);
 
-                            // Criar uma aba para cada ano
-                            for (String ano : anosOrdenados) {
-                                log.debug("Criando aba para ano: {}", ano);
-                                Sheet sheet = workbook.createSheet(ano);
+                                        // Criar uma aba para cada ano
+                                        for (String ano : anosOrdenados) {
+                                            log.debug("Criando aba para ano: {}", ano);
+                                            Sheet sheet = workbook.createSheet(ano);
 
-                                int currentRow = 0;
+                                            int currentRow = 0;
 
-                                // Linha 1: Informações da pessoa (CPF e Nome na mesma linha)
-                                currentRow = addPersonInfo(sheet, person, currentRow, infoStyle);
+                                            // Linha 1: Informações da pessoa (CPF e Nome na mesma linha)
+                                            currentRow = addPersonInfo(sheet, person, currentRow, infoStyle);
 
-                                // Linha 2: Cabeçalho da matriz
-                                currentRow = addMatrixHeader(sheet, ano, currentRow, headerStyle);
+                                            // Linha 2: Cabeçalho da matriz
+                                            currentRow = addMatrixHeader(sheet, ano, currentRow, headerStyle);
 
-                                // Dados das rubricas (apenas do ano atual)
-                                currentRow = addMatrixData(sheet, consolidatedResponse, ano, currentRow, numberStyle,
-                                        defaultStyle);
+                                            // Dados das rubricas (apenas do ano atual)
+                                            currentRow = addMatrixData(sheet, consolidatedResponse, ano, currentRow,
+                                                    numberStyle,
+                                                    defaultStyle);
 
-                                // Linha de totais mensais
-                                currentRow = addMonthlyTotals(sheet, consolidatedResponse, ano, currentRow, totalStyle,
-                                        numberStyle);
+                                            // Linha de totais mensais
+                                            currentRow = addMonthlyTotals(sheet, consolidatedResponse, ano, currentRow,
+                                                    totalStyle,
+                                                    numberStyle);
 
-                                // Adicionar seção de Imposto Devido (se houver para este ano)
-                                currentRow = addIncomeTaxSection(sheet, ano, incomeTaxEntries, currentRow, totalStyle,
-                                        numberStyle);
+                                            // Adicionar quadro resumo de IR (se houver para este ano)
+                                            currentRow = addIncomeTaxSummaryTable(sheet, ano, incomeTaxEntries,
+                                                    consolidatedResponse, tabelasTributacao, currentRow, totalStyle,
+                                                    numberStyle);
 
-                                // Ajustar largura das colunas
-                                autoSizeColumns(sheet,
-                                        consolidatedResponse.getRubricas().size() > 0
-                                                ? consolidatedResponse.getRubricas().get(0).getValores().size()
-                                                : 0);
+                                            // Ajustar largura das colunas
+                                            autoSizeColumns(sheet,
+                                                    consolidatedResponse.getRubricas().size() > 0
+                                                            ? consolidatedResponse.getRubricas().get(0).getValores()
+                                                                    .size()
+                                                            : 0);
 
-                                // Congelar linha de cabeçalho (linha 2, índice 1)
-                                sheet.createFreezePane(0, 2); // Congela após linha 2 (cabeçalho)
-                            }
+                                            // Congelar linha de cabeçalho (linha 2, índice 1)
+                                            sheet.createFreezePane(0, 2); // Congela após linha 2 (cabeçalho)
+                                        }
 
-                            // Criar aba "Consolidação" com todos os anos
-                            log.info("Criando aba consolidada com todos os anos");
-                            Sheet consolidatedSheet = workbook.createSheet("Consolidação");
-                            int currentRow = 0;
+                                        // Criar aba "Consolidação" com todos os anos
+                                        log.info("Criando aba consolidada com todos os anos");
+                                        Sheet consolidatedSheet = workbook.createSheet("Consolidação");
+                                        int currentRow = 0;
 
-                            // Linha 1: Informações da pessoa
-                            currentRow = addPersonInfo(consolidatedSheet, person, currentRow, infoStyle);
+                                        // Linha 1: Informações da pessoa
+                                        currentRow = addPersonInfo(consolidatedSheet, person, currentRow, infoStyle);
 
-                            // Linha 2: Cabeçalho consolidado (todos os anos)
-                            currentRow = addConsolidatedHeader(consolidatedSheet, anosOrdenados, currentRow,
-                                    headerStyle);
+                                        // Linha 2: Cabeçalho consolidado (todos os anos)
+                                        currentRow = addConsolidatedHeader(consolidatedSheet, anosOrdenados, currentRow,
+                                                headerStyle);
 
-                            // Dados consolidados (todas as rubricas de todos os anos)
-                            currentRow = addConsolidatedData(consolidatedSheet, consolidatedResponse, anosOrdenados,
-                                    currentRow, numberStyle, defaultStyle);
+                                        // Dados consolidados (todas as rubricas de todos os anos)
+                                        currentRow = addConsolidatedData(consolidatedSheet, consolidatedResponse,
+                                                anosOrdenados,
+                                                currentRow, numberStyle, defaultStyle);
 
-                            // Linha de totais consolidados
-                            currentRow = addConsolidatedTotals(consolidatedSheet, consolidatedResponse, anosOrdenados,
-                                    currentRow, totalStyle, numberStyle);
+                                        // Linha de totais consolidados
+                                        currentRow = addConsolidatedTotals(consolidatedSheet, consolidatedResponse,
+                                                anosOrdenados,
+                                                currentRow, totalStyle, numberStyle);
 
-                            // Ajustar largura das colunas
-                            autoSizeConsolidatedColumns(consolidatedSheet, anosOrdenados.size());
+                                        // Ajustar largura das colunas
+                                        autoSizeConsolidatedColumns(consolidatedSheet, anosOrdenados.size());
 
-                            // Congelar linha de cabeçalho
-                            consolidatedSheet.createFreezePane(0, 2);
+                                        // Congelar linha de cabeçalho
+                                        consolidatedSheet.createFreezePane(0, 2);
 
-                            workbook.write(out);
-                            log.info("Workbook Excel gerado com sucesso. Tamanho: {} bytes", out.size());
-                            return out.toByteArray();
-                        } catch (Exception e) {
-                            log.error("Erro ao gerar Excel", e);
-                            throw new ExcelGenerationException("Erro ao gerar arquivo Excel: " + e.getMessage(), e);
-                        }
-                    }).subscribeOn(Schedulers.boundedElastic());
+                                        workbook.write(out);
+                                        log.info("Workbook Excel gerado com sucesso. Tamanho: {} bytes", out.size());
+                                        return out.toByteArray();
+                                    } catch (Exception e) {
+                                        log.error("Erro ao gerar Excel", e);
+                                        throw new ExcelGenerationException(
+                                                "Erro ao gerar arquivo Excel: " + e.getMessage(), e);
+                                    }
+                                }).subscribeOn(Schedulers.boundedElastic());
+                            });
                 });
     }
 
     /**
      * Busca todas as entries de declaração de IR para a pessoa.
+     * Retorna um mapa: ano -> código_rubrica -> valor
      */
-    private Mono<Map<String, PayrollEntry>> buscarEntriesIncomeTax(Person person) {
+    private Mono<Map<String, Map<String, BigDecimal>>> buscarEntriesIncomeTax(Person person) {
         log.info("Buscando entries de declaração de IR para pessoa: {} ({})", person.getNome(), person.getCpf());
 
         // Buscar documentos de IR da pessoa
@@ -142,30 +155,24 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
                 .map(entries -> {
                     log.info("Encontradas {} entries de IR", entries.size());
 
-                    // Criar mapa: ano-calendário -> entry de "Saldo de Imposto a Pagar"
-                    // A referência está no formato "2016-00", então extraímos o ano
-                    Map<String, PayrollEntry> map = new HashMap<>();
+                    // Criar mapa: ano -> código -> valor
+                    Map<String, Map<String, BigDecimal>> map = new HashMap<>();
 
                     for (PayrollEntry entry : entries) {
-                        // Buscar entry de "Saldo de Imposto a Pagar" (IR_SALDO_IMPOSTO_A_PAGAR)
-                        if ("IR_SALDO_IMPOSTO_A_PAGAR".equals(entry.getRubricaCodigo())) {
+                        // Extrair ano da referência (formato "2016-00")
+                        if (entry.getReferencia() != null && entry.getReferencia().contains("-")) {
+                            String ano = entry.getReferencia().split("-")[0];
+                            String codigo = entry.getRubricaCodigo();
+                            BigDecimal valor = entry.getValor() != null ? entry.getValor() : BigDecimal.ZERO;
 
-                            // Extrair ano da referência (formato "2016-00")
-                            if (entry.getReferencia() != null && entry.getReferencia().contains("-")) {
-                                String ano = entry.getReferencia().split("-")[0];
-                                log.debug("Entry de Saldo de Imposto a Pagar encontrada para ano: {} (valor: {})",
-                                        ano, entry.getValor());
+                            map.putIfAbsent(ano, new HashMap<>());
+                            map.get(ano).put(codigo, valor);
 
-                                map.put(ano, entry);
-                            }
+                            log.debug("Entry IR: ano={}, codigo={}, valor={}", ano, codigo, valor);
                         }
                     }
 
-                    log.info("Mapeamento de Saldo de Imposto a Pagar por ano: {}",
-                            map.keySet().stream()
-                                    .map(ano -> ano + "=" + map.get(ano).getValor())
-                                    .collect(Collectors.joining(", ")));
-
+                    log.info("Mapeamento de IR por ano: {}", map.keySet());
                     return map;
                 })
                 .onErrorResume(e -> {
@@ -175,58 +182,298 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
     }
 
     /**
-     * Adiciona seção de Saldo de Imposto a Pagar após a linha TOTAL.
-     * Formato:
-     * - Linha vazia (espaçamento)
-     * - Linha: "SALDO DE IMPOSTO A PAGAR" | valor
-     * - Linha: "Imposto Pago (novo calculo)" | (vazio)
-     * - Linha: "Valor a restituir" | (vazio)
+     * Busca as tabelas de tributação para os anos especificados.
+     * Retorna um mapa: ano -> lista de faixas de tributação
      */
-    private int addIncomeTaxSection(Sheet sheet, String ano, Map<String, PayrollEntry> incomeTaxEntries,
-            int startRow, CellStyle totalStyle, CellStyle numberStyle) {
-        PayrollEntry saldoImpostoPagarEntry = incomeTaxEntries.get(ano);
+    private Mono<Map<String, java.util.List<br.com.verticelabs.pdfprocessor.domain.model.IrTabelaTributacao>>> buscarTabelasTributacao(
+            java.util.Set<String> anos) {
+        log.info("Buscando tabelas de tributação para anos: {}", anos);
 
-        if (saldoImpostoPagarEntry == null || saldoImpostoPagarEntry.getValor() == null) {
-            log.debug("Nenhum Saldo de Imposto a Pagar encontrado para ano: {}", ano);
+        return reactor.core.publisher.Flux.fromIterable(anos)
+                .flatMap(ano -> {
+                    try {
+                        int anoInt = Integer.parseInt(ano);
+                        return tributacaoService.buscarFaixas(anoInt, "ANUAL")
+                                .collectList()
+                                .map(faixas -> new java.util.AbstractMap.SimpleEntry<>(ano, faixas));
+                    } catch (NumberFormatException e) {
+                        log.warn("Ano inválido: {}", ano);
+                        return Mono.empty();
+                    }
+                })
+                .collectMap(
+                        java.util.AbstractMap.SimpleEntry::getKey,
+                        java.util.AbstractMap.SimpleEntry::getValue)
+                .doOnSuccess(map -> log.info("Tabelas de tributação carregadas para {} anos", map.size()));
+    }
+
+    /**
+     * Calcula o imposto devido usando a tabela de tributação do banco.
+     * Fórmula: Imposto = (Base × Alíquota) - Dedução
+     */
+    private BigDecimal calcularImpostoComTabelaBanco(BigDecimal baseCalculo, String ano,
+            Map<String, java.util.List<br.com.verticelabs.pdfprocessor.domain.model.IrTabelaTributacao>> tabelasTributacao) {
+
+        if (baseCalculo == null || baseCalculo.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
+
+        java.util.List<br.com.verticelabs.pdfprocessor.domain.model.IrTabelaTributacao> faixas = tabelasTributacao
+                .get(ano);
+
+        if (faixas == null || faixas.isEmpty()) {
+            log.warn("Nenhuma tabela de tributação encontrada para ano: {}. Usando valores padrão (2016-2022).", ano);
+            // Fallback para valores de 2016-2022
+            return baseCalculo.multiply(new BigDecimal("0.275"))
+                    .subtract(new BigDecimal("10432.32"))
+                    .setScale(2, java.math.RoundingMode.HALF_UP)
+                    .max(BigDecimal.ZERO);
+        }
+
+        // Encontrar a faixa correta
+        for (br.com.verticelabs.pdfprocessor.domain.model.IrTabelaTributacao faixa : faixas) {
+            BigDecimal limiteInferior = faixa.getLimiteInferior();
+            BigDecimal limiteSuperior = faixa.getLimiteSuperior();
+
+            boolean acimaDeLimiteInferior = baseCalculo.compareTo(limiteInferior) >= 0;
+            boolean abaixoDeLimiteSuperior = limiteSuperior == null ||
+                    baseCalculo.compareTo(limiteSuperior) <= 0;
+
+            if (acimaDeLimiteInferior && abaixoDeLimiteSuperior) {
+                BigDecimal aliquota = faixa.getAliquota();
+                BigDecimal deducao = faixa.getDeducao();
+
+                if (aliquota == null || aliquota.compareTo(BigDecimal.ZERO) == 0) {
+                    return BigDecimal.ZERO; // Faixa isenta
+                }
+
+                BigDecimal imposto = baseCalculo.multiply(aliquota)
+                        .subtract(deducao != null ? deducao : BigDecimal.ZERO)
+                        .setScale(2, java.math.RoundingMode.HALF_UP);
+
+                log.debug("Ano {}, Faixa {}: base={}, aliquota={}, deducao={}, imposto={}",
+                        ano, faixa.getFaixa(), baseCalculo, aliquota, deducao, imposto);
+
+                return imposto.max(BigDecimal.ZERO);
+            }
+        }
+
+        // Se não encontrou faixa, usa a última
+        br.com.verticelabs.pdfprocessor.domain.model.IrTabelaTributacao ultimaFaixa = faixas.get(faixas.size() - 1);
+        BigDecimal aliquota = ultimaFaixa.getAliquota();
+        BigDecimal deducao = ultimaFaixa.getDeducao();
+
+        log.debug("Usando última faixa para ano {}: aliquota={}, deducao={}", ano, aliquota, deducao);
+
+        return baseCalculo.multiply(aliquota != null ? aliquota : BigDecimal.ZERO)
+                .subtract(deducao != null ? deducao : BigDecimal.ZERO)
+                .setScale(2, java.math.RoundingMode.HALF_UP)
+                .max(BigDecimal.ZERO);
+    }
+
+    /**
+     * Adiciona quadro resumo de Imposto de Renda após a linha TOTAL.
+     * 
+     * Estrutura:
+     * - Linha vazia (espaçamento)
+     * - RENDIMENTOS TRIBUTÁVEIS | valor
+     * - DEDUÇÕES (Contrib. prev. compl. - Declaração) | valor
+     * - DEDUÇÕES (Contrib. prev. compl. - Novo cálculo) | total contracheques
+     * - DEDUÇÕES (Total) | valor
+     * - DEDUÇÕES (Total - novo cálculo) | calculado
+     * - Limite de 12% sobre os rendimentos tributáveis | calculado
+     */
+    private int addIncomeTaxSummaryTable(Sheet sheet, String ano,
+            Map<String, Map<String, BigDecimal>> incomeTaxEntries,
+            ConsolidatedResponse consolidatedResponse,
+            Map<String, java.util.List<br.com.verticelabs.pdfprocessor.domain.model.IrTabelaTributacao>> tabelasTributacao,
+            int startRow, CellStyle totalStyle, CellStyle numberStyle) {
+
+        Map<String, BigDecimal> irAno = incomeTaxEntries.get(ano);
+
+        if (irAno == null || irAno.isEmpty()) {
+            log.debug("Nenhum dado de IR encontrado para ano: {}", ano);
             return startRow;
         }
 
-        log.info("Adicionando seção de Saldo de Imposto a Pagar para ano {}: R$ {}", ano,
-                saldoImpostoPagarEntry.getValor());
+        log.info("Adicionando quadro resumo de IR para ano {}", ano);
 
-        // Linha vazia (espaçamento entre TOTAL e Saldo de Imposto a Pagar)
+        // Buscar valores do IR
+        BigDecimal rendimentosTributaveis = irAno.getOrDefault("IR_RENDIMENTOS_TRIBUTAVEIS", BigDecimal.ZERO);
+        BigDecimal deducoesContribPrevCompl = irAno.getOrDefault("IR_DEDUCOES_CONTRIB_PREV_COMPL", BigDecimal.ZERO);
+        BigDecimal deducoesTotal = irAno.getOrDefault("IR_DEDUCOES", BigDecimal.ZERO);
+
+        // Calcular total dos contracheques (novo cálculo) = soma de todas as rubricas
+        // do ano
+        BigDecimal totalContracheques = calcularTotalContracheques(consolidatedResponse, ano);
+
+        // Calcular DEDUÇÕES Total - novo cálculo = deducoesTotal -
+        // deducoesContribPrevCompl + totalContracheques
+        BigDecimal deducoesTotalNovoCalculo = deducoesTotal
+                .subtract(deducoesContribPrevCompl)
+                .add(totalContracheques);
+
+        // Calcular limite de 12% sobre rendimentos tributáveis
+        BigDecimal limite12Porcento = rendimentosTributaveis
+                .multiply(new BigDecimal("0.12"));
+
+        // Buscar valores do segundo quadro
+        BigDecimal baseCalculoImposto = irAno.getOrDefault("IR_BASE_CALCULO_IMPOSTO", BigDecimal.ZERO);
+        BigDecimal totalImpostoDevido = irAno.getOrDefault("IR_TOTAL_IMPOSTO_DEVIDO", BigDecimal.ZERO);
+        BigDecimal impostoPagoTotal = irAno.getOrDefault("IR_IMPOSTO_PAGO_TOTAL", BigDecimal.ZERO);
+        BigDecimal saldoImpostoPagar = irAno.getOrDefault("IR_SALDO_IMPOSTO_A_PAGAR", BigDecimal.ZERO);
+
+        // Linha vazia (espaçamento)
         sheet.createRow(startRow);
+        int rowNum = startRow + 1;
 
-        // Linha 1: "SALDO DE IMPOSTO A PAGAR" | valor
-        Row row1 = sheet.createRow(startRow + 1);
-        Cell label1 = row1.createCell(1); // Coluna B
-        label1.setCellValue("SALDO DE IMPOSTO A PAGAR");
-        label1.setCellStyle(totalStyle);
+        // =============================================
+        // QUADRO 1: RENDIMENTOS E DEDUÇÕES
+        // =============================================
 
-        Cell value1 = row1.createCell(2); // Coluna C
-        // Usar doubleValue() para POI
-        value1.setCellValue(saldoImpostoPagarEntry.getValor().doubleValue());
-        value1.setCellStyle(totalStyle);
+        // Linha 1: RENDIMENTOS TRIBUTÁVEIS
+        rowNum = addSummaryRow(sheet, rowNum, "RENDIMENTOS TRIBUTÁVEIS",
+                rendimentosTributaveis, totalStyle, numberStyle);
 
-        // Linha 2: "Imposto Pago (novo calculo)" | (vazio)
-        Row row2 = sheet.createRow(startRow + 2);
-        Cell label2 = row2.createCell(1); // Coluna B
-        label2.setCellValue("Imposto Pago (novo calculo)");
-        label2.setCellStyle(totalStyle);
+        // Linha 2: DEDUÇÕES (Contrib. prev. compl. - Declaração)
+        rowNum = addSummaryRow(sheet, rowNum, "DEDUÇÕES (Contribuição à previdência complementar - Declaração)",
+                deducoesContribPrevCompl, totalStyle, numberStyle);
 
-        Cell value2 = row2.createCell(2); // Coluna C (vazio)
-        value2.setCellStyle(totalStyle);
+        // Linha 3: DEDUÇÕES (Contrib. prev. compl. - Novo cálculo)
+        rowNum = addSummaryRow(sheet, rowNum, "DEDUÇÕES (Contribuição à previdência complementar - Novo calculo)",
+                totalContracheques, totalStyle, numberStyle);
 
-        // Linha 3: "Valor a restituir" | (vazio)
-        Row row3 = sheet.createRow(startRow + 3);
-        Cell label3 = row3.createCell(1); // Coluna B
-        label3.setCellValue("Valor a restituir");
-        label3.setCellStyle(totalStyle);
+        // Linha 4: DEDUÇÕES (Total)
+        rowNum = addSummaryRow(sheet, rowNum, "DEDUÇÕES (Total)",
+                deducoesTotal, totalStyle, numberStyle);
 
-        Cell value3 = row3.createCell(2); // Coluna C (vazio)
-        value3.setCellStyle(totalStyle);
+        // Linha 5: DEDUÇÕES (Total - novo cálculo)
+        rowNum = addSummaryRow(sheet, rowNum, "DEDUÇÕES (Total - novo calculo)",
+                deducoesTotalNovoCalculo, totalStyle, numberStyle);
 
-        return startRow + 4;
+        // Linha 6: Limite de 12% sobre os rendimentos tributáveis
+        rowNum = addSummaryRow(sheet, rowNum, "Limite de 12% sobre os rendimentos tributáveis",
+                limite12Porcento, totalStyle, numberStyle);
+
+        // =============================================
+        // QUADRO 2: IMPOSTO DEVIDO E PAGO
+        // =============================================
+
+        // Linha vazia (espaçamento entre os quadros)
+        sheet.createRow(rowNum);
+        rowNum++;
+
+        // Linha 1: Base de calculo do imposto
+        rowNum = addSummaryRow(sheet, rowNum, "Base de calculo do imposto",
+                baseCalculoImposto, totalStyle, numberStyle);
+
+        // Linha 2: IMPOSTO DEVIDO
+        rowNum = addSummaryRow(sheet, rowNum, "IMPOSTO DEVIDO",
+                totalImpostoDevido, totalStyle, numberStyle);
+
+        // Linha 3: IMPOSTO PAGO (Imposto retido na fonte)
+        rowNum = addSummaryRow(sheet, rowNum, "IMPOSTO PAGO (Imposto retido na fonte)",
+                impostoPagoTotal, totalStyle, numberStyle);
+
+        // Linha 4: SALDO IMPOSTO A PAGAR (Conforme declaração entregue)
+        rowNum = addSummaryRow(sheet, rowNum, "SALDO IMPOSTO A PAGAR (Conforme declaração entregue)",
+                saldoImpostoPagar, totalStyle, numberStyle);
+
+        // =============================================
+        // QUADRO 3: ESTUDO CONTRIBUIÇÕES EXTRAORDINÁRIAS
+        // =============================================
+
+        // Calcular Base de cálculo (Estudo) = Rendimentos - Deduções (Total novo
+        // cálculo)
+        BigDecimal baseCalculoEstudo = rendimentosTributaveis.subtract(deducoesTotalNovoCalculo);
+
+        // Calcular Imposto Devido (Estudo) usando tabela de tributação do banco
+        BigDecimal impostoDevidoEstudo = calcularImpostoComTabelaBanco(baseCalculoEstudo, ano, tabelasTributacao);
+
+        // Saldo Imposto a Pagar (Estudo) = Imposto Devido (Estudo) - Imposto Pago
+        BigDecimal saldoImpostoEstudo = impostoDevidoEstudo.subtract(impostoPagoTotal);
+
+        // Resultado = Saldo (Declaração) - Saldo (Estudo)
+        BigDecimal resultadoRestituir = saldoImpostoPagar.subtract(saldoImpostoEstudo);
+
+        // Linha vazia (espaçamento entre os quadros)
+        sheet.createRow(rowNum);
+        rowNum++;
+
+        // Linha 1: Base de cálculo (Estudo)
+        rowNum = addSummaryRow(sheet, rowNum,
+                "Base de calculo de imposto (Conforme estudo contribuições extraordinárias)",
+                baseCalculoEstudo, totalStyle, numberStyle);
+
+        // Linha 2: IMPOSTO DEVIDO (Estudo)
+        rowNum = addSummaryRow(sheet, rowNum, "IMPOSTO DEVIDO",
+                impostoDevidoEstudo, totalStyle, numberStyle);
+
+        // Linha 3: IMPOSTO PAGO (mesmo valor)
+        rowNum = addSummaryRow(sheet, rowNum, "IMPOSTO PAGO (Imposto retido na fonte)",
+                impostoPagoTotal, totalStyle, numberStyle);
+
+        // Linha 4: SALDO IMPOSTO A PAGAR (Estudo)
+        rowNum = addSummaryRow(sheet, rowNum, "SALDO IMPOSTO A PAGAR (Conforme estudo contribuições extraordinárias)",
+                saldoImpostoEstudo, totalStyle, numberStyle);
+
+        // =============================================
+        // RESULTADO FINAL
+        // =============================================
+
+        // Linha vazia (espaçamento)
+        sheet.createRow(rowNum);
+        rowNum++;
+
+        // Linha: Resultado de imposto a restituir
+        rowNum = addSummaryRow(sheet, rowNum, "Resultado de imposto a restituir",
+                resultadoRestituir, totalStyle, numberStyle);
+
+        return rowNum;
+    }
+
+    /**
+     * Adiciona uma linha no quadro resumo de IR.
+     * Ambas as células (label e valor) recebem o mesmo estilo (amarelo).
+     */
+    private int addSummaryRow(Sheet sheet, int rowNum, String label, BigDecimal valor,
+            CellStyle style, CellStyle numberStyle) {
+        Row row = sheet.createRow(rowNum);
+
+        // Coluna B: Label
+        Cell labelCell = row.createCell(1);
+        labelCell.setCellValue(label);
+        labelCell.setCellStyle(style);
+
+        // Coluna C: Valor (com estilo amarelo também)
+        Cell valorCell = row.createCell(2);
+        valorCell.setCellValue(valor != null ? valor.doubleValue() : 0.0);
+        valorCell.setCellStyle(style); // Mesmo estilo amarelo
+
+        return rowNum + 1;
+    }
+
+    /**
+     * Calcula o total de todas as rubricas dos contracheques para um ano
+     * específico.
+     */
+    private BigDecimal calcularTotalContracheques(ConsolidatedResponse consolidatedResponse, String ano) {
+        BigDecimal total = BigDecimal.ZERO;
+
+        for (ConsolidationRow rubrica : consolidatedResponse.getRubricas()) {
+            // Soma simples para o ano
+            BigDecimal somaAno = BigDecimal.ZERO;
+            for (int mes = 1; mes <= 12; mes++) {
+                String mesStr = String.format("%02d", mes);
+                String referencia = ano + "-" + mesStr;
+                somaAno = somaAno.add(rubrica.getValores().getOrDefault(referencia, BigDecimal.ZERO));
+            }
+            // Aplicar a regra NOV - FEV se necessário
+            total = total.add(calcularTotalRubricaAno(rubrica, ano, somaAno));
+        }
+
+        log.debug("Total contracheques para ano {}: {}", ano, total);
+        return total;
     }
 
     /**
@@ -482,7 +729,7 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
     private void autoSizeColumns(Sheet sheet, int numColumns) {
         // Ajustar colunas principais
         sheet.setColumnWidth(0, 4000); // Código
-        sheet.setColumnWidth(1, 12000); // Rubrica
+        sheet.setColumnWidth(1, 18300); // Rubrica (~500 pixels)
 
         // Ajustar colunas de valores
         for (int i = 2; i < 14; i++) { // 12 meses + total

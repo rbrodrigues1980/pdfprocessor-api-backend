@@ -472,6 +472,62 @@ public class IncomeTaxDeclarationServiceImpl implements IncomeTaxDeclarationServ
                                                                                                         resumoPageText,
                                                                                                         DEDUCOES_LIVRO_CAIXA_PATTERN);
 
+                                                                                        // FALLBACK: Extração posicional
+                                                                                        // para PDFs 2016/2017 com
+                                                                                        // layout duas colunas
+                                                                                        // Usa quando pelo menos 3
+                                                                                        // campos de deduções estão null
+                                                                                        int camposNulls = 0;
+                                                                                        if (deducoesContribPrevOficial == null)
+                                                                                                camposNulls++;
+                                                                                        if (deducoesContribPrevCompl == null)
+                                                                                                camposNulls++;
+                                                                                        if (deducoesDependentes == null)
+                                                                                                camposNulls++;
+                                                                                        if (deducoesInstrucao == null)
+                                                                                                camposNulls++;
+                                                                                        if (deducoesMedicas == null)
+                                                                                                camposNulls++;
+                                                                                        if (deducoesPensaoJudicial == null)
+                                                                                                camposNulls++;
+                                                                                        if (deducoesLivroCaixa == null)
+                                                                                                camposNulls++;
+
+                                                                                        if (camposNulls >= 3) {
+                                                                                                log.info("🔄 Muitos campos de DEDUÇÕES null ({}). Tentando extração posicional...",
+                                                                                                                camposNulls);
+                                                                                                DeducoesPositionais deducoesPos = extractDeducoesPositional(
+                                                                                                                resumoPageText);
+                                                                                                if (deducoesPos != null) {
+                                                                                                        log.info("✅ Usando valores da extração posicional de DEDUÇÕES");
+                                                                                                        if (deducoesContribPrevOficial == null)
+                                                                                                                deducoesContribPrevOficial = deducoesPos
+                                                                                                                                .getContribPrevOficial();
+                                                                                                        if (deducoesContribPrevCompl == null)
+                                                                                                                deducoesContribPrevCompl = deducoesPos
+                                                                                                                                .getContribPrevCompl();
+                                                                                                        if (deducoesDependentes == null)
+                                                                                                                deducoesDependentes = deducoesPos
+                                                                                                                                .getDependentes();
+                                                                                                        if (deducoesInstrucao == null)
+                                                                                                                deducoesInstrucao = deducoesPos
+                                                                                                                                .getInstrucao();
+                                                                                                        if (deducoesMedicas == null)
+                                                                                                                deducoesMedicas = deducoesPos
+                                                                                                                                .getMedicas();
+                                                                                                        if (deducoesPensaoJudicial == null)
+                                                                                                                deducoesPensaoJudicial = deducoesPos
+                                                                                                                                .getPensaoJudicial();
+                                                                                                        if (deducoesLivroCaixa == null)
+                                                                                                                deducoesLivroCaixa = deducoesPos
+                                                                                                                                .getLivroCaixa();
+                                                                                                        if (deducoes == null
+                                                                                                                        && deducoesPos.getTotal() != null)
+                                                                                                                deducoes = deducoesPos
+                                                                                                                                .getTotal();
+                                                                                                }
+                                                                                        }
+
                                                                                         // Campos individuais de IMPOSTO
                                                                                         // PAGO
                                                                                         BigDecimal impostoRetidoFonteDependentes = extractValorMonetario(
@@ -822,5 +878,157 @@ public class IncomeTaxDeclarationServiceImpl implements IncomeTaxDeclarationServ
                         return exercicio;
                 }
                 return null;
+        }
+
+        // ==========================================
+        // EXTRAÇÃO POSICIONAL PARA PDFs 2016/2017
+        // ==========================================
+
+        /**
+         * Classe para armazenar valores extraídos da seção DEDUÇÕES por posição.
+         */
+        @lombok.Data
+        @lombok.Builder
+        private static class DeducoesPositionais {
+                private BigDecimal contribPrevOficial;
+                private BigDecimal contribPrevCompl;
+                private BigDecimal dependentes;
+                private BigDecimal instrucao;
+                private BigDecimal medicas;
+                private BigDecimal pensaoJudicial;
+                private BigDecimal livroCaixa;
+                private BigDecimal total;
+        }
+
+        /**
+         * Extrai valores da seção DEDUÇÕES usando estratégia posicional.
+         * 
+         * PDF 2016 tem layout de DUAS COLUNAS:
+         * - Coluna esquerda: todos os labels
+         * - Coluna direita: todos os valores
+         * 
+         * O texto extraído tem todos os labels primeiro, depois "IMPOSTO DEVIDO",
+         * e então todos os valores em sequência.
+         * 
+         * Estrutura dos valores (após "Base de cálculo do imposto"):
+         * - Valores 0-4: RENDIMENTOS TRIBUTÁVEIS (5 valores)
+         * - Valor 5: RENDIMENTOS TOTAL (168.097,04)
+         * - Valores 6-12: DEDUÇÕES (7 valores)
+         * - Valor 13: DEDUÇÕES TOTAL (28.263,54)
+         * - Valores 14+: IMPOSTO DEVIDO, etc.
+         */
+        private DeducoesPositionais extractDeducoesPositional(String text) {
+                log.info("🔍 Tentando extração posicional de DEDUÇÕES (PDF 2016 duas colunas)...");
+
+                // Encontrar onde começam os valores (após "Base de cálculo do imposto")
+                String upperText = text.toUpperCase();
+                int idxBase = upperText.indexOf("BASE DE CÁLCULO DO IMPOSTO");
+                if (idxBase < 0) {
+                        idxBase = upperText.indexOf("BASE DE CALCULO DO IMPOSTO");
+                }
+                if (idxBase < 0) {
+                        idxBase = upperText.indexOf("IMPOSTO DEVIDO");
+                }
+
+                if (idxBase < 0) {
+                        log.warn("Não encontrou início da seção de valores");
+                        return null;
+                }
+
+                // Extrair texto a partir da seção de valores
+                String textoValores = text.substring(idxBase);
+                log.info("🔍 Texto de valores a partir da posição {}, tamanho: {}", idxBase, textoValores.length());
+
+                // Extrair TODOS os valores monetários da página
+                Pattern valorPattern = Pattern.compile("([\\d]{1,3}(?:[.]?[\\d]{3})*[,][\\d]{2})");
+                Matcher matcher = valorPattern.matcher(textoValores);
+
+                java.util.List<BigDecimal> valores = new java.util.ArrayList<>();
+                while (matcher.find()) {
+                        String valorStr = matcher.group(1)
+                                        .replace(".", "")
+                                        .replace(",", ".");
+                        try {
+                                valores.add(new BigDecimal(valorStr));
+                        } catch (NumberFormatException e) {
+                                log.warn("Erro ao converter valor: {}", matcher.group(1));
+                        }
+                }
+
+                log.info("🔍 Total de valores extraídos: {} - Valores: {}", valores.size(), valores);
+
+                // PDF 2016 tem estrutura:
+                // [0] Base cálculo = 168.097,04
+                // [1-4] Rendimentos individuais = 0,00, 0,00, 0,00, 0,00
+                // [5] Rendimentos TOTAL = 168.097,04
+                // [6] Contrib prev oficial = 6.850,56
+                // [7] Contrib prev complementar = 15.523,61
+                // [8] Dependentes = 0,00
+                // [9] Instrução = 0,00
+                // [10] Médicas = 5.889,37
+                // [11] Pensão judicial = 0,00
+                // [12] Livro caixa = 0,00
+                // [13] Deduções TOTAL = 28.263,54
+                // [14+] Imposto devido, etc.
+
+                if (valores.size() >= 14) {
+                        DeducoesPositionais result = DeducoesPositionais.builder()
+                                        .contribPrevOficial(valores.get(6)) // 6.850,56
+                                        .contribPrevCompl(valores.get(7)) // 15.523,61
+                                        .dependentes(valores.get(8)) // 0,00
+                                        .instrucao(valores.get(9)) // 0,00
+                                        .medicas(valores.get(10)) // 5.889,37
+                                        .pensaoJudicial(valores.get(11)) // 0,00
+                                        .livroCaixa(valores.get(12)) // 0,00
+                                        .total(valores.get(13)) // 28.263,54
+                                        .build();
+
+                        log.info("✅ DEDUÇÕES posicional extraído com sucesso!");
+                        log.info("   ContribPrev: {}, ContribPrevCompl: {}, Depend: {}, Instrução: {}",
+                                        result.getContribPrevOficial(), result.getContribPrevCompl(),
+                                        result.getDependentes(), result.getInstrucao());
+                        log.info("   Médicas: {}, PensãoJud: {}, LivroCaixa: {}, TOTAL: {}",
+                                        result.getMedicas(), result.getPensaoJudicial(),
+                                        result.getLivroCaixa(), result.getTotal());
+
+                        return result;
+                }
+
+                // Fallback para menos valores
+                if (valores.size() >= 10) {
+                        log.info("Tentando layout alternativo com {} valores", valores.size());
+                        // Layout simplificado
+                        DeducoesPositionais result = DeducoesPositionais.builder()
+                                        .contribPrevOficial(valores.get(5))
+                                        .contribPrevCompl(valores.get(6))
+                                        .dependentes(valores.get(7))
+                                        .instrucao(valores.get(8))
+                                        .medicas(valores.get(9))
+                                        .pensaoJudicial(valores.size() > 10 ? valores.get(10) : null)
+                                        .livroCaixa(valores.size() > 11 ? valores.get(11) : null)
+                                        .total(valores.size() > 12 ? valores.get(12) : null)
+                                        .build();
+
+                        log.info("✅ DEDUÇÕES posicional (layout alternativo): med={}", result.getMedicas());
+                        return result;
+                }
+
+                log.warn("Valores insuficientes para mapeamento posicional ({} < 10)", valores.size());
+                return null;
+        }
+
+        /**
+         * Classe para armazenar valores extraídos da seção IMPOSTO PAGO por posição.
+         */
+        @lombok.Data
+        @lombok.Builder
+        private static class ImpostoPagoPositional {
+                private BigDecimal retidoFonteTitular;
+                private BigDecimal retidoFonteDependentes;
+                private BigDecimal impostoComplementar;
+                private BigDecimal carneLeaoTitular;
+                private BigDecimal pagoExterior;
+                private BigDecimal retidoFonteLei11033;
+                private BigDecimal totalPago;
         }
 }
