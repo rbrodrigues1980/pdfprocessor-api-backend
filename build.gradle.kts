@@ -40,14 +40,14 @@ dependencies {
     implementation("org.apache.tika:tika-core:2.9.2")
     implementation("org.apache.tika:tika-parsers-standard-package:2.9.2")
 
+    // iText 8 - Extração avançada de PDF (tabelas e estruturas complexas)
+    implementation("com.itextpdf:itext-core:8.0.1")
+
     // MongoDB Sync Driver (for Logback)
     implementation("org.mongodb:mongodb-driver-sync")
 
     // Excel (Apache POI)
     implementation("org.apache.poi:poi-ooxml:5.2.5")
-
-    // Extração de texto de imagem (Tesseract)
-    implementation("net.sourceforge.tess4j:tess4j:5.10.0")
 
     // Security (JWT + Argon2)
     implementation("io.jsonwebtoken:jjwt-api:0.12.6")

@@ -333,27 +333,33 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
 
         // Linha 1: RENDIMENTOS TRIBUTÁVEIS
         rowNum = addSummaryRow(sheet, rowNum, "RENDIMENTOS TRIBUTÁVEIS",
-                rendimentosTributaveis, totalStyle, numberStyle);
+                rendimentosTributaveis, totalStyle, numberStyle,
+                "Total de rendimentos tributáveis declarados na DIRPF (salários, aluguéis, etc.)");
 
         // Linha 2: DEDUÇÕES (Contrib. prev. compl. - Declaração)
         rowNum = addSummaryRow(sheet, rowNum, "DEDUÇÕES (Contribuição à previdência complementar - Declaração)",
-                deducoesContribPrevCompl, totalStyle, numberStyle);
+                deducoesContribPrevCompl, totalStyle, numberStyle,
+                "Valor declarado na DIRPF para contribuições à previdência complementar/FAPI");
 
         // Linha 3: DEDUÇÕES (Contrib. prev. compl. - Novo cálculo)
         rowNum = addSummaryRow(sheet, rowNum, "DEDUÇÕES (Contribuição à previdência complementar - Novo calculo)",
-                totalContracheques, totalStyle, numberStyle);
+                totalContracheques, totalStyle, numberStyle,
+                "Soma das contribuições extraordinárias extraídas dos contracheques no ano");
 
         // Linha 4: DEDUÇÕES (Total)
         rowNum = addSummaryRow(sheet, rowNum, "DEDUÇÕES (Total)",
-                deducoesTotal, totalStyle, numberStyle);
+                deducoesTotal, totalStyle, numberStyle,
+                "Total de deduções declaradas na DIRPF (previdência, dependentes, instrução, médicas)");
 
         // Linha 5: DEDUÇÕES (Total - novo cálculo)
         rowNum = addSummaryRow(sheet, rowNum, "DEDUÇÕES (Total - novo calculo)",
-                deducoesTotalNovoCalculo, totalStyle, numberStyle);
+                deducoesTotalNovoCalculo, totalStyle, numberStyle,
+                "Deduções Total - Contrib. Declaração + Contrib. Contracheques (recalculado)");
 
         // Linha 6: Limite de 12% sobre os rendimentos tributáveis
         rowNum = addSummaryRow(sheet, rowNum, "Limite de 12% sobre os rendimentos tributáveis",
-                limite12Porcento, totalStyle, numberStyle);
+                limite12Porcento, totalStyle, numberStyle,
+                "Limite máximo de dedução para previdência complementar (12% dos rendimentos)");
 
         // =============================================
         // QUADRO 2: IMPOSTO DEVIDO E PAGO
@@ -365,19 +371,23 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
 
         // Linha 1: Base de calculo do imposto
         rowNum = addSummaryRow(sheet, rowNum, "Base de calculo do imposto",
-                baseCalculoImposto, totalStyle, numberStyle);
+                baseCalculoImposto, totalStyle, numberStyle,
+                "Rendimentos tributáveis menos deduções (base para cálculo do IR)");
 
         // Linha 2: IMPOSTO DEVIDO
         rowNum = addSummaryRow(sheet, rowNum, "IMPOSTO DEVIDO",
-                totalImpostoDevido, totalStyle, numberStyle);
+                totalImpostoDevido, totalStyle, numberStyle,
+                "Imposto calculado aplicando a tabela progressiva sobre a base de cálculo");
 
         // Linha 3: IMPOSTO PAGO (Imposto retido na fonte)
         rowNum = addSummaryRow(sheet, rowNum, "IMPOSTO PAGO (Imposto retido na fonte)",
-                impostoPagoTotal, totalStyle, numberStyle);
+                impostoPagoTotal, totalStyle, numberStyle,
+                "Total de IR já retido na fonte durante o ano (antecipações)");
 
         // Linha 4: SALDO IMPOSTO A PAGAR (Conforme declaração entregue)
         rowNum = addSummaryRow(sheet, rowNum, "SALDO IMPOSTO A PAGAR (Conforme declaração entregue)",
-                saldoImpostoPagar, totalStyle, numberStyle);
+                saldoImpostoPagar, totalStyle, numberStyle,
+                "Imposto Devido - Imposto Pago = saldo a pagar/restituir (conforme DIRPF)");
 
         // =============================================
         // QUADRO 3: ESTUDO CONTRIBUIÇÕES EXTRAORDINÁRIAS
@@ -403,19 +413,23 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
         // Linha 1: Base de cálculo (Estudo)
         rowNum = addSummaryRow(sheet, rowNum,
                 "Base de calculo de imposto (Conforme estudo contribuições extraordinárias)",
-                baseCalculoEstudo, totalStyle, numberStyle);
+                baseCalculoEstudo, totalStyle, numberStyle,
+                "Rendimentos - Deduções (com novo cálculo de contribuições extraordinárias)");
 
         // Linha 2: IMPOSTO DEVIDO (Estudo)
         rowNum = addSummaryRow(sheet, rowNum, "IMPOSTO DEVIDO",
-                impostoDevidoEstudo, totalStyle, numberStyle);
+                impostoDevidoEstudo, totalStyle, numberStyle,
+                "Imposto recalculado com base nas contribuições extraordinárias corrigidas");
 
         // Linha 3: IMPOSTO PAGO (mesmo valor)
         rowNum = addSummaryRow(sheet, rowNum, "IMPOSTO PAGO (Imposto retido na fonte)",
-                impostoPagoTotal, totalStyle, numberStyle);
+                impostoPagoTotal, totalStyle, numberStyle,
+                "Mesmo valor do imposto pago (não muda no estudo)");
 
         // Linha 4: SALDO IMPOSTO A PAGAR (Estudo)
         rowNum = addSummaryRow(sheet, rowNum, "SALDO IMPOSTO A PAGAR (Conforme estudo contribuições extraordinárias)",
-                saldoImpostoEstudo, totalStyle, numberStyle);
+                saldoImpostoEstudo, totalStyle, numberStyle,
+                "Imposto Devido (estudo) - Imposto Pago = saldo recalculado");
 
         // =============================================
         // RESULTADO FINAL
@@ -427,7 +441,8 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
 
         // Linha: Resultado de imposto a restituir
         rowNum = addSummaryRow(sheet, rowNum, "Resultado de imposto a restituir",
-                resultadoRestituir, totalStyle, numberStyle);
+                resultadoRestituir, totalStyle, numberStyle,
+                "Saldo DIRPF - Saldo Estudo = valor a ser restituído pela correção");
 
         return rowNum;
     }
@@ -435,9 +450,10 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
     /**
      * Adiciona uma linha no quadro resumo de IR.
      * Ambas as células (label e valor) recebem o mesmo estilo (amarelo).
+     * A coluna D recebe a explicação do que significa cada linha.
      */
     private int addSummaryRow(Sheet sheet, int rowNum, String label, BigDecimal valor,
-            CellStyle style, CellStyle numberStyle) {
+            CellStyle style, CellStyle numberStyle, String explicacao) {
         Row row = sheet.createRow(rowNum);
 
         // Coluna B: Label
@@ -449,6 +465,12 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
         Cell valorCell = row.createCell(2);
         valorCell.setCellValue(valor != null ? valor.doubleValue() : 0.0);
         valorCell.setCellStyle(style); // Mesmo estilo amarelo
+
+        // Coluna D: Explicação
+        if (explicacao != null && !explicacao.isEmpty()) {
+            Cell explicacaoCell = row.createCell(3);
+            explicacaoCell.setCellValue(explicacao);
+        }
 
         return rowNum + 1;
     }

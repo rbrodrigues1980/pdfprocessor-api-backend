@@ -1,0 +1,262 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: pdfprocessor
+data:
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus:9090
+        isDefault: true
+        editable: false
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards-provider
+  namespace: pdfprocessor
+data:
+  dashboards.yaml: |
+    apiVersion: 1
+    providers:
+      - name: 'default'
+        folder: ''
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-spring
+  namespace: pdfprocessor
+data:
+  spring-boot-dashboard.json: |
+    {
+      "annotations": {
+        "list": []
+      },
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 0,
+      "id": null,
+      "links": [],
+      "liveNow": false,
+      "panels": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.5 },
+                  { "color": "red", "value": 1 }
+                ]
+              },
+              "unit": "s"
+            }
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+          "id": 1,
+          "options": { "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "showThresholdLabels": false, "showThresholdMarkers": true },
+          "targets": [
+            {
+              "expr": "rate(http_server_requests_seconds_sum{job=\"pdfprocessor-api\"}[5m]) / rate(http_server_requests_seconds_count{job=\"pdfprocessor-api\"}[5m])",
+              "legendFormat": "{{uri}}",
+              "refId": "A"
+            }
+          ],
+          "title": "Latência HTTP (média 5m)",
+          "type": "gauge"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "mappings": [],
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+              "unit": "reqps"
+            }
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+          "id": 2,
+          "targets": [
+            {
+              "expr": "sum(rate(http_server_requests_seconds_count{job=\"pdfprocessor-api\"}[5m]))",
+              "legendFormat": "Requests/s",
+              "refId": "A"
+            }
+          ],
+          "title": "Requests por Segundo",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "mappings": [],
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 80 }] },
+              "unit": "percent"
+            }
+          },
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
+          "id": 3,
+          "targets": [
+            {
+              "expr": "jvm_memory_used_bytes{job=\"pdfprocessor-api\", area=\"heap\"} / jvm_memory_max_bytes{job=\"pdfprocessor-api\", area=\"heap\"} * 100",
+              "legendFormat": "Heap Usage %",
+              "refId": "A"
+            }
+          ],
+          "title": "JVM Heap Memory %",
+          "type": "gauge"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "mappings": [],
+              "unit": "short"
+            }
+          },
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 8 },
+          "id": 4,
+          "targets": [
+            {
+              "expr": "sum(http_server_requests_seconds_count{job=\"pdfprocessor-api\", status=~\"5..\"}) or vector(0)",
+              "legendFormat": "5xx Errors",
+              "refId": "A"
+            }
+          ],
+          "title": "Erros 5xx (Total)",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "mappings": [],
+              "unit": "short"
+            }
+          },
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 8 },
+          "id": 5,
+          "targets": [
+            {
+              "expr": "count(up{job=\"pdfprocessor-api\"} == 1)",
+              "legendFormat": "Pods Healthy",
+              "refId": "A"
+            }
+          ],
+          "title": "Pods Ativos",
+          "type": "stat"
+        }
+      ],
+      "refresh": "10s",
+      "schemaVersion": 38,
+      "style": "dark",
+      "tags": ["pdfprocessor", "spring-boot"],
+      "templating": { "list": [] },
+      "time": { "from": "now-1h", "to": "now" },
+      "title": "PDF Processor API - Dashboard",
+      "uid": "pdfprocessor-dashboard",
+      "version": 1
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: pdfprocessor
+  labels:
+    app: grafana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      containers:
+        - name: grafana
+          image: grafana/grafana:10.1.0
+          ports:
+            - containerPort: 3000
+          env:
+            - name: GF_SECURITY_ADMIN_USER
+              value: "admin"
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              value: "admin123"  # Mude em produção!
+            - name: GF_USERS_ALLOW_SIGN_UP
+              value: "false"
+          volumeMounts:
+            - name: datasources
+              mountPath: /etc/grafana/provisioning/datasources
+            - name: dashboards-provider
+              mountPath: /etc/grafana/provisioning/dashboards
+            - name: dashboards
+              mountPath: /var/lib/grafana/dashboards
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+      volumes:
+        - name: datasources
+          configMap:
+            name: grafana-datasources
+        - name: dashboards-provider
+          configMap:
+            name: grafana-dashboards-provider
+        - name: dashboards
+          configMap:
+            name: grafana-dashboard-spring
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: pdfprocessor
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3000
+      targetPort: 3000
+  selector:
+    app: grafana

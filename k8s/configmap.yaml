@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pdfprocessor-config
+  namespace: pdfprocessor
+data:
+  # Spring Configuration
+  SPRING_PROFILES_ACTIVE: "docker"
+  SERVER_PORT: "8081"
+  
+  # JWT Configuration
+  JWT_EXPIRATION: "900000"
+  JWT_REFRESH_EXPIRATION: "2592000000"
+  
+  # Logging
+  LOGGING_LEVEL_ROOT: "INFO"
+  LOGGING_LEVEL_BR_COM_VERTICELABS: "DEBUG"

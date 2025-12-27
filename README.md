@@ -109,7 +109,10 @@ Esta documentação inclui:
 - 👉 **[🏷️ API de Rubricas](./docs/API_RUBRICAS_FRONTEND.md)** - Gerenciamento de rubricas (tabela mestra) com isolamento multi-tenant
 - 👉 **[👥 API de Pessoas](./docs/API_PERSONS_FRONTEND.md)** - Gerenciamento de pessoas com CRUD completo
 - 👉 **[👥 API de Gestão de Pessoas - Implementação](./docs/API_PERSONS_CRUD_IMPLEMENTATION.md)** - Documentação técnica da implementação do CRUD de pessoas
-- 👉 **[🔍 API de Extração de Texto](./docs/API_TEXT_EXTRACTION.md)** - Extração de texto de PDFs escaneados usando Tesseract
+- 👉 **[👤 API de Usuários](./docs/API_USERS_FRONTEND.md)** - Gerenciamento de usuários com roles e permissões
+- 👉 **[📊 API de Consolidação](./docs/API_CONSOLIDATION_FRONTEND.md)** - Consolidação de dados e geração de relatórios
+- 👉 **[💰 API de Imposto de Renda](./docs/API_INCOME_TAX_FRONTEND.md)** - Extração e processamento de declarações IRPF
+- 👉 **[📈 API Taxa Selic](./docs/API_TAXA_SELIC.md)** - Consulta e gerenciamento de taxas Selic
 
 ### Guias Explicativos
 
@@ -169,6 +172,80 @@ O sistema possui suporte completo a **multi-tenancy**, permitindo isolamento tot
 *   **Contexto de tenant**: Resolvido automaticamente via JWT ou header `X-Tenant-ID` (apenas para SUPER_ADMIN)
 *   **Índices únicos por tenant**: CPF e hash de arquivo são únicos apenas dentro do mesmo tenant
 
+## 📋 Extração de Declarações de Imposto de Renda (iText 8)
+
+O projeto inclui um serviço especializado para extração de informações de **Declarações de Imposto de Renda (IRPF)** usando a biblioteca **iText 8**.
+
+### Visão Geral
+
+Este serviço substitui a abordagem anterior baseada em regex por uma extração estruturada usando APIs avançadas do iText 8, oferecendo melhor suporte a:
+- PDFs com layout de duas colunas (labels e valores separados)
+- Formatos variáveis entre anos (2016 vs 2017+)
+- Extração posicional complexa
+
+> ⚠️ **Licença iText 8**: O iText 8 usa licença AGPL. Se a aplicação for distribuída comercialmente sem disponibilizar o código-fonte, será necessária uma licença comercial.
+
+### Endpoints Disponíveis
+
+| Endpoint | Método | Descrição |
+|----------|--------|-----------|
+| `/api/v1/incometax/extract` | POST | Extrai informações de um PDF de declaração de IR |
+| `/api/v1/incometax/extract/raw` | POST | Retorna apenas o texto bruto extraído |
+| `/api/v1/incometax/extract/page/{pageNumber}` | POST | Retorna texto de uma página específica |
+| `/api/v1/incometax/extract/debug` | POST | Retorna texto bruto + informações extraídas (debug) |
+| `/api/v1/incometax/find-resumo` | POST | Localiza a página RESUMO no PDF |
+| `/api/v1/incometax/upload` | POST | Upload + persistência da declaração (com CPF) |
+| `/api/v1/incometax/upload/person/{personId}` | POST | Upload + persistência (com ID da pessoa) |
+
+### Arquitetura
+
+```
+IncomeTaxController
+        │
+        ▼
+ITextIncomeTaxService (Interface)
+        │
+        ▼
+ITextIncomeTaxServiceImpl
+        │
+        ├── iText 8 PdfReader / PdfDocument
+        ├── PdfTextExtractor
+        ├── LocationTextExtractionStrategy
+        └── SimpleTextExtractionStrategy
+        │
+        ▼
+IncomeTaxInfo DTO
+```
+
+### Campos Extraídos
+
+O serviço extrai automaticamente os seguintes campos:
+
+- **Dados Básicos**: Nome, CPF, Exercício, Ano-Calendário
+- **Seção IMPOSTO DEVIDO**: Base de cálculo, Imposto devido, Deduções de incentivo, etc.
+- **Seção DEDUÇÕES**: Contribuição previdência, Despesas médicas, Instrução, Dependentes, etc.
+- **Seção IMPOSTO PAGO**: Imposto retido na fonte, Carnê-Leão, Imposto complementar, etc.
+- **Seção RESULTADO**: Saldo a pagar, Imposto a restituir
+
+### Exemplo de Uso
+
+```bash
+# Extrair informações de um PDF
+curl -X POST "http://localhost:8081/api/v1/incometax/extract" \
+  -F "file=@declaracao_ir_2023.pdf"
+
+# Upload com persistência
+curl -X POST "http://localhost:8081/api/v1/incometax/upload" \
+  -F "file=@declaracao_ir_2023.pdf" \
+  -F "cpf=12345678900"
+```
+
+### Documentação Completa
+
+👉 **[📋 API de Imposto de Renda (iText 8)](./docs/API_INCOMETAX_ITEXT8.md)** - Documentação detalhada com todos os campos e exemplos
+
+---
+
 ## 🐛 Solução de Problemas
 
 *   **Erro de Build (Lombok)**: Se tiver problemas com o Lombok, tente rodar `.\gradlew.bat clean build`. O projeto usa uma versão específica do Lombok configurada no Gradle.
@@ -177,7 +254,334 @@ O sistema possui suporte completo a **multi-tenancy**, permitindo isolamento tot
 
 ---
 
+## 🐳 Docker
+
+O projeto está containerizado para facilitar deploy em qualquer ambiente.
+
+### Arquivos Docker
+
+| Arquivo | Descrição |
+|---------|-----------|
+| `Dockerfile` | Build multi-stage otimizado (Java 21 Alpine) |
+| `docker-compose.yml` | Orquestração com opção de MongoDB local |
+| `.dockerignore` | Otimiza build ignorando arquivos desnecessários |
+| `.env.example` | Template de variáveis de ambiente |
+
+### Características do Dockerfile
+
+- ✅ **Multi-stage build** - Imagem final ~200MB (vs ~1GB sem otimização)
+- ✅ **Java 21 JRE Alpine** - Imagem leve baseada em Alpine Linux
+- ✅ **Usuário não-root** - Segurança aprimorada
+- ✅ **Health check integrado** - Monitoramento automático
+- ✅ **JVM otimizada** - Configurações para containers
+
+### Como Usar Docker
+
+#### Build e execução simples (MongoDB Atlas):
+
+```bash
+# Copiar e configurar variáveis
+cp .env.example .env
+# Editar .env com suas credenciais MongoDB e JWT
+
+# Build e run
+docker-compose up --build
+```
+
+#### Com MongoDB local (desenvolvimento):
+
+```bash
+docker-compose --profile with-mongodb up --build
+```
+
+#### Build manual da imagem:
+
+```bash
+# Build
+docker build -t pdfprocessor-api:latest .
+
+# Run
+docker run -d \
+  -p 8081:8081 \
+  -e SPRING_DATA_MONGODB_URI="sua-uri-mongodb" \
+  -e JWT_SECRET="sua-chave-secreta" \
+  --name pdfprocessor \
+  pdfprocessor-api:latest
+```
+
+---
+
+## ☸️ Kubernetes
+
+Para deploy em produção com alta disponibilidade, escalabilidade automática e auto-healing.
+
+### Estrutura de Arquivos K8s
+
+```
+k8s/
+├── namespace.yaml     # Namespace isolado para a aplicação
+├── secret.yaml        # Credenciais sensíveis (MongoDB, JWT)
+├── configmap.yaml     # Configurações não-sensíveis
+├── deployment.yaml    # Deploy com 2 réplicas + health checks
+├── service.yaml       # Exposição interna (ClusterIP)
+├── ingress.yaml       # Exposição externa (domínio HTTPS)
+├── hpa.yaml           # Auto-scaling (2-10 pods)
+└── monitoring/
+    ├── prometheus.yaml  # Coleta de métricas
+    └── grafana.yaml     # Dashboards visuais
+```
+
+### Fluxo Docker → Kubernetes
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                      FLUXO DE DEPLOY                          │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│   1. Dockerfile       →  Define a IMAGEM do container        │
+│                                                              │
+│   2. docker build     →  Gera imagem localmente              │
+│                                                              │
+│   3. docker push      →  Envia para registry (ECR/GCR/Hub)   │
+│                                                              │
+│   4. deployment.yaml  →  K8s baixa imagem e cria PODS        │
+│                                                              │
+│   5. service.yaml     →  Balanceia tráfego entre pods        │
+│                                                              │
+│   6. ingress.yaml     →  Expõe via domínio HTTPS             │
+│                                                              │
+│   7. hpa.yaml         →  Escala automaticamente (CPU/RAM)    │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### Arquitetura no Kubernetes
+
+```
+                        ┌─────────────────────┐
+                        │      INTERNET       │
+                        └──────────┬──────────┘
+                                   │
+                                   ▼
+                        ┌─────────────────────┐
+                        │       INGRESS       │
+                        │ (api.example.com)   │
+                        └──────────┬──────────┘
+                                   │
+                                   ▼
+                        ┌─────────────────────┐
+                        │       SERVICE       │
+                        │  (ClusterIP :80)    │
+                        └──────────┬──────────┘
+                                   │
+           ┌───────────────────────┼───────────────────────┐
+           │                       │                       │
+           ▼                       ▼                       ▼
+   ┌───────────────┐       ┌───────────────┐       ┌───────────────┐
+   │     POD 1     │       │     POD 2     │       │    POD N      │
+   │ pdfprocessor  │       │ pdfprocessor  │       │ pdfprocessor  │
+   │    :8081      │       │    :8081      │       │    :8081      │
+   └───────────────┘       └───────────────┘       └───────────────┘
+           │                       │                       │
+           └───────────────────────┼───────────────────────┘
+                                   │
+                                   ▼
+                        ┌─────────────────────┐
+                        │   MongoDB Atlas     │
+                        │     (externo)       │
+                        └─────────────────────┘
+```
+
+### Deploy Passo a Passo
+
+#### 1. Build e push da imagem
+
+```bash
+# Build com tag de versão
+docker build -t your-registry/pdfprocessor-api:v1.0.0 .
+
+# Push para registry (Docker Hub, ECR, GCR, etc.)
+docker push your-registry/pdfprocessor-api:v1.0.0
+```
+
+#### 2. Configurar credenciais
+
+Edite `k8s/secret.yaml` com as credenciais reais:
+
+```yaml
+stringData:
+  mongodb-uri: "mongodb+srv://user:password@cluster.mongodb.net/dbname"
+  jwt-secret: "sua-chave-secreta-256-bits-minimo"
+```
+
+#### 3. Atualizar imagem no deployment
+
+Edite `k8s/deployment.yaml`:
+
+```yaml
+image: your-registry/pdfprocessor-api:v1.0.0
+```
+
+#### 4. Aplicar manifests
+
+```bash
+# Aplicar todos os arquivos de uma vez
+kubectl apply -f k8s/
+
+# Ou em ordem específica
+kubectl apply -f k8s/namespace.yaml
+kubectl apply -f k8s/secret.yaml
+kubectl apply -f k8s/configmap.yaml
+kubectl apply -f k8s/deployment.yaml
+kubectl apply -f k8s/service.yaml
+kubectl apply -f k8s/ingress.yaml
+kubectl apply -f k8s/hpa.yaml
+```
+
+#### 5. Verificar status
+
+```bash
+# Ver pods
+kubectl get pods -n pdfprocessor
+
+# Ver logs em tempo real
+kubectl logs -f deployment/pdfprocessor-api -n pdfprocessor
+
+# Ver serviços
+kubectl get svc -n pdfprocessor
+
+# Ver HPA (auto-scaling)
+kubectl get hpa -n pdfprocessor
+
+# Descrever pod (troubleshooting)
+kubectl describe pod <pod-name> -n pdfprocessor
+```
+
+### Recursos e Limites
+
+| Componente | CPU Request | CPU Limit | Memory Request | Memory Limit |
+|------------|-------------|-----------|----------------|--------------|
+| API Pod    | 250m        | 1000m     | 512Mi          | 1Gi          |
+| Prometheus | 100m        | 500m      | 256Mi          | 512Mi        |
+| Grafana    | 50m         | 200m      | 128Mi          | 256Mi        |
+
+Com HPA de 2-10 pods, o cluster precisa:
+- **Mínimo**: 500m CPU, 1Gi RAM (2 pods)
+- **Máximo**: 10 CPU, 10Gi RAM (10 pods)
+
+---
+
+## 📊 Monitoring com Prometheus + Grafana
+
+O projeto inclui stack de observabilidade completa para monitorar a saúde da aplicação.
+
+### O que é Monitorado
+
+| Métrica | Descrição |
+|---------|-----------|
+| **HTTP Latency** | Tempo de resposta das requisições |
+| **Requests/sec** | Taxa de requisições por segundo |
+| **Error Rate** | Porcentagem de erros 5xx |
+| **JVM Heap** | Uso de memória da JVM |
+| **Pod Health** | Quantidade de pods saudáveis |
+| **CPU/Memory** | Uso de recursos por pod |
+
+### Arquitetura de Monitoring
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        MONITORING                           │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│   Spring Boot Actuator ──────► Prometheus ──────► Grafana   │
+│   (/actuator/prometheus)       (coleta)         (dashboards)│
+│                                                             │
+│   Pod 1 ─────┐                                              │
+│   Pod 2 ─────┼──► /actuator/prometheus ──► prometheus:9090  │
+│   Pod N ─────┘                                              │
+│                                                             │
+│                               grafana:3000 ◄── Dashboard    │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Deploy do Monitoring
+
+```bash
+# Aplicar Prometheus e Grafana
+kubectl apply -f k8s/monitoring/prometheus.yaml
+kubectl apply -f k8s/monitoring/grafana.yaml
+
+# Verificar status
+kubectl get pods -n pdfprocessor -l app=prometheus
+kubectl get pods -n pdfprocessor -l app=grafana
+```
+
+### Acessar Dashboards
+
+```bash
+# Port-forward para Grafana (desenvolvimento)
+kubectl port-forward svc/grafana 3000:3000 -n pdfprocessor
+
+# Acessar: http://localhost:3000
+# Login: admin / admin123 (mude em produção!)
+```
+
+### Métricas Disponíveis
+
+O Spring Boot Actuator expõe automaticamente métricas em `/actuator/prometheus`:
+
+```promql
+# Latência média das requisições HTTP
+rate(http_server_requests_seconds_sum[5m]) / rate(http_server_requests_seconds_count[5m])
+
+# Requests por segundo
+sum(rate(http_server_requests_seconds_count[5m]))
+
+# Uso de memória heap
+jvm_memory_used_bytes{area="heap"} / jvm_memory_max_bytes{area="heap"} * 100
+
+# Quantidade de erros 5xx
+sum(http_server_requests_seconds_count{status=~"5.."})
+
+# Pods ativos
+count(up{job="pdfprocessor-api"} == 1)
+```
+
+### Dashboard Pré-configurado
+
+O Grafana já vem com um dashboard pronto que mostra:
+
+- 📈 **Latência HTTP** - Gauge com cores (verde < 0.5s, amarelo < 1s, vermelho > 1s)
+- 📊 **Requests/sec** - Stat panel em tempo real
+- 💾 **JVM Heap %** - Gauge de uso de memória
+- ❌ **Erros 5xx** - Contador total de erros
+- ✅ **Pods Ativos** - Quantidade de instâncias saudáveis
+
+---
+
+## 🔧 Configuração de Produção
+
+### Checklist de Deploy
+
+- [ ] Alterar credenciais em `k8s/secret.yaml`
+- [ ] Alterar senha do Grafana em `k8s/monitoring/grafana.yaml`
+- [ ] Configurar domínio real em `k8s/ingress.yaml`
+- [ ] Habilitar TLS/SSL (cert-manager)
+- [ ] Ajustar recursos de CPU/RAM conforme carga esperada
+- [ ] Configurar alertas no Prometheus (AlertManager)
+- [ ] Configurar backup do MongoDB
+
+### Variáveis de Ambiente Importantes
+
+| Variável | Descrição | Exemplo |
+|----------|-----------|---------|
+| `SPRING_DATA_MONGODB_URI` | URI do MongoDB | `mongodb+srv://...` |
+| `JWT_SECRET` | Chave para assinar tokens | `min-256-bits` |
+| `JWT_EXPIRATION` | Tempo de expiração do access token | `900000` (15min) |
+| `JWT_REFRESH_EXPIRATION` | Tempo de expiração do refresh token | `2592000000` (30d) |
+| `SPRING_PROFILES_ACTIVE` | Perfil Spring | `docker` ou `prod` |
+
+---
+
 Bom código! 🚀
-#   p d f p r o c e s s o r - a p i - b a c k e n d 
- 
- 

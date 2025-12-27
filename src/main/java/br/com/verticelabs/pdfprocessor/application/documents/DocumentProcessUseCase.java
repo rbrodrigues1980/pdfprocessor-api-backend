@@ -4,9 +4,9 @@ import br.com.verticelabs.pdfprocessor.domain.exceptions.InvalidPdfException;
 import br.com.verticelabs.pdfprocessor.domain.model.*;
 import br.com.verticelabs.pdfprocessor.domain.repository.PayrollDocumentRepository;
 import br.com.verticelabs.pdfprocessor.domain.repository.PayrollEntryRepository;
-import br.com.verticelabs.pdfprocessor.application.textextraction.TextExtractionUseCase;
+
 import br.com.verticelabs.pdfprocessor.domain.service.GridFsService;
-import br.com.verticelabs.pdfprocessor.domain.service.IncomeTaxDeclarationService;
+import br.com.verticelabs.pdfprocessor.domain.service.ITextIncomeTaxService;
 import br.com.verticelabs.pdfprocessor.domain.service.MonthYearDetectionService;
 import br.com.verticelabs.pdfprocessor.domain.service.PdfService;
 import br.com.verticelabs.pdfprocessor.infrastructure.pdf.*;
@@ -32,15 +32,16 @@ public class DocumentProcessUseCase {
     private final PayrollEntryRepository entryRepository;
     private final GridFsService gridFsService;
     private final PdfService pdfService;
-    private final TextExtractionUseCase textExtractionUseCase;
+
     private final MonthYearDetectionService monthYearDetectionService;
-    private final IncomeTaxDeclarationService incomeTaxDeclarationService;
+    private final ITextIncomeTaxService iTextIncomeTaxService;
     private final PdfLineParser lineParser;
     private final PdfNormalizer normalizer;
     private final RubricaValidator rubricaValidator;
 
     // Limite mínimo de caracteres para considerar que o PDF tem texto suficiente
-    // Abaixo disso, usamos extração de texto de imagem como fallback
+    // PDFs abaixo deste limite são considerados baseados em imagem e serão
+    // rejeitados
     private static final int MIN_TEXT_LENGTH_FOR_PDF = 100;
 
     /**
@@ -316,16 +317,19 @@ public class DocumentProcessUseCase {
         // Tentar extrair texto normalmente primeiro
         return pdfService.extractTextFromPage(new ByteArrayInputStream(pdfBytes), pageNumber)
                 .flatMap(pageText -> {
-                    // Se o texto extraído for muito pequeno, tentar usar extração de texto de
+                    // Se o texto extraído for muito pequeno, o PDF provavelmente é baseado em
                     // imagem
                     if (pageText == null || pageText.trim().length() < MIN_TEXT_LENGTH_FOR_PDF) {
-                        log.info(
-                                "Texto extraído muito pequeno ({} caracteres) na página {}. Tentando usar extração de texto de imagem...",
+                        log.warn(
+                                "Texto extraído muito pequeno ({} caracteres) na página {}. PDF baseado em imagem não é suportado.",
                                 pageText != null ? pageText.length() : 0, pageNumber);
-                        return extractTextWithImageTextExtractionFallback(pdfBytes, pageNumber, pageText);
+                        // Pular esta página (retornar resultado vazio)
+                        return Mono.just(new PageResult(new ArrayList<>()));
                     }
                     return Mono.just(pageText);
                 })
+                .filter(result -> result instanceof String) // Continua apenas se for texto
+                .cast(String.class)
                 .flatMap(pageText -> {
                     // Determinar origem da página
                     String origem = determinePageOrigin(document, pageNumber);
@@ -534,33 +538,6 @@ public class DocumentProcessUseCase {
     }
 
     /**
-     * Extrai texto usando extração de texto de imagem como fallback quando o texto
-     * normal é muito pequeno.
-     */
-    private Mono<String> extractTextWithImageTextExtractionFallback(byte[] pdfBytes, int pageNumber,
-            String fallbackText) {
-        log.info("Usando extração de texto de imagem para extrair texto da página {}...", pageNumber);
-        return textExtractionUseCase.extractTextFromPdfPage(new ByteArrayInputStream(pdfBytes), pageNumber)
-                .map(extractedText -> {
-                    if (extractedText != null && extractedText.trim().length() > 0) {
-                        log.info("✅ Extração de texto de imagem extraiu {} caracteres da página {}",
-                                extractedText.length(), pageNumber);
-                        return extractedText;
-                    } else {
-                        log.warn(
-                                "⚠️ Extração de texto de imagem não conseguiu extrair texto da página {}. Usando texto original.",
-                                pageNumber);
-                        return fallbackText != null ? fallbackText : "";
-                    }
-                })
-                .onErrorResume(error -> {
-                    log.error("Erro ao usar extração de texto de imagem na página {}: {}. Usando texto original.",
-                            pageNumber, error.getMessage());
-                    return Mono.just(fallbackText != null ? fallbackText : "");
-                });
-    }
-
-    /**
      * Valida uma entry verificando se a rubrica existe no banco.
      * Retorna a entry se válida, ou null se a rubrica não for encontrada.
      */
@@ -595,7 +572,7 @@ public class DocumentProcessUseCase {
         return loadPdfFromGridFs(document.getOriginalFileId())
                 .flatMap(pdfBytes -> {
                     log.info("PDF carregado do GridFS. Extraindo informações da declaração de IR...");
-                    return incomeTaxDeclarationService.extractIncomeTaxInfo(
+                    return iTextIncomeTaxService.extractIncomeTaxInfo(
                             new ByteArrayInputStream(pdfBytes));
                 })
                 .flatMap(incomeTaxInfo -> {

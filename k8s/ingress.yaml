@@ -1,0 +1,32 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pdfprocessor-ingress
+  namespace: pdfprocessor
+  annotations:
+    # Nginx Ingress Controller
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"  # Limite de upload
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    
+    # SSL/TLS com cert-manager (opcional)
+    # cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  # TLS (descomente quando tiver certificado)
+  # tls:
+  #   - hosts:
+  #       - api.pdfprocessor.com
+  #     secretName: pdfprocessor-tls
+  
+  rules:
+    - host: api.pdfprocessor.com  # Substitua pelo seu domínio
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: pdfprocessor-api
+                port:
+                  number: 80

@@ -1,0 +1,49 @@
+# Build artifacts
+build/
+.gradle/
+out/
+target/
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.project
+.classpath
+
+# Git
+.git/
+.gitignore
+
+# Logs
+logs/
+*.log
+
+# Temp files
+*.tmp
+*.swp
+*~
+
+# Test files
+src/test/
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Local configuration
+.env.local
+*.local.yml
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker files (evita loop)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
