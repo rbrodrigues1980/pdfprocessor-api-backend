@@ -1,0 +1,8 @@
+# ============================================
+# CODEOWNERS - PDF Processor API
+# ============================================
+# Qualquer alteração no repositório precisa de review do owner.
+# Documentação: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Owner padrão para todos os arquivos
+* @rbrodrigues1980
