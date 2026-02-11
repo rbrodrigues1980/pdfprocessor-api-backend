@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+    
+    <!-- Propriedade para o diretório de logs -->
+    <property name="LOG_DIR" value="logs"/>
+    <property name="LOG_FILE" value="${LOG_DIR}/fulllog.log"/>
+    
+    <!-- Pattern do console (formato ISO 8601 com timezone) -->
+    <property name="CONSOLE_LOG_PATTERN" 
+              value="%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %5p ${PID:- } --- [%15.15t] %-40.40logger{39} : %m%n%wEx"/>
+    
+    <!-- Pattern para arquivo (mesmo formato do console) -->
+    <property name="FILE_LOG_PATTERN" 
+              value="%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %5p ${PID:- } --- [%15.15t] %-40.40logger{39} : %m%n%wEx"/>
+
+    <!-- Appender para CONSOLE -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${CONSOLE_LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!-- Appender para ARQUIVO -->
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_FILE}</file>
+        <encoder>
+            <pattern>${FILE_LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        
+        <!-- Política de rotação: rota por tamanho e por data -->
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <!-- Nome do arquivo quando rotaciona: fulllog-2025-12-01.0.log -->
+            <fileNamePattern>${LOG_DIR}/fulllog-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <!-- Tamanho máximo do arquivo antes de rotacionar: 10MB -->
+            <maxFileSize>10MB</maxFileSize>
+            <!-- Número máximo de arquivos históricos a manter: 5 arquivos -->
+            <maxHistory>5</maxHistory>
+            <!-- Tamanho total máximo de todos os arquivos de log: 50MB (5 arquivos x 10MB) -->
+            <totalSizeCap>50MB</totalSizeCap>
+            <!-- Limpar arquivos antigos ao iniciar -->
+            <cleanHistoryOnStart>false</cleanHistoryOnStart>
+        </rollingPolicy>
+        
+        <!-- Criar arquivo imediatamente, mesmo se vazio -->
+        <prudent>false</prudent>
+    </appender>
+
+    <!-- MongoDB Appender Configuration -->
+    <springProperty scope="context" name="MONGO_URI" source="spring.data.mongodb.uri"/>
+    <springProperty scope="context" name="MONGO_LOGGING_ENABLED" source="app.logging.mongo.enabled" defaultValue="true"/>
+
+    <appender name="MONGO" class="br.com.verticelabs.pdfprocessor.infrastructure.logging.MongoAppender">
+        <uri>${MONGO_URI}</uri>
+        <collection>logs</collection>
+        <retentionDays>30</retentionDays>
+        <enabled>${MONGO_LOGGING_ENABLED}</enabled>
+    </appender>
+
+    <appender name="ASYNC_MONGO" class="ch.qos.logback.classic.AsyncAppender">
+        <appender-ref ref="MONGO" />
+        <queueSize>512</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <includeCallerData>false</includeCallerData>
+    </appender>
+
+    <!-- Logger raiz: aplica a todos os loggers -->
+    <!-- Perfil prod (ex.: Cloud Run): apenas console; a plataforma coleta stdout/stderr -->
+    <springProfile name="prod">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+    </springProfile>
+    <springProfile name="!prod">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="FILE"/>
+            <appender-ref ref="ASYNC_MONGO"/>
+        </root>
+    </springProfile>
+
+    <!-- Loggers específicos para reduzir verbosidade de algumas bibliotecas -->
+    <logger name="org.springframework" level="INFO"/>
+    <logger name="org.mongodb" level="INFO"/>
+    <logger name="org.mongodb.driver" level="INFO"/>
+    <logger name="org.apache.tika" level="WARN"/>
+    <logger name="org.apache.pdfbox" level="WARN"/>
+    <logger name="reactor.netty" level="INFO"/>
+    <logger name="io.netty" level="INFO"/>
+    
+    <!-- Logger para a aplicação: nível DEBUG em desenvolvimento -->
+    <logger name="br.com.verticelabs.pdfprocessor" level="INFO"/>
+
+</configuration>
+

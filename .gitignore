@@ -1,0 +1,115 @@
+# Gradle
+.gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+# IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+!**/src/main/**/out/
+!**/src/test/**/out/
+
+# Eclipse
+.classpath
+.project
+.settings/
+bin/
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+
+# NetBeans
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+# VS Code
+.vscode/
+
+# Compiled class files
+*.class
+
+# Log files
+*.log
+logs/
+*.log.*
+
+# Package Files
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# Exceção: Gradle Wrapper JAR (precisa estar no repo para builds funcionarem)
+!gradle/wrapper/gradle-wrapper.jar
+
+# Virtual machine crash logs
+hs_err_pid*
+replay_pid*
+
+# Spring Boot
+application-local.yml
+application-local.properties
+application-dev.yml
+application-dev.properties
+application-prod.yml
+application-prod.properties
+
+# OS Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*~
+
+# Windows
+*.lnk
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.bak
+*.cache
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# MongoDB
+*.bson
+
+# PDF files (se não quiser versionar PDFs de teste)
+# *.pdf
+
+# Uploads directory (se houver)
+uploads/
+temp/
+
+# Coverage reports
+.nyc_output/
+coverage/
+*.lcov
+
+# Dependency directories
+node_modules/
+
+# Kotlin
+*.kt.swp
+*.kt.bak
+
+# Application specific
+# Adicione aqui arquivos específicos do seu projeto que não devem ser versionados
+

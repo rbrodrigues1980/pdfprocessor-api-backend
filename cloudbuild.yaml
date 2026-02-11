@@ -1,0 +1,43 @@
+# ============================================
+# Cloud Build com cache de layers (kaniko)
+# ============================================
+# Kaniko cacheia as layers do Docker no Artifact Registry.
+# Na primeira build, ~7min. A partir da segunda, ~2-3min
+# (dependências do Gradle vêm do cache).
+#
+# Para usar: vá em Cloud Build > Gatilhos > edite o gatilho
+# e troque "Dockerfile" por "Arquivo de configuração do Cloud Build"
+# apontando para este arquivo (cloudbuild.yaml).
+# ============================================
+
+substitutions:
+  _REGION: us-central1
+  _REPO: pdfprocessor-repo
+  _IMAGE_NAME: pdfprocessor-api
+
+steps:
+  # Build com kaniko (cache automático de layers)
+  - name: 'gcr.io/kaniko-project/executor:latest'
+    args:
+      - '--destination=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_IMAGE_NAME}:$COMMIT_SHA'
+      - '--destination=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_IMAGE_NAME}:latest'
+      - '--cache=true'
+      - '--cache-ttl=168h'
+      - '--dockerfile=Dockerfile'
+      - '--context=.'
+
+  # Deploy no Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'pdfprocessor-api-backend'
+      - '--image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_IMAGE_NAME}:$COMMIT_SHA'
+      - '--region=${_REGION}'
+      - '--platform=managed'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+timeout: '1200s'

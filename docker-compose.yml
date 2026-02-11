@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  # ============================================
+  # API Backend - PDF Processor
+  # ============================================
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pdfprocessor-api
+    ports:
+      - "8081:8081"
+    environment:
+      # Spring Profiles
+      - SPRING_PROFILES_ACTIVE=docker
+
+      # MongoDB Atlas (substitua pela sua URI)
+      - SPRING_DATA_MONGODB_URI=${MONGODB_URI:-mongodb://localhost:27017/pdfprocessor}
+
+      # JWT Configuration
+      - JWT_SECRET=${JWT_SECRET:-your-super-secret-key-change-in-production}
+      - JWT_EXPIRATION=${JWT_EXPIRATION:-900000}
+      - JWT_REFRESH_EXPIRATION=${JWT_REFRESH_EXPIRATION:-2592000000}
+
+      # Server Configuration
+      - SERVER_PORT=8081
+
+      # Logging
+      - LOGGING_LEVEL_ROOT=INFO
+      - LOGGING_LEVEL_BR_COM_VERTICELABS=DEBUG
+    volumes:
+      # Volume para logs persistentes
+      - ./logs:/app/logs
+      # Volume para arquivos temporários (opcional)
+      - ./temp:/app/temp
+    networks:
+      - pdfprocessor-network
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/actuator/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ============================================
+  # MongoDB Local (opcional - para desenvolvimento)
+  # ============================================
+  mongodb:
+    image: mongo:7.0
+    container_name: pdfprocessor-mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_ROOT_USER:-admin}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD:-admin123}
+      - MONGO_INITDB_DATABASE=pdfprocessor
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+    networks:
+      - pdfprocessor-network
+    restart: unless-stopped
+    profiles:
+      - with-mongodb
+
+networks:
+  pdfprocessor-network:
+    driver: bridge
+
+volumes:
+  mongodb_data:
+  mongodb_config:

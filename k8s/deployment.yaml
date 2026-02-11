@@ -1,0 +1,98 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pdfprocessor-api
+  namespace: pdfprocessor
+  labels:
+    app: pdfprocessor-api
+spec:
+  replicas: 2  # Alta disponibilidade com 2 réplicas
+  selector:
+    matchLabels:
+      app: pdfprocessor-api
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1        # Criar 1 pod extra durante update
+      maxUnavailable: 0  # Nunca ter menos que o desejado
+  template:
+    metadata:
+      labels:
+        app: pdfprocessor-api
+    spec:
+      containers:
+        - name: api
+          image: pdfprocessor-api:latest  # Trocar por registry real: ghcr.io/user/pdfprocessor-api:v1.0.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8081
+              protocol: TCP
+          
+          # Variáveis de ambiente do ConfigMap
+          envFrom:
+            - configMapRef:
+                name: pdfprocessor-config
+          
+          # Variáveis sensíveis do Secret
+          env:
+            - name: SPRING_DATA_MONGODB_URI
+              valueFrom:
+                secretKeyRef:
+                  name: pdfprocessor-secrets
+                  key: mongodb-uri
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: pdfprocessor-secrets
+                  key: jwt-secret
+          
+          # Health Checks
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8081
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8081
+            initialDelaySeconds: 30
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          
+          # Recursos (ajuste conforme necessidade)
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+          
+          # Volume para logs
+          volumeMounts:
+            - name: logs
+              mountPath: /app/logs
+      
+      volumes:
+        - name: logs
+          emptyDir: {}
+      
+      # Evitar scheduling no mesmo node (alta disponibilidade)
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - pdfprocessor-api
+                topologyKey: kubernetes.io/hostname
