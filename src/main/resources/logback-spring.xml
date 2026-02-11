@@ -67,11 +67,19 @@
     </appender>
 
     <!-- Logger raiz: aplica a todos os loggers -->
-    <root level="INFO">
-        <appender-ref ref="CONSOLE"/>
-        <appender-ref ref="FILE"/>
-        <appender-ref ref="ASYNC_MONGO"/>
-    </root>
+    <!-- Perfil prod (ex.: Cloud Run): apenas console; a plataforma coleta stdout/stderr -->
+    <springProfile name="prod">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+    </springProfile>
+    <springProfile name="!prod">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="FILE"/>
+            <appender-ref ref="ASYNC_MONGO"/>
+        </root>
+    </springProfile>
 
     <!-- Loggers específicos para reduzir verbosidade de algumas bibliotecas -->
     <logger name="org.springframework" level="INFO"/>

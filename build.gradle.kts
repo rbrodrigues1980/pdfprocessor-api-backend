@@ -68,6 +68,9 @@ dependencies {
     // OpenAPI
     implementation("org.springdoc:springdoc-openapi-starter-webflux-ui:2.6.0")
 
+    // Spring AI - Google Gemini (Vertex AI)
+    implementation("com.google.cloud:google-cloud-vertexai:1.2.0")
+
     // Test
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("io.projectreactor:reactor-test")

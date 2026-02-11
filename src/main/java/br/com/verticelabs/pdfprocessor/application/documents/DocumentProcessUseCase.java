@@ -5,6 +5,7 @@ import br.com.verticelabs.pdfprocessor.domain.model.*;
 import br.com.verticelabs.pdfprocessor.domain.repository.PayrollDocumentRepository;
 import br.com.verticelabs.pdfprocessor.domain.repository.PayrollEntryRepository;
 
+import br.com.verticelabs.pdfprocessor.domain.service.AiPdfExtractionService;
 import br.com.verticelabs.pdfprocessor.domain.service.GridFsService;
 import br.com.verticelabs.pdfprocessor.domain.service.ITextIncomeTaxService;
 import br.com.verticelabs.pdfprocessor.domain.service.MonthYearDetectionService;
@@ -32,6 +33,7 @@ public class DocumentProcessUseCase {
     private final PayrollEntryRepository entryRepository;
     private final GridFsService gridFsService;
     private final PdfService pdfService;
+    private final AiPdfExtractionService aiPdfExtractionService;
 
     private final MonthYearDetectionService monthYearDetectionService;
     private final ITextIncomeTaxService iTextIncomeTaxService;
@@ -40,8 +42,7 @@ public class DocumentProcessUseCase {
     private final RubricaValidator rubricaValidator;
 
     // Limite mínimo de caracteres para considerar que o PDF tem texto suficiente
-    // PDFs abaixo deste limite são considerados baseados em imagem e serão
-    // rejeitados
+    // PDFs abaixo deste limite são considerados escaneados e usarão Gemini AI
     private static final int MIN_TEXT_LENGTH_FOR_PDF = 100;
 
     /**
@@ -317,20 +318,43 @@ public class DocumentProcessUseCase {
         // Tentar extrair texto normalmente primeiro
         return pdfService.extractTextFromPage(new ByteArrayInputStream(pdfBytes), pageNumber)
                 .flatMap(pageText -> {
-                    // Se o texto extraído for muito pequeno, o PDF provavelmente é baseado em
-                    // imagem
+                    // Se o texto extraído for muito pequeno, tentar usar Gemini AI
                     if (pageText == null || pageText.trim().length() < MIN_TEXT_LENGTH_FOR_PDF) {
-                        log.warn(
-                                "Texto extraído muito pequeno ({} caracteres) na página {}. PDF baseado em imagem não é suportado.",
+                        log.info(
+                                "🔍 Texto extraído muito pequeno ({} caracteres) na página {}. Tentando Gemini AI...",
                                 pageText != null ? pageText.length() : 0, pageNumber);
-                        // Pular esta página (retornar resultado vazio)
-                        return Mono.just(new PageResult(new ArrayList<>()));
+
+                        // Verificar se Gemini está habilitado
+                        if (aiPdfExtractionService.isEnabled()) {
+                            log.info("🤖 Usando Gemini AI para extrair texto da página {}...", pageNumber);
+                            return aiPdfExtractionService.extractTextFromScannedPage(pdfBytes, pageNumber)
+                                    .map(extractedText -> {
+                                        if (extractedText != null && !extractedText.trim().isEmpty()) {
+                                            log.info("✅ Gemini extraiu {} caracteres da página {}",
+                                                    extractedText.length(), pageNumber);
+                                            return extractedText;
+                                        }
+                                        log.warn("⚠️ Gemini não conseguiu extrair texto da página {}", pageNumber);
+                                        return "";
+                                    })
+                                    .onErrorResume(error -> {
+                                        log.error("❌ Erro ao usar Gemini na página {}: {}", pageNumber,
+                                                error.getMessage());
+                                        return Mono.just("");
+                                    });
+                        } else {
+                            log.warn("⚠️ Gemini AI desabilitado. Página {} será ignorada.", pageNumber);
+                            return Mono.just("");
+                        }
                     }
                     return Mono.just(pageText);
                 })
-                .filter(result -> result instanceof String) // Continua apenas se for texto
-                .cast(String.class)
                 .flatMap(pageText -> {
+                    // Se texto vazio, retornar resultado vazio
+                    if (pageText == null || pageText.isEmpty()) {
+                        return Mono.just(new PageResult(new ArrayList<>()));
+                    }
+
                     // Determinar origem da página
                     String origem = determinePageOrigin(document, pageNumber);
                     log.debug("Página {} - Origem: {}", pageNumber, origem);

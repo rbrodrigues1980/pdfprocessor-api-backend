@@ -55,19 +55,46 @@ O código está organizado para separar responsabilidades e isolar o domínio:
 O projeto conecta ao MongoDB Atlas. A URI de conexão está em `src/main/resources/application.yml`.
 
 ### 2. Segurança (JWT)
-As chaves de segurança também estão configuradas no `application.yml`.
-**Importante**: Em produção, substitua os valores padrão por variáveis de ambiente.
+As chaves de segurança devem vir de **variáveis de ambiente** (nunca fixas no código em produção). O `application.yml` já está preparado para usar placeholders:
 
 ```yaml
+server:
+  port: ${PORT:8081}
+
+spring:
+  data:
+    mongodb:
+      uri: ${SPRING_DATA_MONGODB_URI}
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
+
 jwt:
-  secret: <sua-chave-secreta-super-segura>
-  expiration: 900000 # 15 minutos
-  refresh-expiration: 2592000000 # 30 dias
+  secret: ${JWT_SECRET}
+  expiration: ${JWT_EXPIRATION:900000}
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:2592000000}
 ```
+
+**Em produção, dados sensíveis (JWT, credenciais) devem ficar no Secret Manager** (por exemplo, no [Google Cloud Secret Manager](https://cloud.google.com/run/docs/configuring/secrets) ao usar Cloud Run).
 
 ---
 
-## ▶️ Como Rodar a Aplicação
+## 🚀 Instalação rápida para teste (notebook / outro PC)
+
+Para alguém que só quer **subir e parar** a aplicação sem instalar Java:
+
+1. **Instalar Docker Desktop** (Windows): https://www.docker.com/products/docker-desktop/
+2. Copiar a pasta do projeto para o PC e colocar na pasta o **mesmo `.env`** que você usa localmente (assim a API no Docker usa as mesmas credenciais de MongoDB e JWT que seus testes locais).
+3. Na pasta do projeto:
+   - **Subir:** dar dois cliques em **`INICIAR.bat`** (sobe só a API em container).
+   - **Parar:** dar dois cliques em **`PARAR.bat`**.
+
+Se não tiver o `.env`, copie `.env.example` para `.env` e preencha **MONGODB_URI** e **JWT_SECRET** (ou peça o `.env` a quem sobe localmente). A API fica em **http://localhost:8081** e o Swagger em **http://localhost:8081/swagger-ui.html**.
+
+👉 Guia passo a passo: **[docs/INSTALACAO_RAPIDA.md](./docs/INSTALACAO_RAPIDA.md)**
+
+---
+
+## ▶️ Como Rodar a Aplicação (desenvolvimento)
 
 ### Pré-requisitos
 *   Java JDK 21 instalado.
@@ -84,7 +111,7 @@ O projeto usa o **Gradle Wrapper**, não é necessário instalar o Gradle manual
     ./gradlew bootRun
     ```
 
-A aplicação iniciará na porta **8081**.
+Por padrão a aplicação inicia na porta **8081**. Você pode sobrescrever com a variável de ambiente `PORT`.
 
 ---
 
@@ -113,6 +140,8 @@ Esta documentação inclui:
 - 👉 **[📊 API de Consolidação](./docs/API_CONSOLIDATION_FRONTEND.md)** - Consolidação de dados e geração de relatórios
 - 👉 **[💰 API de Imposto de Renda](./docs/API_INCOME_TAX_FRONTEND.md)** - Extração e processamento de declarações IRPF
 - 👉 **[📈 API Taxa Selic](./docs/API_TAXA_SELIC.md)** - Consulta e gerenciamento de taxas Selic
+- 👉 **[🤖 API Gemini AI](./docs/API_GEMINI_AI.md)** - Processamento de PDFs escaneados com IA
+- 👉 **[⚙️ API Configuração de IA](./docs/API_AI_CONFIG_FRONTEND.md)** - Habilitar/desabilitar IA via frontend
 
 ### Guias Explicativos
 
@@ -146,7 +175,7 @@ Acesse a interface interativa para testar os endpoints:
 
 ## 📝 Sistema de Logs
 
-O projeto possui um sistema de logs profissional configurado com **Logback**:
+O projeto possui um sistema de logs configurado com **Logback**:
 
 *   **Localização**: Os logs são salvos em `logs/fulllog.log`
 *   **Formato**: Mesmo formato do console (ISO 8601 com timezone)
@@ -159,6 +188,8 @@ O projeto possui um sistema de logs profissional configurado com **Logback**:
     *   `fulllog-YYYY-MM-DD.0.log` (arquivos históricos)
 
 Os logs continuam sendo exibidos no console e também são salvos no arquivo simultaneamente.
+
+**Em produção (ex.: Cloud Run)** o ambiente é stateless e não há disco persistente. Use **apenas stdout/stderr**: a plataforma coleta os logs automaticamente. Com o perfil `prod` (`SPRING_PROFILES_ACTIVE=prod`), o Logback envia logs só para o console; arquivos em `logs/` não são usados e seriam perdidos em reinícios ou scale-to-zero.
 
 ## 🏢 Multi-tenancy
 
@@ -308,6 +339,158 @@ docker run -d \
   --name pdfprocessor \
   pdfprocessor-api:latest
 ```
+
+---
+
+## ☁️ Deploy no Google Cloud Run
+
+A API pode ser publicada no **Google Cloud Run** usando **Cloud Build** (build da imagem), **Artifact Registry** (armazenamento da imagem) e **Cloud Run** (execução). Esse é o fluxo recomendado pela Google para aplicações containerizadas.
+
+### Pré-requisitos
+
+- **Projeto no Google Cloud** com [Billing](https://console.cloud.google.com/billing) habilitado (há free tier).
+- **gcloud CLI** instalado e autenticado:
+  ```bash
+  gcloud auth login
+  gcloud config set project SEU_PROJECT_ID
+  ```
+- **APIs habilitadas**: Cloud Run, Cloud Build, Artifact Registry (comando abaixo).
+
+### Variáveis de ambiente (produção)
+
+O Cloud Run injeta a variável **`PORT`** no container; a aplicação já está configurada com `server.port=${PORT:8081}`. É essencial **escutar na porta injetada** (o valor pode variar).
+
+| Variável | Obrigatória | Descrição |
+|----------|-------------|-----------|
+| `PORT` | (injetada) | Cloud Run injeta automaticamente (valor pode variar). Local: default 8081. |
+| `SPRING_PROFILES_ACTIVE` | Sim | Use `prod` em produção. |
+| `SPRING_DATA_MONGODB_URI` | Sim | URI do MongoDB Atlas. |
+| `JWT_SECRET` | Sim | Chave do JWT. Em produção use [Secret Manager](https://cloud.google.com/run/docs/configuring/secrets). |
+| `JWT_EXPIRATION` | Não | Default `900000` (15 min), em ms. |
+| `JWT_REFRESH_EXPIRATION` | Não | Default `2592000000` (30 dias), em ms. |
+
+### Passo a passo (CLI)
+
+#### 1. Definir região e variáveis
+
+```bash
+export REGION=southamerica-east1   # São Paulo
+export REPO=pdfprocessor-repo
+export SERVICE=pdfprocessor-api
+export PROJECT_ID=$(gcloud config get-value project)
+export IMAGE=$REGION-docker.pkg.dev/$PROJECT_ID/$REPO/pdfprocessor-api:1.0.0
+```
+
+#### 2. Habilitar APIs
+
+```bash
+gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com
+```
+
+#### 3. Criar repositório Docker no Artifact Registry
+
+```bash
+gcloud artifacts repositories create $REPO \
+  --repository-format=docker \
+  --location=$REGION \
+  --description="Imagens do PDF Processor API"
+```
+
+#### 4. Build e push da imagem (Cloud Build)
+
+Na **raiz do projeto** (onde está o `Dockerfile`):
+
+```bash
+gcloud builds submit --tag $IMAGE .
+```
+
+#### 5. Deploy no Cloud Run
+
+```bash
+gcloud run deploy $SERVICE \
+  --image $IMAGE \
+  --region $REGION \
+  --allow-unauthenticated \
+  --memory 2Gi \
+  --cpu 1 \
+  --concurrency 10 \
+  --timeout 900
+```
+
+- **`--allow-unauthenticated`**: serviço público; o acesso é controlado por JWT na aplicação.
+- **`--memory 2Gi`**: PDFBox/Tika/POI usam bastante RAM; ajuste conforme necessidade.
+- **`--timeout 900`**: até 15 min por requisição (Cloud Run permite até **60 min**; altere se precisar).
+- **Custo**: use `--max-instances N` para limitar instâncias e evitar surpresas.
+- **Cold start**: use `--min-instances 1` para manter uma instância sempre quente (aumenta custo).
+
+#### 6. Configurar variáveis de ambiente
+
+Use **`--update-env-vars`** (faz *merge* com as existentes). O comando **`--set-env-vars`** é destrutivo e remove todas as env vars que não estiverem na lista.
+
+```bash
+gcloud run services update $SERVICE --region $REGION \
+  --update-env-vars "SPRING_PROFILES_ACTIVE=prod" \
+  --update-env-vars "SPRING_DATA_MONGODB_URI=mongodb+srv://user:pass@cluster.mongodb.net/dbname" \
+  --update-env-vars "JWT_SECRET=sua-chave-secreta"
+```
+
+Substitua os valores pelos reais. **Para dados sensíveis (JWT, credenciais), use Secret Manager em vez de env var plana** — veja o passo opcional abaixo.
+
+##### Usar JWT no Secret Manager (recomendado em produção)
+
+```bash
+# 1) Criar o secret (uma vez)
+printf "sua-chave-super-secreta" | gcloud secrets create jwt-secret --data-file=-
+
+# 2) Dar permissão ao Cloud Run de acessar o secret (conta de serviço do serviço)
+#    No Console: IAM & Admin → garantir "Secret Manager Secret Accessor" para a default compute SA
+#    Ou via gcloud (ajuste PROJECT_NUMBER e REGION conforme seu projeto):
+#    gcloud secrets add-iam-policy-binding jwt-secret \
+#      --member="serviceAccount:PROJECT_NUMBER-compute@developer.gserviceaccount.com" \
+#      --role="roles/secretmanager.secretAccessor"
+
+# 3) Atualizar o serviço para usar o secret como variável de ambiente
+gcloud run services update $SERVICE --region $REGION \
+  --update-secrets "JWT_SECRET=jwt-secret:latest"
+```
+
+#### 7. URL e logs
+
+```bash
+# URL do serviço
+gcloud run services describe $SERVICE --region $REGION --format="value(status.url)"
+
+# Últimos logs
+gcloud logs read --region $REGION --limit 100
+```
+
+### Fluxo resumido
+
+```
+Dockerfile → gcloud builds submit → Artifact Registry → gcloud run deploy → Cloud Run
+```
+
+### Healthcheck (Actuator)
+
+Em produção, o Cloud Run (e outras plataformas) usam health checks para saber se o container está pronto. **Garanta que `/actuator/health` e `/actuator/info` estejam liberados sem autenticação** no `SecurityConfig` — se os checks estiverem configurados na plataforma e o health estiver bloqueado, o deploy pode falhar ou a revisão não ficar “ready”. O Swagger (`/swagger-ui/**`, `/v3/api-docs/**`) também permanece público, se quiser documentação acessível.
+
+### Upload de PDFs grandes (limite 32 MiB)
+
+O Cloud Run tem [limite de tamanho de requisição HTTP/1](https://cloud.google.com/run/quotas) de **32 MiB**. Para arquivos maiores:
+
+1. **Upload direto para Cloud Storage** (por exemplo, via URL assinada gerada pela sua aplicação).
+2. A API recebe apenas o **caminho/identificador** do arquivo (bucket + object) e processa de forma síncrona ou assíncrona.
+
+Assim você evita estourar o limite da requisição e melhora custo e desempenho.
+
+### MongoDB Atlas (IP allowlist)
+
+Se o cluster no Atlas estiver com **IP Access List** ativa, o Cloud Run usa **IPs de saída dinâmicos** por padrão. Para produção com allowlist:
+
+- Configure **IP de saída estático** no Cloud Run usando **VPC + Cloud NAT** e inclua esse IP na allowlist do Atlas.
+- Documentação oficial: [Static outbound IP address (Cloud Run)](https://cloud.google.com/run/docs/configuring/static-outbound-ip).
+
+Em ambiente de teste, alguns times liberam `0.0.0.0/0` no Atlas; não recomendado para produção.
 
 ---
 
@@ -564,6 +747,7 @@ O Grafana já vem com um dashboard pronto que mostra:
 
 ### Checklist de Deploy
 
+**Kubernetes (k8s):**
 - [ ] Alterar credenciais em `k8s/secret.yaml`
 - [ ] Alterar senha do Grafana em `k8s/monitoring/grafana.yaml`
 - [ ] Configurar domínio real em `k8s/ingress.yaml`
@@ -572,15 +756,21 @@ O Grafana já vem com um dashboard pronto que mostra:
 - [ ] Configurar alertas no Prometheus (AlertManager)
 - [ ] Configurar backup do MongoDB
 
+**Google Cloud Run:**  
+- [ ] Ver seção [Deploy no Google Cloud Run](#-deploy-no-google-cloud-run)
+- [ ] Definir `SPRING_PROFILES_ACTIVE=prod` e variáveis de ambiente (MongoDB, JWT)
+- [ ] Preferir Secret Manager para `JWT_SECRET`; tratar MongoDB Atlas IP allowlist se aplicável
+
 ### Variáveis de Ambiente Importantes
 
 | Variável | Descrição | Exemplo |
 |----------|-----------|---------|
+| `PORT` | Cloud Run injeta automaticamente (valor pode variar). Local: default 8081. | — |
 | `SPRING_DATA_MONGODB_URI` | URI do MongoDB | `mongodb+srv://...` |
 | `JWT_SECRET` | Chave para assinar tokens | `min-256-bits` |
 | `JWT_EXPIRATION` | Tempo de expiração do access token | `900000` (15min) |
 | `JWT_REFRESH_EXPIRATION` | Tempo de expiração do refresh token | `2592000000` (30d) |
-| `SPRING_PROFILES_ACTIVE` | Perfil Spring | `docker` ou `prod` |
+| `SPRING_PROFILES_ACTIVE` | Perfil Spring | `local`, `docker` ou `prod` |
 
 ---
 

@@ -40,12 +40,16 @@ public class SecurityConfig {
                                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                                 .authorizeExchange(exchanges -> exchanges
+                                                // Preflight OPTIONS sempre permitido para CORS funcionar
+                                                .pathMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                                                 .pathMatchers("/v3/api-docs/**",
                                                                 "/swagger-ui/**",
                                                                 "/swagger-ui.html",
                                                                 "/webjars/**",
                                                                 "/favicon.ico",
                                                                 "/error",
+                                                                "/actuator/health",
+                                                                "/actuator/info",
                                                                 apiPrefix + "/system/**",
                                                                 apiPrefix + "/auth/**",
                                                                 apiPrefix + "/tenants") // Permitir criação de tenants (apenas SUPER_ADMIN depois)

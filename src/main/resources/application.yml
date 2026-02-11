@@ -1,20 +1,23 @@
 server:
-  port: 8081
+  # Cloud Run injeta a variável PORT; em local usa 8081 como padrão
+  port: ${PORT:8081}
 
 spring:
   application:
     name: pdfprocessor-api-backend
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
   data:
     mongodb:
-      # URI com parâmetros de timeout e retry para melhor resiliência
-      # Timeouts aumentados e configurações otimizadas para reduzir warnings durante manutenção do pool
-      uri: mongodb+srv://concursosuser:YUWjEG1aR8ZZVAkp@fenaeprodcluster.f4rqt.mongodb.net/pdfprocessor?retryWrites=true&w=majority&appName=FenaeProdCluster&serverSelectionTimeoutMS=60000&connectTimeoutMS=60000&socketTimeoutMS=60000&maxPoolSize=50&minPoolSize=5&maxIdleTimeMS=600000&heartbeatFrequencyMS=15000&serverSelectionRetryDelayMS=5000&retryReads=true&retryWrites=true
+      # Em produção/Cloud Run, defina SPRING_DATA_MONGODB_URI. Em local, usa o valor abaixo.
+      uri: ${SPRING_DATA_MONGODB_URI:mongodb+srv://concursosuser:YUWjEG1aR8ZZVAkp@fenaeprodcluster.f4rqt.mongodb.net/pdfprocessor?retryWrites=true&w=majority&appName=FenaeProdCluster&serverSelectionTimeoutMS=60000&connectTimeoutMS=60000&socketTimeoutMS=60000&maxPoolSize=50&minPoolSize=5&maxIdleTimeMS=600000&heartbeatFrequencyMS=15000&serverSelectionRetryDelayMS=5000&retryReads=true&retryWrites=true}
       # uri: mongodb+srv://rbrodrigues_db_user:PghGGyWyVMCY9945@prod.ewbwotp.mongodb.net/pdfprocessor?appName=Prod&retryWrites=true&w=majority&serverSelectionTimeoutMS=60000&connectTimeoutMS=60000&socketTimeoutMS=60000&maxPoolSize=50&minPoolSize=5&maxIdleTimeMS=600000&heartbeatFrequencyMS=15000&serverSelectionRetryDelayMS=5000&retryReads=true&retryWrites=true
 
 jwt:
-  secret: my-super-secret-key-that-must-be-very-long-and-secure-at-least-256-bits
-  expiration: 43200000 # 12 horas
-  refresh-expiration: 2592000000 # 30 dias (conforme documentação)
+  # Em produção/Cloud Run, defina JWT_SECRET (recomendado: Secret Manager). Em local, usa o valor abaixo.
+  secret: ${JWT_SECRET:my-super-secret-key-that-must-be-very-long-and-secure-at-least-256-bits}
+  expiration: ${JWT_EXPIRATION:43200000} # 12 horas (em ms)
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:2592000000} # 30 dias (conforme documentação)
 
 app:
   security:
@@ -23,14 +26,20 @@ app:
     allowed-origins:
       - http://localhost:5173
       - http://127.0.0.1:5173
+      - http://localhost
+      - http://localhost:80
+      - http://127.0.0.1
+      - http://127.0.0.1:80
   logging:
     mongo:
       enabled: false
 
-text-extraction:
-  tesseract:
-    # Path to tessdata directory
-    datapath: "D:/dev/tessdata-main/tessdata-main"
-    language: "por"  # Portuguese
-    dpi: 300  # DPI for PDF to image conversion
-
+# Gemini AI Configuration (para PDFs escaneados)
+gemini:
+  enabled: false  # Habilitar quando tiver credenciais GCP configuradas
+  project-id: ${GOOGLE_CLOUD_PROJECT:}
+  location: us-central1
+  model: gemini-1.5-flash-002
+  max-output-tokens: 8192
+  temperature: 0.1
+  timeout-seconds: 60

@@ -158,7 +158,7 @@ public class PersonController {
                         @RequestParam(required = false) String cpf,
                         @RequestParam(required = false) String matricula,
                         @RequestParam(defaultValue = "0") int page,
-                        @RequestParam(defaultValue = "20") int size) {
+                        @RequestParam(defaultValue = "100") int size) {
                 log.info("📥 GET /api/v1/persons - Listar pessoas (page={}, size={})", page, size);
 
                 return listPersonsUseCase.execute(nome, cpf, matricula, page, size)

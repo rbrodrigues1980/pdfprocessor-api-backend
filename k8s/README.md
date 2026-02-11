@@ -4,6 +4,9 @@
 
 Este diretório contém os manifests Kubernetes para deploy da aplicação.
 
+> **Deploy no Google Cloud Run**  
+> Para publicar a API no **Google Cloud Run** (sem gerenciar cluster), use o passo a passo da seção [Deploy no Google Cloud Run](../README.md#-deploy-no-google-cloud-run) no README principal.
+
 ## Arquivos
 
 | Arquivo | Descrição |
