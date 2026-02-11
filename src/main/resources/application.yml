@@ -1,0 +1,50 @@
+server:
+  # Cloud Run injeta a variável PORT; em local usa 8081 como padrão
+  port: ${PORT:8081}
+  # Cloud Run (e outros proxies reversos) envia X-Forwarded-Proto/Port.
+  # Sem isso, o Spring gera URLs com http:// em vez de https:// (ex.: Swagger).
+  forward-headers-strategy: framework
+
+spring:
+  application:
+    name: pdfprocessor-api-backend
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
+  data:
+    mongodb:
+      # OBRIGATÓRIO: defina SPRING_DATA_MONGODB_URI como variável de ambiente (nunca commitar credenciais).
+      # Em local, crie um arquivo .env ou exporte a variável no terminal.
+      # Em Cloud Run, configure nas variáveis do serviço.
+      uri: ${SPRING_DATA_MONGODB_URI}
+
+jwt:
+  # OBRIGATÓRIO: defina JWT_SECRET como variável de ambiente (nunca commitar secrets).
+  # Em Cloud Run, use Secret Manager. Em local, defina no .env ou terminal.
+  secret: ${JWT_SECRET}
+  expiration: ${JWT_EXPIRATION:43200000} # 12 horas (em ms)
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:2592000000} # 30 dias (conforme documentação)
+
+app:
+  security:
+    force2fa-global: false # Forçar 2FA globalmente (pode ser ativado por tenant ou usuário)
+  cors:
+    allowed-origins:
+      - http://localhost:5173
+      - http://127.0.0.1:5173
+      - http://localhost
+      - http://localhost:80
+      - http://127.0.0.1
+      - http://127.0.0.1:80
+  logging:
+    mongo:
+      enabled: false
+
+# Gemini AI Configuration (para PDFs escaneados)
+gemini:
+  enabled: false  # Habilitar quando tiver credenciais GCP configuradas
+  project-id: ${GOOGLE_CLOUD_PROJECT:}
+  location: us-central1
+  model: gemini-1.5-flash-002
+  max-output-tokens: 8192
+  temperature: 0.1
+  timeout-seconds: 60
