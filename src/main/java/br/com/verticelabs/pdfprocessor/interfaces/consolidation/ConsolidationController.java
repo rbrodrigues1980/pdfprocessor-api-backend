@@ -31,8 +31,8 @@ public class ConsolidationController {
             @RequestParam(required = false) String ano,
             @RequestParam(required = false) String origem) {
         
-        log.info("=== INÍCIO: GET /api/v1/persons/{}/consolidated ===", cpf);
-        log.info("Parâmetros recebidos - CPF: {}, Ano: {}, Origem: {}", cpf, ano, origem);
+        log.debug("=== INÍCIO: GET /api/v1/persons/{}/consolidated ===", cpf);
+        log.debug("Parâmetros recebidos - CPF: {}, Ano: {}, Origem: {}", cpf, ano, origem);
 
         return consolidationUseCase.consolidate(cpf, ano, origem)
                 .<ResponseEntity<Object>>map(response -> {
@@ -40,10 +40,10 @@ public class ConsolidationController {
                         log.warn("Consolidação retornou vazia para CPF: {}", cpf);
                         return ResponseEntity.status(HttpStatus.NO_CONTENT).body((Object) response);
                     }
-                    log.info("=== SUCESSO: Consolidação concluída para CPF: {} ===", cpf);
-                    log.info("Total de rubricas consolidadas: {}", response.getRubricas().size());
-                    log.info("Anos encontrados: {}", response.getAnos());
-                    log.info("Total geral: R$ {}", response.getTotalGeral());
+                    log.debug("=== SUCESSO: Consolidação concluída para CPF: {} ===", cpf);
+                    log.debug("Total de rubricas consolidadas: {}", response.getRubricas().size());
+                    log.debug("Anos encontrados: {}", response.getAnos());
+                    log.debug("Total geral: R$ {}", response.getTotalGeral());
                     return ResponseEntity.ok((Object) response);
                 })
                 .onErrorResume(PersonNotFoundException.class, e -> {

@@ -67,7 +67,7 @@ public class DatabaseController {
                             .collectList();
                 })
                 .flatMap(allCollections -> {
-                    log.info("Collections encontradas no banco: {}", allCollections);
+                    log.debug("Collections encontradas no banco: {}", allCollections);
                     
                     // Filtrar collections que devem ser preservadas
                     List<String> collectionsToClean = new ArrayList<>();
@@ -75,11 +75,11 @@ public class DatabaseController {
                         if (!collectionsToPreserve.contains(collectionName)) {
                             collectionsToClean.add(collectionName);
                         } else {
-                            log.info("Collection '{}' será PRESERVADA (não será limpa)", collectionName);
+                            log.debug("Collection '{}' será PRESERVADA (não será limpa)", collectionName);
                         }
                     }
                     
-                    log.info("Collections que serão limpas: {}", collectionsToClean);
+                    log.debug("Collections que serão limpas: {}", collectionsToClean);
                     
                     if (collectionsToClean.isEmpty()) {
                         log.warn("Nenhuma collection para limpar (todas estão na lista de preservação)");
@@ -93,7 +93,7 @@ public class DatabaseController {
                     // Limpar cada collection
                     return Flux.fromIterable(collectionsToClean)
                             .flatMap(collectionName -> {
-                                log.info("Limpando collection '{}'...", collectionName);
+                                log.debug("Limpando collection '{}'...", collectionName);
                                 
                                 // Para GridFS, usar o template específico
                                 if (collectionName.equals("fs.files") || collectionName.equals("fs.chunks")) {
@@ -105,7 +105,7 @@ public class DatabaseController {
                                 return mongoTemplate.remove(new Query(), collectionName)
                                         .map(deleteResult -> {
                                             long deletedCount = deleteResult.getDeletedCount();
-                                            log.info("✅ Collection '{}': {} documentos deletados", collectionName, deletedCount);
+                                            log.debug("✅ Collection '{}': {} documentos deletados", collectionName, deletedCount);
                                             return new CollectionCleanResult(collectionName, deletedCount, false);
                                         })
                                         .onErrorResume(error -> {
@@ -116,17 +116,17 @@ public class DatabaseController {
                             .collectList()
                             .flatMap(cleanResults -> {
                                 // Limpar GridFS separadamente
-                                log.info("Limpando GridFS (fs.files e fs.chunks)...");
+                                log.debug("Limpando GridFS (fs.files e fs.chunks)...");
                                 return gridFsTemplate.find(new Query())
                                         .collectList()
                                         .flatMap(files -> {
                                             if (files.isEmpty()) {
-                                                log.info("Nenhum arquivo encontrado no GridFS");
+                                                log.debug("Nenhum arquivo encontrado no GridFS");
                                                 resultMap.put("gridfs_files_deleted", 0);
                                                 return Mono.just(cleanResults);
                                             }
                                             
-                                            log.info("Encontrados {} arquivos no GridFS. Deletando...", files.size());
+                                            log.debug("Encontrados {} arquivos no GridFS. Deletando...", files.size());
                                             return Flux.fromIterable(files)
                                                     .flatMap(file -> gridFsTemplate.delete(new Query(
                                                             org.springframework.data.mongodb.core.query.Criteria.where("_id").is(file.getId())
@@ -135,7 +135,7 @@ public class DatabaseController {
                                                     .thenReturn(files.size())
                                                     .map(count -> {
                                                         resultMap.put("gridfs_files_deleted", count);
-                                                        log.info("✅ GridFS: {} arquivos deletados", count);
+                                                        log.debug("✅ GridFS: {} arquivos deletados", count);
                                                         return cleanResults;
                                                     });
                                         });

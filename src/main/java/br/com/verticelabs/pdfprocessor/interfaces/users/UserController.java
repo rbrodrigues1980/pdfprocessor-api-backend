@@ -89,7 +89,7 @@ public class UserController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        log.info("📥 GET /api/v1/users - Listar usuários (page={}, size={})", page, size);
+        log.debug("📥 GET /api/v1/users - Listar usuários (page={}, size={})", page, size);
 
         return listUsersUseCase.execute(tenantId, role, ativo, email, nome, page, size)
                 .flatMap(result -> {
@@ -119,7 +119,7 @@ public class UserController {
     @GetMapping("/{id}")
     @ResponseStatus(HttpStatus.OK)
     public Mono<ResponseEntity<UserResponse>> getUserById(@PathVariable String id) {
-        log.info("📥 GET /api/v1/users/{} - Buscar usuário", id);
+        log.debug("📥 GET /api/v1/users/{} - Buscar usuário", id);
 
         return getUserByIdUseCase.execute(id)
                 .flatMap(user -> {
@@ -146,7 +146,7 @@ public class UserController {
     public Mono<ResponseEntity<UserResponse>> updateUser(
             @PathVariable String id,
             @Valid @RequestBody UpdateUserRequest request) {
-        log.info("📥 PUT /api/v1/users/{} - Atualizar usuário", id);
+        log.debug("📥 PUT /api/v1/users/{} - Atualizar usuário", id);
 
         return updateUserUseCase.execute(
                 id,
@@ -209,7 +209,7 @@ public class UserController {
     @PostMapping("/{id}/activate")
     @ResponseStatus(HttpStatus.OK)
     public Mono<ResponseEntity<UserResponse>> activateUser(@PathVariable String id) {
-        log.info("📥 POST /api/v1/users/{}/activate - Reativar usuário", id);
+        log.debug("📥 POST /api/v1/users/{}/activate - Reativar usuário", id);
 
         return activateUserUseCase.execute(id)
                 .flatMap(user -> {
@@ -236,7 +236,7 @@ public class UserController {
     public Mono<ResponseEntity<Map<String, String>>> changePassword(
             @PathVariable String id,
             @Valid @RequestBody ChangePasswordRequest request) {
-        log.info("📥 PUT /api/v1/users/{}/password - Alterar senha", id);
+        log.debug("📥 PUT /api/v1/users/{}/password - Alterar senha", id);
 
         return changePasswordUseCase.execute(id, request.getSenhaAtual(), request.getNovaSenha())
                 .then(Mono.fromCallable(() -> {
@@ -265,7 +265,7 @@ public class UserController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        log.info("📥 GET /api/v1/tenants/{}/users - Listar usuários do tenant", tenantId);
+        log.debug("📥 GET /api/v1/tenants/{}/users - Listar usuários do tenant", tenantId);
 
         return listUsersUseCase.execute(tenantId, role, ativo, null, null, page, size)
                 .flatMap(result -> tenantRepository.findById(tenantId)

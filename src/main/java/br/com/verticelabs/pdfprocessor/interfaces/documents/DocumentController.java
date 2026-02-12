@@ -63,14 +63,14 @@ public class DocumentController {
                         @RequestPart("nome") String nome,
                         @RequestPart("matricula") String matricula) {
 
-                log.info("=== INÍCIO: POST /api/v1/documents/bulk-upload ===");
-                log.info("Total de arquivos: {}, CPF: {}, Nome: {}, Matrícula: {}",
+                log.debug("=== INÍCIO: POST /api/v1/documents/bulk-upload ===");
+                log.debug("Total de arquivos: {}, CPF: {}, Nome: {}, Matrícula: {}",
                                 files != null ? files.size() : 0, cpf, nome, matricula);
 
                 return bulkDocumentUploadUseCase.uploadBulk(files, cpf, nome, matricula)
                                 .<ResponseEntity<Object>>map(response -> {
-                                        log.info("=== SUCESSO: BulkUpload concluído ===");
-                                        log.info("CPF: {}, Total: {}, Sucessos: {}, Falhas: {}",
+                                        log.debug("=== SUCESSO: BulkUpload concluído ===");
+                                        log.debug("CPF: {}, Total: {}, Sucessos: {}, Falhas: {}",
                                                         response.getCpf(), response.getTotalArquivos(),
                                                         response.getSucessos(), response.getFalhas());
                                         return ResponseEntity.status(HttpStatus.CREATED).body((Object) response);
@@ -151,12 +151,12 @@ public class DocumentController {
          */
         @GetMapping("/{id}")
         public Mono<ResponseEntity<Object>> getDocument(@PathVariable String id) {
-                log.info("=== INÍCIO: GET /api/v1/documents/{} ===", id);
+                log.debug("=== INÍCIO: GET /api/v1/documents/{} ===", id);
 
                 return documentQueryUseCase.findById(id)
                                 .<ResponseEntity<Object>>map(response -> {
-                                        log.info("=== SUCESSO: Documento encontrado ===");
-                                        log.info("ID: {}, Status: {}, CPF: {}", response.getId(), response.getStatus(),
+                                        log.debug("=== SUCESSO: Documento encontrado ===");
+                                        log.debug("ID: {}, Status: {}, CPF: {}", response.getId(), response.getStatus(),
                                                         response.getCpf());
                                         return ResponseEntity.ok((Object) response);
                                 });
@@ -174,14 +174,14 @@ public class DocumentController {
                         @RequestParam(required = false) String tipo,
                         @RequestParam(required = false) Long minEntries,
                         @RequestParam(required = false) Long maxEntries) {
-                log.info("=== INÍCIO: GET /api/v1/documents ===");
-                log.info("Filtros - CPF: {}, Ano: {}, Status: {}, Tipo: {}, MinEntries: {}, MaxEntries: {}",
+                log.debug("=== INÍCIO: GET /api/v1/documents ===");
+                log.debug("Filtros - CPF: {}, Ano: {}, Status: {}, Tipo: {}, MinEntries: {}, MaxEntries: {}",
                                 cpf, ano, status, tipo, minEntries, maxEntries);
 
                 return documentQueryUseCase.findByFilters(cpf, ano, status, tipo, minEntries, maxEntries)
                                 .collectList()
                                 .<ResponseEntity<Object>>map(documents -> {
-                                        log.info("=== SUCESSO: {} documentos encontrados ===", documents.size());
+                                        log.debug("=== SUCESSO: {} documentos encontrados ===", documents.size());
                                         return ResponseEntity.ok((Object) documents);
                                 });
         }
@@ -192,12 +192,12 @@ public class DocumentController {
          */
         @GetMapping("/{id}/pages")
         public Mono<ResponseEntity<Object>> getDocumentPages(@PathVariable String id) {
-                log.info("=== INÍCIO: GET /api/v1/documents/{}/pages ===", id);
+                log.debug("=== INÍCIO: GET /api/v1/documents/{}/pages ===", id);
 
                 return documentQueryUseCase.findPagesById(id)
                                 .<ResponseEntity<Object>>map(response -> {
-                                        log.info("=== SUCESSO: Páginas encontradas ===");
-                                        log.info("Documento ID: {}, Total de páginas: {}", response.getDocumentId(),
+                                        log.debug("=== SUCESSO: Páginas encontradas ===");
+                                        log.debug("Documento ID: {}, Total de páginas: {}", response.getDocumentId(),
                                                         response.getPages().size());
                                         return ResponseEntity.ok((Object) response);
                                 });
@@ -209,12 +209,12 @@ public class DocumentController {
          */
         @GetMapping("/{id}/summary")
         public Mono<ResponseEntity<Object>> getDocumentSummary(@PathVariable String id) {
-                log.info("=== INÍCIO: GET /api/v1/documents/{}/summary ===", id);
+                log.debug("=== INÍCIO: GET /api/v1/documents/{}/summary ===", id);
 
                 return documentSummaryUseCase.getSummary(id)
                                 .<ResponseEntity<Object>>map(response -> {
-                                        log.info("=== SUCESSO: Resumo gerado ===");
-                                        log.info("Documento ID: {}, Entries: {}, Rubricas: {}",
+                                        log.debug("=== SUCESSO: Resumo gerado ===");
+                                        log.debug("Documento ID: {}, Entries: {}, Rubricas: {}",
                                                         response.getDocumentId(), response.getEntriesCount(),
                                                         response.getRubricasResumo().size());
                                         return ResponseEntity.ok((Object) response);
@@ -232,13 +232,13 @@ public class DocumentController {
         public Mono<ResponseEntity<Object>> uploadIncomeTaxDeclaration(
                         @RequestPart("file") FilePart file,
                         @RequestPart("cpf") String cpf) {
-                log.info("=== INÍCIO: POST /api/v1/documents/upload-income-tax ===");
-                log.info("Arquivo: {}, CPF: {}", file.filename(), cpf);
+                log.debug("=== INÍCIO: POST /api/v1/documents/upload-income-tax ===");
+                log.debug("Arquivo: {}, CPF: {}", file.filename(), cpf);
 
                 return incomeTaxUploadUseCase.uploadIncomeTaxDeclaration(file, cpf)
                                 .<ResponseEntity<Object>>map(response -> {
-                                        log.info("=== SUCESSO: Declaração de IR enviada ===");
-                                        log.info("DocumentId: {}, Tipo: {}, Status: {}",
+                                        log.debug("=== SUCESSO: Declaração de IR enviada ===");
+                                        log.debug("DocumentId: {}, Tipo: {}, Status: {}",
                                                         response.getDocumentId(), response.getTipoDetectado(),
                                                         response.getStatus());
                                         return ResponseEntity.status(HttpStatus.CREATED).body((Object) response);
@@ -251,7 +251,7 @@ public class DocumentController {
          */
         @PostMapping("/{id}/reprocess")
         public Mono<ResponseEntity<Object>> reprocessDocument(@PathVariable String id) {
-                log.info("=== INÍCIO: POST /api/v1/documents/{}/reprocess ===", id);
+                log.debug("=== INÍCIO: POST /api/v1/documents/{}/reprocess ===", id);
 
                 return documentQueryUseCase.findById(id)
                                 .flatMap(document -> {
@@ -264,7 +264,7 @@ public class DocumentController {
                                                                                 + document.getStatus()));
                                         }
 
-                                        log.info("✓ Documento validado para reprocessamento: {} - Status atual: {}", id,
+                                        log.debug("✓ Documento validado para reprocessamento: {} - Status atual: {}", id,
                                                         document.getStatus());
 
                                         return documentProcessUseCase.processDocument(id)
@@ -275,8 +275,8 @@ public class DocumentController {
                                                                                 .message("Reprocessamento iniciado")
                                                                                 .build();
 
-                                                                log.info("=== SUCESSO: Reprocessamento iniciado ===");
-                                                                log.info("Documento ID: {}, Novo status: {}",
+                                                                log.debug("=== SUCESSO: Reprocessamento iniciado ===");
+                                                                log.debug("Documento ID: {}, Novo status: {}",
                                                                                 response.getDocumentId(),
                                                                                 response.getStatus());
                                                                 return response;

@@ -65,11 +65,11 @@ public class IncomeTaxController {
             @Parameter(description = "Arquivo PDF da declaração de IR") @RequestPart("file") FilePart filePart,
             @Parameter(description = "CPF da pessoa (formato: 000.000.000-00 ou 00000000000)") @RequestPart("cpf") String cpf) {
 
-        log.info("📥 Upload de declaração de IR (iText 8): arquivo={}, cpf={}", filePart.filename(), cpf);
+        log.debug("📥 Upload de declaração de IR (iText 8): arquivo={}, cpf={}", filePart.filename(), cpf);
 
         return iTextIncomeTaxUploadUseCase.uploadIncomeTaxDeclaration(filePart, cpf)
                 .<ResponseEntity<UploadDocumentResponse>>map(response -> {
-                    log.info("✅ Upload concluído: documentId={}, status={}",
+                    log.debug("✅ Upload concluído: documentId={}, status={}",
                             response.getDocumentId(), response.getStatus());
                     return ResponseEntity.status(HttpStatus.CREATED).body(response);
                 })
@@ -100,12 +100,12 @@ public class IncomeTaxController {
             @Parameter(description = "Arquivo PDF da declaração de IR") @RequestPart("file") FilePart filePart,
             @Parameter(description = "ID da pessoa") @PathVariable String personId) {
 
-        log.info("📥 Upload de declaração de IR por PersonId (iText 8): arquivo={}, personId={}",
+        log.debug("📥 Upload de declaração de IR por PersonId (iText 8): arquivo={}, personId={}",
                 filePart.filename(), personId);
 
         return iTextIncomeTaxUploadUseCase.uploadIncomeTaxByPersonId(filePart, personId)
                 .<ResponseEntity<UploadDocumentResponse>>map(response -> {
-                    log.info("✅ Upload concluído: documentId={}, status={}",
+                    log.debug("✅ Upload concluído: documentId={}, status={}",
                             response.getDocumentId(), response.getStatus());
                     return ResponseEntity.status(HttpStatus.CREATED).body(response);
                 })
@@ -136,7 +136,7 @@ public class IncomeTaxController {
 
         long startTime = System.currentTimeMillis();
         String filename = filePart.filename();
-        log.info("📥 Recebendo PDF para extração: {}", filename);
+        log.debug("📥 Recebendo PDF para extração: {}", filename);
 
         return DataBufferUtils.join(filePart.content())
                 .flatMap(dataBuffer -> {
@@ -147,7 +147,7 @@ public class IncomeTaxController {
                     return iTextIncomeTaxService.extractIncomeTaxInfo(new ByteArrayInputStream(bytes))
                             .map(info -> {
                                 long elapsedTime = System.currentTimeMillis() - startTime;
-                                log.info("✅ Extração concluída em {}ms para arquivo: {}", elapsedTime, filename);
+                                log.debug("✅ Extração concluída em {}ms para arquivo: {}", elapsedTime, filename);
 
                                 return ResponseEntity.ok(new IncomeTaxExtractionResponse(
                                         true,
@@ -265,7 +265,7 @@ public class IncomeTaxController {
 
         long startTime = System.currentTimeMillis();
         String filename = filePart.filename();
-        log.info("🔍 Extração DEBUG para: {}", filename);
+        log.debug("🔍 Extração DEBUG para: {}", filename);
 
         return DataBufferUtils.join(filePart.content())
                 .flatMap(dataBuffer -> {
@@ -285,7 +285,7 @@ public class IncomeTaxController {
                                                     new ByteArrayInputStream(bytes))
                                                     .map(info -> {
                                                         long elapsedTime = System.currentTimeMillis() - startTime;
-                                                        log.info("✅ Extração DEBUG concluída em {}ms", elapsedTime);
+                                                        log.debug("✅ Extração DEBUG concluída em {}ms", elapsedTime);
 
                                                         return ResponseEntity.ok(new IncomeTaxExtractionResponse(
                                                                 true,
