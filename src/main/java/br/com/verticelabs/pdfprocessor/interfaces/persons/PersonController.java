@@ -79,7 +79,7 @@ public class PersonController {
          */
         @GetMapping("/{id}")
         public Mono<ResponseEntity<Object>> getPersonById(@PathVariable String id) {
-                log.info("📥 GET /api/v1/persons/{} - Buscar pessoa por ID", id);
+                log.debug("📥 GET /api/v1/persons/{} - Buscar pessoa por ID", id);
 
                 return getPersonByIdUseCase.execute(id)
                                 .map(person -> {
@@ -96,7 +96,7 @@ public class PersonController {
         public Mono<ResponseEntity<Object>> updatePerson(
                         @PathVariable String id,
                         @Valid @RequestBody UpdatePersonRequest request) {
-                log.info("📥 PUT /api/v1/persons/{} - Atualizar pessoa: Nome={}, Matrícula={}",
+                log.debug("📥 PUT /api/v1/persons/{} - Atualizar pessoa: Nome={}, Matrícula={}",
                                 id, request.getNome(), request.getMatricula());
 
                 return updatePersonUseCase.execute(id, request)
@@ -124,7 +124,7 @@ public class PersonController {
          */
         @PatchMapping("/{id}/activate")
         public Mono<ResponseEntity<Object>> activatePerson(@PathVariable String id) {
-                log.info("📥 PATCH /api/v1/persons/{}/activate - Ativar pessoa", id);
+                log.debug("📥 PATCH /api/v1/persons/{}/activate - Ativar pessoa", id);
 
                 return activatePersonUseCase.execute(id)
                                 .map(person -> {
@@ -139,7 +139,7 @@ public class PersonController {
          */
         @PatchMapping("/{id}/deactivate")
         public Mono<ResponseEntity<Object>> deactivatePerson(@PathVariable String id) {
-                log.info("📥 PATCH /api/v1/persons/{}/deactivate - Desativar pessoa", id);
+                log.debug("📥 PATCH /api/v1/persons/{}/deactivate - Desativar pessoa", id);
 
                 return deactivatePersonUseCase.execute(id)
                                 .map(person -> {
@@ -159,7 +159,7 @@ public class PersonController {
                         @RequestParam(required = false) String matricula,
                         @RequestParam(defaultValue = "0") int page,
                         @RequestParam(defaultValue = "100") int size) {
-                log.info("📥 GET /api/v1/persons - Listar pessoas (page={}, size={})", page, size);
+                log.debug("📥 GET /api/v1/persons - Listar pessoas (page={}, size={})", page, size);
 
                 return listPersonsUseCase.execute(nome, cpf, matricula, page, size)
                                 .flatMap(result -> {
@@ -218,12 +218,12 @@ public class PersonController {
          */
         @GetMapping("/{personId}/documents-by-id")
         public Mono<ResponseEntity<Object>> getDocumentsByPersonId(@PathVariable String personId) {
-                log.info("=== INÍCIO: GET /api/v1/persons/{}/documents-by-id ===", personId);
+                log.debug("=== INÍCIO: GET /api/v1/persons/{}/documents-by-id ===", personId);
 
                 return documentQueryUseCase.findByPersonId(personId)
                                 .<ResponseEntity<Object>>map(response -> {
-                                        log.info("=== SUCESSO: Documentos encontrados ===");
-                                        log.info("PersonId: {}, Total de documentos: {}", personId,
+                                        log.debug("=== SUCESSO: Documentos encontrados ===");
+                                        log.debug("PersonId: {}, Total de documentos: {}", personId,
                                                         response.getDocumentos().size());
                                         return ResponseEntity.ok((Object) response);
                                 });
@@ -240,12 +240,12 @@ public class PersonController {
          */
         @GetMapping("/{cpf}/documents")
         public Mono<ResponseEntity<Object>> getDocumentsByCpf(@PathVariable String cpf) {
-                log.info("=== INÍCIO: GET /api/v1/persons/{}/documents ===", cpf);
+                log.debug("=== INÍCIO: GET /api/v1/persons/{}/documents ===", cpf);
 
                 return documentQueryUseCase.findByCpf(cpf)
                                 .<ResponseEntity<Object>>map(response -> {
-                                        log.info("=== SUCESSO: Documentos encontrados ===");
-                                        log.info("CPF: {}, Total de documentos: {}", response.getCpf(),
+                                        log.debug("=== SUCESSO: Documentos encontrados ===");
+                                        log.debug("CPF: {}, Total de documentos: {}", response.getCpf(),
                                                         response.getDocumentos().size());
                                         return ResponseEntity.ok((Object) response);
                                 });
@@ -264,7 +264,7 @@ public class PersonController {
 
                 return documentUploadUseCase.uploadByPersonId(file, personId)
                                 .<ResponseEntity<Object>>map(response -> {
-                                        log.info("✓ Documento enviado com sucesso: DocumentId={}, Status={}",
+                                        log.debug("✓ Documento enviado com sucesso: DocumentId={}, Status={}",
                                                         response.getDocumentId(), response.getStatus());
                                         return ResponseEntity.status(HttpStatus.CREATED).body((Object) response);
                                 });
@@ -284,7 +284,7 @@ public class PersonController {
 
                 return bulkDocumentUploadUseCase.uploadBulkByPersonId(files, personId)
                                 .<ResponseEntity<Object>>map(response -> {
-                                        log.info("✓ BulkUpload concluído: Total={}, Sucessos={}, Falhas={}",
+                                        log.debug("✓ BulkUpload concluído: Total={}, Sucessos={}, Falhas={}",
                                                         response.getTotalArquivos(), response.getSucessos(),
                                                         response.getFalhas());
                                         return ResponseEntity.status(HttpStatus.CREATED).body((Object) response);
@@ -304,7 +304,7 @@ public class PersonController {
 
                 return incomeTaxUploadUseCase.uploadIncomeTaxByPersonId(file, personId)
                                 .<ResponseEntity<Object>>map(response -> {
-                                        log.info("✓ Declaração de IR enviada com sucesso: DocumentId={}, Status={}",
+                                        log.debug("✓ Declaração de IR enviada com sucesso: DocumentId={}, Status={}",
                                                         response.getDocumentId(), response.getStatus());
                                         return ResponseEntity.status(HttpStatus.CREATED).body((Object) response);
                                 });
@@ -332,7 +332,7 @@ public class PersonController {
                 // Processar cada arquivo sequencialmente
                 return getPersonByIdUseCase.execute(personId)
                                 .flatMap(person -> {
-                                        log.info("✓ Pessoa encontrada: CPF={}, Nome={}, TenantId={}",
+                                        log.debug("✓ Pessoa encontrada: CPF={}, Nome={}, TenantId={}",
                                                         person.getCpf(), person.getNome(), person.getTenantId());
 
                                         // Validar CPF
@@ -351,7 +351,7 @@ public class PersonController {
                                                                 FilePart file = tuple.getT2();
                                                                 String filename = file.filename();
 
-                                                                log.info("Processando declaração de IR {}/{}: {}",
+                                                                log.debug("Processando declaração de IR {}/{}: {}",
                                                                                 index + 1,
                                                                                 files.size(), filename);
 
@@ -362,7 +362,7 @@ public class PersonController {
                                                                                                                 normalizedCpf),
                                                                                 person.getTenantId())
                                                                                 .map(response -> {
-                                                                                        log.info("✓ Declaração de IR {} enviada: DocumentId={}, Status={}",
+                                                                                        log.debug("✓ Declaração de IR {} enviada: DocumentId={}, Status={}",
                                                                                                         filename,
                                                                                                         response.getDocumentId(),
                                                                                                         response.getStatus());
@@ -398,8 +398,8 @@ public class PersonController {
                                                                                 .count();
                                                                 long falhas = totalArquivos - sucessos;
 
-                                                                log.info("=== BulkUpload de Declarações de IR CONCLUÍDO ===");
-                                                                log.info("Total: {}, Sucessos: {}, Falhas: {}",
+                                                                log.debug("=== BulkUpload de Declarações de IR CONCLUÍDO ===");
+                                                                log.debug("Total: {}, Sucessos: {}, Falhas: {}",
                                                                                 totalArquivos,
                                                                                 sucessos, falhas);
 
@@ -413,7 +413,7 @@ public class PersonController {
                                                         });
                                 })
                                 .<ResponseEntity<Object>>map(response -> {
-                                        log.info("✓ BulkUpload de declarações de IR concluído: Total={}, Sucessos={}, Falhas={}",
+                                        log.debug("✓ BulkUpload de declarações de IR concluído: Total={}, Sucessos={}, Falhas={}",
                                                         response.getTotalArquivos(), response.getSucessos(),
                                                         response.getFalhas());
                                         return ResponseEntity.status(HttpStatus.CREATED).body((Object) response);
@@ -449,7 +449,7 @@ public class PersonController {
          */
         @GetMapping("/{cpf}/rubricas")
         public Mono<ResponseEntity<PersonRubricasMatrixResponse>> getPersonRubricasMatrix(@PathVariable String cpf) {
-                log.info("📥 GET /api/v1/persons/{}/rubricas - Matriz de rubricas", cpf);
+                log.debug("📥 GET /api/v1/persons/{}/rubricas - Matriz de rubricas", cpf);
 
                 return personRubricasMatrixUseCase.execute(cpf)
                                 .flatMap(useCaseResponse -> {
@@ -458,10 +458,10 @@ public class PersonController {
 
                                         // Se a matriz está vazia, retornar 200 OK com dados vazios (não é erro)
                                         if (response.getMatrix() == null || response.getMatrix().isEmpty()) {
-                                                log.info("✓ Matriz de rubricas vazia para pessoa: {} (sem dados processados)",
+                                                log.debug("✓ Matriz de rubricas vazia para pessoa: {} (sem dados processados)",
                                                                 cpf);
                                         } else {
-                                                log.info("✓ Matriz de rubricas retornada: {} rubricas, total geral: R$ {}",
+                                                log.debug("✓ Matriz de rubricas retornada: {} rubricas, total geral: R$ {}",
                                                                 response.getMatrix().size(), response.getTotalGeral());
                                         }
 

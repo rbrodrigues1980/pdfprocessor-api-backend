@@ -36,8 +36,8 @@ public class ExcelController {
             @RequestParam(required = false) String ano,
             @RequestParam(required = false) String origem) {
         
-        log.info("=== INÍCIO: GET /api/v1/persons/{}/excel ===", cpf);
-        log.info("Parâmetros recebidos - CPF: {}, Ano: {}, Origem: {}", cpf, ano, origem);
+        log.debug("=== INÍCIO: GET /api/v1/persons/{}/excel ===", cpf);
+        log.debug("Parâmetros recebidos - CPF: {}, Ano: {}, Origem: {}", cpf, ano, origem);
 
         return excelExportUseCase.generateExcel(cpf, ano, origem)
                 .map(result -> {
@@ -46,9 +46,9 @@ public class ExcelController {
                     headers.setContentDispositionFormData("attachment", result.getFilename());
                     headers.setContentLength(result.getBytes().length);
                     
-                    log.info("=== SUCESSO: Excel gerado para CPF: {} ===", cpf);
-                    log.info("Tamanho do arquivo: {} bytes ({} KB)", result.getBytes().length, result.getBytes().length / 1024);
-                    log.info("Nome do arquivo: {}", result.getFilename());
+                    log.debug("=== SUCESSO: Excel gerado para CPF: {} ===", cpf);
+                    log.debug("Tamanho do arquivo: {} bytes ({} KB)", result.getBytes().length, result.getBytes().length / 1024);
+                    log.debug("Nome do arquivo: {}", result.getFilename());
                     
                     return ResponseEntity.ok()
                             .headers(headers)
@@ -113,8 +113,8 @@ public class ExcelController {
             @RequestParam(required = false) String ano,
             @RequestParam(required = false) String origem) {
         
-        log.info("=== INÍCIO: GET /api/v1/persons/{}/excel-by-id ===", personId);
-        log.info("Parâmetros recebidos - PersonId: {}, Ano: {}, Origem: {}", personId, ano, origem);
+        log.debug("=== INÍCIO: GET /api/v1/persons/{}/excel-by-id ===", personId);
+        log.debug("Parâmetros recebidos - PersonId: {}, Ano: {}, Origem: {}", personId, ano, origem);
 
         return excelExportUseCase.generateExcelById(personId, ano, origem)
                 .map(result -> {
@@ -123,9 +123,9 @@ public class ExcelController {
                     headers.setContentDispositionFormData("attachment", result.getFilename());
                     headers.setContentLength(result.getBytes().length);
                     
-                    log.info("=== SUCESSO: Excel gerado para personId: {} ===", personId);
-                    log.info("Tamanho do arquivo: {} bytes ({} KB)", result.getBytes().length, result.getBytes().length / 1024);
-                    log.info("Nome do arquivo: {}", result.getFilename());
+                    log.debug("=== SUCESSO: Excel gerado para personId: {} ===", personId);
+                    log.debug("Tamanho do arquivo: {} bytes ({} KB)", result.getBytes().length, result.getBytes().length / 1024);
+                    log.debug("Nome do arquivo: {}", result.getFilename());
                     
                     return ResponseEntity.ok()
                             .headers(headers)
@@ -194,8 +194,8 @@ public class ExcelController {
             @RequestParam(required = false) String ano,
             @RequestParam(required = false) String origem) {
         
-        log.info("=== INÍCIO: GET /api/v1/persons/{}/excel-by-tenant ===", cpf);
-        log.info("Parâmetros recebidos - CPF: {}, TenantId: {}, Ano: {}, Origem: {}", cpf, tenantId, ano, origem);
+        log.debug("=== INÍCIO: GET /api/v1/persons/{}/excel-by-tenant ===", cpf);
+        log.debug("Parâmetros recebidos - CPF: {}, TenantId: {}, Ano: {}, Origem: {}", cpf, tenantId, ano, origem);
 
         return excelExportUseCase.generateExcelByCpfAndTenant(cpf, tenantId, ano, origem)
                 .map(result -> {
@@ -211,10 +211,10 @@ public class ExcelController {
                     );
                     headers.setContentLength(result.getBytes().length);
                     
-                    log.info("=== SUCESSO: Excel gerado para CPF: {} no tenant: {} ===", cpf, tenantId);
-                    log.info("Tamanho do arquivo: {} bytes ({} KB)", result.getBytes().length, result.getBytes().length / 1024);
-                    log.info("Nome do arquivo: {}", filename);
-                    log.info("Content-Disposition header: {}", headers.getContentDisposition());
+                    log.debug("=== SUCESSO: Excel gerado para CPF: {} no tenant: {} ===", cpf, tenantId);
+                    log.debug("Tamanho do arquivo: {} bytes ({} KB)", result.getBytes().length, result.getBytes().length / 1024);
+                    log.debug("Nome do arquivo: {}", filename);
+                    log.debug("Content-Disposition header: {}", headers.getContentDisposition());
                     
                     return ResponseEntity.ok()
                             .headers(headers)

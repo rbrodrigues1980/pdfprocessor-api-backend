@@ -46,6 +46,9 @@ dependencies {
     // MongoDB Sync Driver (for Logback)
     implementation("org.mongodb:mongodb-driver-sync")
 
+    // Logging JSON estruturado (Cloud Run / Cloud Logging)
+    implementation("net.logstash.logback:logstash-logback-encoder:8.1")
+
     // Excel (Apache POI)
     implementation("org.apache.poi:poi-ooxml:5.2.5")
 
