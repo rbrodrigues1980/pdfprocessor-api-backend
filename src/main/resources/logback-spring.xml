@@ -14,11 +14,27 @@
     <property name="FILE_LOG_PATTERN" 
               value="%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %5p ${PID:- } --- [%15.15t] %-40.40logger{39} : %m%n%wEx"/>
 
-    <!-- Appender para CONSOLE -->
+    <!-- Appender para CONSOLE (texto legível - usado em dev/local) -->
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
             <pattern>${CONSOLE_LOG_PATTERN}</pattern>
             <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!-- Appender JSON estruturado (usado em prod/Cloud Run) -->
+    <!-- Cloud Logging parseia JSON automaticamente, permitindo filtragem por campos -->
+    <appender name="JSON_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <includeMdcKeyName>tenantId</includeMdcKeyName>
+            <includeMdcKeyName>userId</includeMdcKeyName>
+            <timestampPattern>yyyy-MM-dd'T'HH:mm:ss.SSSXXX</timestampPattern>
+            <fieldNames>
+                <timestamp>timestamp</timestamp>
+                <version>[ignore]</version>
+                <levelValue>[ignore]</levelValue>
+            </fieldNames>
+            <shortenedLoggerNameLength>36</shortenedLoggerNameLength>
         </encoder>
     </appender>
 
@@ -66,32 +82,63 @@
         <includeCallerData>false</includeCallerData>
     </appender>
 
-    <!-- Logger raiz: aplica a todos os loggers -->
-    <!-- Perfil prod (ex.: Cloud Run): apenas console; a plataforma coleta stdout/stderr -->
+    <!-- ============================================================ -->
+    <!-- PERFIL PROD (Cloud Run): otimizado para custo mínimo        -->
+    <!-- Cloud Run já fornece request logs grátis (status, latência,  -->
+    <!-- IP, user-agent). A aplicação loga apenas eventos críticos.   -->
+    <!-- ============================================================ -->
     <springProfile name="prod">
-        <root level="INFO">
-            <appender-ref ref="CONSOLE"/>
+        <!-- Root WARN: apenas warnings e errors por padrão -->
+        <!-- JSON_CONSOLE para Cloud Logging parsear campos automaticamente -->
+        <root level="WARN">
+            <appender-ref ref="JSON_CONSOLE"/>
         </root>
+
+        <!-- Auth/Segurança: INFO para auditoria (login, falhas, tokens) -->
+        <logger name="br.com.verticelabs.pdfprocessor.application.auth" level="INFO"/>
+        <logger name="br.com.verticelabs.pdfprocessor.infrastructure.security" level="INFO"/>
+
+        <!-- Processamento de documentos: INFO para resultados de negócio -->
+        <logger name="br.com.verticelabs.pdfprocessor.application.documents" level="INFO"/>
+
+        <!-- Exceptions tratadas: INFO para erros capturados pelo handler -->
+        <logger name="br.com.verticelabs.pdfprocessor.interfaces.exception" level="INFO"/>
+
+        <!-- Startup/Config: INFO para diagnóstico na inicialização -->
+        <logger name="br.com.verticelabs.pdfprocessor.infrastructure.config" level="INFO"/>
+
+        <!-- Bibliotecas externas: silenciar em prod -->
+        <logger name="org.springframework" level="WARN"/>
+        <logger name="org.mongodb" level="WARN"/>
+        <logger name="org.mongodb.driver" level="WARN"/>
+        <logger name="org.apache.tika" level="ERROR"/>
+        <logger name="org.apache.pdfbox" level="ERROR"/>
+        <logger name="reactor.netty" level="WARN"/>
+        <logger name="io.netty" level="WARN"/>
     </springProfile>
+
+    <!-- ============================================================ -->
+    <!-- PERFIL NÃO-PROD (local, docker, dev): logging completo      -->
+    <!-- ============================================================ -->
     <springProfile name="!prod">
         <root level="INFO">
             <appender-ref ref="CONSOLE"/>
             <appender-ref ref="FILE"/>
             <appender-ref ref="ASYNC_MONGO"/>
         </root>
-    </springProfile>
 
-    <!-- Loggers específicos para reduzir verbosidade de algumas bibliotecas -->
-    <logger name="org.springframework" level="INFO"/>
-    <logger name="org.mongodb" level="INFO"/>
-    <logger name="org.mongodb.driver" level="INFO"/>
-    <logger name="org.apache.tika" level="WARN"/>
-    <logger name="org.apache.pdfbox" level="WARN"/>
-    <logger name="reactor.netty" level="INFO"/>
-    <logger name="io.netty" level="INFO"/>
-    
-    <!-- Logger para a aplicação: nível DEBUG em desenvolvimento -->
-    <logger name="br.com.verticelabs.pdfprocessor" level="INFO"/>
+        <!-- Loggers específicos para reduzir verbosidade de bibliotecas -->
+        <logger name="org.springframework" level="INFO"/>
+        <logger name="org.mongodb" level="INFO"/>
+        <logger name="org.mongodb.driver" level="INFO"/>
+        <logger name="org.apache.tika" level="WARN"/>
+        <logger name="org.apache.pdfbox" level="WARN"/>
+        <logger name="reactor.netty" level="INFO"/>
+        <logger name="io.netty" level="INFO"/>
+
+        <!-- Aplicação: INFO em desenvolvimento -->
+        <logger name="br.com.verticelabs.pdfprocessor" level="INFO"/>
+    </springProfile>
 
 </configuration>
 

@@ -18,6 +18,7 @@
 9. [Custos e Economia](#9-custos-e-economia)
 10. [Comandos Úteis](#10-comandos-úteis)
 11. [Checklist de Deploy](#11-checklist-de-deploy)
+12. [Estratégia de Logging e Custos](#12-estratégia-de-logging-e-custos)
 
 ---
 
@@ -560,6 +561,73 @@ gcloud run services update pdfprocessor-api-backend --region us-central1 \
 | `8703f33` | fix: incluir gradle-wrapper.jar no repositório | Build falhava por falta do wrapper JAR |
 | `d84e389` | fix: habilitar forward-headers-strategy para HTTPS | Swagger gerava URLs `http://` causando erro CORS |
 | `cffe816` | feat: adicionar cloudbuild.yaml com kaniko cache | Otimização de tempo de build (~7 min → ~2-3 min) |
+
+---
+
+## 12. Estratégia de Logging e Custos
+
+### Custos do Cloud Logging
+
+| Recurso | Free Tier | Após Free Tier |
+|---------|-----------|----------------|
+| **Ingestão de logs** | 50 GiB/mês | $0.50/GiB |
+| **Armazenamento** | 0.5 GiB/mês | $0.01/GiB/mês |
+| **Request logs do Cloud Run** | Incluído | Incluído |
+
+> **Importante:** O Cloud Run já fornece request logs **grátis** (`run.googleapis.com/requests`) com status code, latência, IP, user-agent, etc. Não é necessário logar cada request na aplicação.
+
+### O que a aplicação loga em produção
+
+A configuração de logging (`logback-spring.xml`) no perfil `prod` é otimizada para custo mínimo:
+
+| Nível | Pacotes | O que aparece |
+|-------|---------|---------------|
+| **WARN/ERROR** | Root (padrão) | Erros, exceções, falhas críticas |
+| **INFO** | `application.auth`, `infrastructure.security` | Login, falhas de autenticação, tokens |
+| **INFO** | `application.documents` | Resultados de processamento de PDFs |
+| **INFO** | `interfaces.exception` | Erros HTTP tratados pelo handler |
+| **INFO** | `infrastructure.config` | Diagnóstico de inicialização |
+| **DEBUG** (desligado) | Controllers, queries | Início/fim de requests, parâmetros |
+
+### JSON Estruturado
+
+Em produção, os logs são emitidos em **JSON** (via `logstash-logback-encoder`), permitindo:
+- Filtragem eficiente por campo no Cloud Logging Console
+- Queries por `level`, `logger_name`, `message`, etc.
+- Menor custo de parsing (Cloud Logging parseia JSON nativamente)
+
+Exemplo de log em prod:
+```json
+{
+  "timestamp": "2026-02-12T10:30:00.123-03:00",
+  "level": "WARN",
+  "logger_name": "b.c.v.p.i.exception.GlobalExceptionHandler",
+  "message": "Documento não encontrado: abc123",
+  "thread_name": "reactor-http-nio-3"
+}
+```
+
+### Estimativa de Volume
+
+- **Antes da otimização:** ~10-30 linhas de log por request HTTP (INFO em tudo)
+- **Após otimização:** ~0-2 linhas por request (apenas erros/eventos críticos)
+- **Redução estimada:** 80-90% do volume
+- Com 50 GiB/mês grátis, o custo de logging deve ser **zero** para uso normal
+
+### Como Ver Logs no Cloud Logging
+
+```bash
+# Últimos 50 logs da aplicação
+gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=pdfprocessor-api-backend" --project=rrr-software-solutions --limit=50 --format=json
+
+# Apenas erros
+gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=pdfprocessor-api-backend AND severity>=ERROR" --project=rrr-software-solutions --limit=20
+
+# Filtrar por campo JSON (ex: apenas auth)
+gcloud logging read 'resource.type=cloud_run_revision AND jsonPayload.logger_name=~"application.auth"' --project=rrr-software-solutions --limit=20
+```
+
+Ou pelo Console: [Cloud Logging Console](https://console.cloud.google.com/logs) → Filtrar por `Cloud Run Revision` → `pdfprocessor-api-backend`.
 
 ---
 

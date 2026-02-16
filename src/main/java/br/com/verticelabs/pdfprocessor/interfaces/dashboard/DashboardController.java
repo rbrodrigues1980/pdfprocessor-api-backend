@@ -24,12 +24,12 @@ public class DashboardController {
      */
     @GetMapping
     public Mono<ResponseEntity<Object>> getDashboard() {
-        log.info("=== INÍCIO: GET /api/v1/dashboard ===");
+        log.debug("=== INÍCIO: GET /api/v1/dashboard ===");
 
         return dashboardUseCase.getDashboardMetrics()
                 .<ResponseEntity<Object>>map(ResponseEntity::ok)
                 .doOnSuccess(response -> {
-                    log.info("=== SUCESSO: Dashboard metrics retornadas ===");
+                    log.debug("=== SUCESSO: Dashboard metrics retornadas ===");
                 })
                 .onErrorResume(IllegalStateException.class, e -> {
                     String message = e.getMessage();
