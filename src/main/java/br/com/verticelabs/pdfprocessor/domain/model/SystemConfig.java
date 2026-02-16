@@ -59,7 +59,8 @@ public class SystemConfig {
      */
     private String updatedBy;
 
-    // Constantes para chaves de configuração
+    // Constantes para chaves de configuração de IA
     public static final String KEY_AI_ENABLED = "ai.enabled";
     public static final String KEY_AI_MODEL = "ai.model";
+    public static final String KEY_AI_FALLBACK_MODEL = "ai.fallback-model";
 }

@@ -5,11 +5,15 @@ import br.com.verticelabs.pdfprocessor.domain.model.*;
 import br.com.verticelabs.pdfprocessor.domain.repository.PayrollDocumentRepository;
 import br.com.verticelabs.pdfprocessor.domain.repository.PayrollEntryRepository;
 
+
 import br.com.verticelabs.pdfprocessor.domain.service.AiPdfExtractionService;
+import br.com.verticelabs.pdfprocessor.domain.service.CrossValidationService;
+import br.com.verticelabs.pdfprocessor.domain.service.ExtractionValidationService;
 import br.com.verticelabs.pdfprocessor.domain.service.GridFsService;
 import br.com.verticelabs.pdfprocessor.domain.service.ITextIncomeTaxService;
 import br.com.verticelabs.pdfprocessor.domain.service.MonthYearDetectionService;
 import br.com.verticelabs.pdfprocessor.domain.service.PdfService;
+import br.com.verticelabs.pdfprocessor.infrastructure.ai.GeminiResponseParser;
 import br.com.verticelabs.pdfprocessor.infrastructure.pdf.*;
 import br.com.verticelabs.pdfprocessor.interfaces.documents.dto.ProcessDocumentResponse;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +38,8 @@ public class DocumentProcessUseCase {
     private final GridFsService gridFsService;
     private final PdfService pdfService;
     private final AiPdfExtractionService aiPdfExtractionService;
+    private final ExtractionValidationService validationService;
+    private final CrossValidationService crossValidationService;
 
     private final MonthYearDetectionService monthYearDetectionService;
     private final ITextIncomeTaxService iTextIncomeTaxService;
@@ -312,143 +318,255 @@ public class DocumentProcessUseCase {
 
     /**
      * Processa uma página específica e retorna as entries extraídas + metadados.
+     * Para páginas escaneadas (texto < 100 chars), usa extração JSON estruturada do Gemini (Fase 2).
+     * Para páginas digitais, usa o parser regex tradicional.
      */
     private Mono<PageResult> processPageWithMetadata(PayrollDocument document, byte[] pdfBytes,
             int pageNumber, int totalPages) {
         // Tentar extrair texto normalmente primeiro
         return pdfService.extractTextFromPage(new ByteArrayInputStream(pdfBytes), pageNumber)
                 .flatMap(pageText -> {
-                    // Se o texto extraído for muito pequeno, tentar usar Gemini AI
+                    // Se o texto extraído for muito pequeno, tentar usar Gemini AI com JSON estruturado
                     if (pageText == null || pageText.trim().length() < MIN_TEXT_LENGTH_FOR_PDF) {
                         log.info(
-                                "🔍 Texto extraído muito pequeno ({} caracteres) na página {}. Tentando Gemini AI...",
+                                "🔍 Texto extraído muito pequeno ({} caracteres) na página {}. Tentando Gemini AI (JSON estruturado)...",
                                 pageText != null ? pageText.length() : 0, pageNumber);
 
                         // Verificar se Gemini está habilitado
                         if (aiPdfExtractionService.isEnabled()) {
-                            log.info("🤖 Usando Gemini AI para extrair texto da página {}...", pageNumber);
-                            return aiPdfExtractionService.extractTextFromScannedPage(pdfBytes, pageNumber)
-                                    .map(extractedText -> {
-                                        if (extractedText != null && !extractedText.trim().isEmpty()) {
-                                            log.info("✅ Gemini extraiu {} caracteres da página {}",
-                                                    extractedText.length(), pageNumber);
-                                            return extractedText;
+                            log.info("🤖 Usando Gemini AI para extração ESTRUTURADA (JSON) da página {}...", pageNumber);
+
+                            // Fase 2: Usar extractPayrollData (JSON) ao invés de extractTextFromScannedPage (texto cru)
+                            return aiPdfExtractionService.extractPayrollData(pdfBytes, pageNumber)
+                                    .flatMap(jsonResponse -> {
+                                        if (jsonResponse == null || jsonResponse.trim().isEmpty()) {
+                                            log.warn("⚠️ Gemini não retornou dados da página {}", pageNumber);
+                                            return Mono.just(new PageResult(new ArrayList<>()));
                                         }
-                                        log.warn("⚠️ Gemini não conseguiu extrair texto da página {}", pageNumber);
-                                        return "";
+
+                                        log.info("✅ Gemini retornou {} chars de JSON estruturado da página {}",
+                                                jsonResponse.length(), pageNumber);
+
+                                        // Parsear JSON do Gemini em entries
+                                        String origem = determinePageOrigin(document, pageNumber);
+                                        GeminiResponseParser.ParsedPayrollData parsedData =
+                                                GeminiResponseParser.parsePayrollResponse(
+                                                        jsonResponse,
+                                                        document.getId(),
+                                                        document.getTenantId(),
+                                                        origem,
+                                                        pageNumber);
+
+                                        if (parsedData == null || parsedData.getEntries().isEmpty()) {
+                                            log.warn("⚠️ Gemini JSON não contém rubricas válidas na página {}", pageNumber);
+                                            return Mono.just(new PageResult(new ArrayList<>()));
+                                        }
+
+                                        // Validação Fase 2: verificar consistência dos dados extraídos
+                                        ValidationResult validation = validationService.validatePayrollExtraction(
+                                                parsedData.getEntries(),
+                                                parsedData.getSalarioBruto(),
+                                                parsedData.getTotalDescontos(),
+                                                parsedData.getSalarioLiquido(),
+                                                parsedData.getCpf(),
+                                                parsedData.getCompetencia()
+                                        );
+
+                                        log.info("📊 Página {} (Gemini JSON) - {} rubricas extraídas, score={}, recommendation={}",
+                                                pageNumber, parsedData.getEntries().size(),
+                                                String.format("%.2f", validation.confidenceScore()),
+                                                validation.recommendation());
+
+                                        if (!validation.issues().isEmpty()) {
+                                            for (ValidationIssue issue : validation.issues()) {
+                                                log.warn("  ⚠️ Validação: [{}] {} — esperado={}, encontrado={}",
+                                                        issue.type(), issue.message(),
+                                                        issue.expected(), issue.found());
+                                            }
+                                        }
+
+                                        // Fase 3: Cross-Validation — se score < 0.85, executar 2ª extração
+                                        if (!validation.isValid()) {
+                                            log.info("🔄 Score {} < 0.85 — Acionando CROSS-VALIDATION (Fase 3) na página {}...",
+                                                    String.format("%.2f", validation.confidenceScore()), pageNumber);
+
+                                            return crossValidationService.crossValidate(
+                                                    pdfBytes, pageNumber,
+                                                    parsedData.getEntries(),
+                                                    jsonResponse,
+                                                    document.getId(),
+                                                    document.getTenantId(),
+                                                    origem
+                                            ).flatMap(crossResult -> {
+                                                log.info("📊 Cross-validation página {}: score={}, matched={}/{}, revisão={}",
+                                                        pageNumber,
+                                                        String.format("%.2f", crossResult.confidenceScore()),
+                                                        crossResult.matchedFields(),
+                                                        crossResult.totalFields(),
+                                                        crossResult.requiresManualReview());
+
+                                                // Fase 4: Se cross-validation indica revisão manual, escalar para Gemini Pro
+                                                if (crossResult.requiresManualReview()) {
+                                                    log.info("⬆️ ESCALAÇÃO PARA GEMINI PRO (Fase 4) — Página {} com campos críticos divergentes",
+                                                            pageNumber);
+
+                                                    return aiPdfExtractionService.extractPayrollDataWithFallback(pdfBytes, pageNumber)
+                                                            .map(proJsonResponse -> {
+                                                                if (proJsonResponse == null || proJsonResponse.trim().isEmpty()) {
+                                                                    log.warn("⚠️ Gemini Pro não retornou dados da página {}. Usando resultado da cross-validation.",
+                                                                            pageNumber);
+                                                                    return new PageResult(crossResult.consolidatedEntries());
+                                                                }
+
+                                                                log.info("✅ Gemini Pro retornou {} chars de JSON da página {}",
+                                                                        proJsonResponse.length(), pageNumber);
+
+                                                                GeminiResponseParser.ParsedPayrollData proData =
+                                                                        GeminiResponseParser.parsePayrollResponse(
+                                                                                proJsonResponse,
+                                                                                document.getId(),
+                                                                                document.getTenantId(),
+                                                                                origem,
+                                                                                pageNumber);
+
+                                                                if (proData != null && !proData.getEntries().isEmpty()) {
+                                                                    log.info("📊 Gemini Pro página {}: {} rubricas extraídas (substituindo resultado da cross-validation)",
+                                                                            pageNumber, proData.getEntries().size());
+                                                                    return new PageResult(proData.getEntries());
+                                                                }
+
+                                                                log.warn("⚠️ Gemini Pro não extraiu rubricas da página {}. Usando cross-validation.",
+                                                                        pageNumber);
+                                                                return new PageResult(crossResult.consolidatedEntries());
+                                                            })
+                                                            .onErrorResume(proError -> {
+                                                                log.error("❌ Erro ao escalar para Gemini Pro na página {}: {}. Usando cross-validation.",
+                                                                        pageNumber, proError.getMessage());
+                                                                return Mono.just(new PageResult(crossResult.consolidatedEntries()));
+                                                            });
+                                                }
+
+                                                // Cross-validation OK — usar entries consolidadas
+                                                return Mono.just(new PageResult(crossResult.consolidatedEntries()));
+                                            });
+                                        }
+
+                                        // Score >= 0.85 — dados confiáveis, usar direto
+                                        return Mono.just(new PageResult(parsedData.getEntries()));
                                     })
                                     .onErrorResume(error -> {
-                                        log.error("❌ Erro ao usar Gemini na página {}: {}", pageNumber,
-                                                error.getMessage());
-                                        return Mono.just("");
+                                        log.error("❌ Erro ao usar Gemini JSON na página {}: {}. Tentando extração de texto...",
+                                                pageNumber, error.getMessage());
+                                        // Fallback: tentar extração de texto cru como antes
+                                        return aiPdfExtractionService.extractTextFromScannedPage(pdfBytes, pageNumber)
+                                                .map(extractedText -> {
+                                                    if (extractedText != null && !extractedText.trim().isEmpty()) {
+                                                        log.info("✅ Fallback: Gemini extraiu {} caracteres (texto) da página {}",
+                                                                extractedText.length(), pageNumber);
+                                                        return extractedText;
+                                                    }
+                                                    return "";
+                                                })
+                                                .flatMap(text -> processPageTextWithParser(document, text, pageNumber))
+                                                .onErrorResume(err -> {
+                                                    log.error("❌ Fallback também falhou na página {}: {}", pageNumber, err.getMessage());
+                                                    return Mono.just(new PageResult(new ArrayList<>()));
+                                                });
                                     });
                         } else {
                             log.warn("⚠️ Gemini AI desabilitado. Página {} será ignorada.", pageNumber);
-                            return Mono.just("");
+                            return Mono.just((Object) "");
                         }
                     }
-                    return Mono.just(pageText);
+                    return Mono.just((Object) pageText);
                 })
-                .flatMap(pageText -> {
-                    // Se texto vazio, retornar resultado vazio
-                    if (pageText == null || pageText.isEmpty()) {
-                        return Mono.just(new PageResult(new ArrayList<>()));
+                .flatMap(result -> {
+                    // Se já é PageResult (veio do Gemini JSON), retornar direto
+                    if (result instanceof PageResult) {
+                        return Mono.just((PageResult) result);
                     }
 
-                    // Determinar origem da página
-                    String origem = determinePageOrigin(document, pageNumber);
-                    log.debug("Página {} - Origem: {}", pageNumber, origem);
-
-                    // Determinar tipo do documento para esta página
-                    DocumentType pageType = determinePageType(document, origem);
-
-                    // Extrair referência (mês/ano) da página
-                    return monthYearDetectionService.detectMonthYear(pageText)
-                            .map(monthYearOpt -> {
-                                String referencia = monthYearOpt.orElse(null);
-                                if (referencia == null) {
-                                    log.warn("Não foi possível detectar referência na página {}", pageNumber);
-                                    // Tentar usar a referência dos meses detectados se disponível
-                                    if (!document.getMesesDetectados().isEmpty()) {
-                                        // Usar o primeiro mês detectado como fallback
-                                        referencia = document.getMesesDetectados().get(0);
-                                    }
-                                }
-
-                                // Extrair linhas de rubricas
-                                log.info(
-                                        "════════════════════════════════════════════════════════════════════════════════");
-                                log.info("🔍 EXTRAINDO RUBRICAS DA PÁGINA {} (tipo: {}, referência: {})", pageNumber,
-                                        pageType, referencia);
-                                log.info(
-                                        "════════════════════════════════════════════════════════════════════════════════");
-
-                                List<PdfLineParser.ParsedLine> parsedLines;
-                                if (pageType == DocumentType.FUNCEF) {
-                                    parsedLines = lineParser.parseLinesFuncef(pageText, referencia);
-                                } else {
-                                    parsedLines = lineParser.parseLines(pageText, pageType);
-                                }
-
-                                log.info("📊 Total de linhas parseadas: {}", parsedLines.size());
-
-                                // Converter para PayrollEntry (validação será feita depois no fluxo reativo)
-                                List<PayrollEntry> entries = new ArrayList<>();
-                                log.info(
-                                        "════════════════════════════════════════════════════════════════════════════════");
-                                log.info("🔄 CONVERTENDO LINHAS PARSEADAS PARA ENTRIES:");
-                                log.info(
-                                        "════════════════════════════════════════════════════════════════════════════════");
-
-                                for (int idx = 0; idx < parsedLines.size(); idx++) {
-                                    PdfLineParser.ParsedLine parsedLine = parsedLines.get(idx);
-                                    log.info(
-                                            "Processando linha parseada [{}]: código=[{}], descrição=[{}], referência=[{}], valor=[{}]",
-                                            idx + 1, parsedLine.getCodigo(), parsedLine.getDescricao(),
-                                            parsedLine.getReferencia(), parsedLine.getValorStr());
-
-                                    // Validar rubrica
-                                    String finalReferencia = parsedLine.getReferencia() != null
-                                            ? parsedLine.getReferencia()
-                                            : referencia;
-
-                                    log.info("  └─ Referência final a usar: [{}]", finalReferencia);
-
-                                    // Criar entry
-                                    PayrollEntry entry = createEntryFromParsedLine(
-                                            document.getId(),
-                                            document.getTenantId(),
-                                            parsedLine,
-                                            finalReferencia,
-                                            origem,
-                                            pageNumber,
-                                            referencia); // Passar o mês de pagamento do documento
-
-                                    if (entry != null) {
-                                        entries.add(entry);
-                                        log.info(
-                                                "  └─ ✅ Entry criada: código=[{}], descrição=[{}], valor=[{}], referência=[{}], mês pagamento=[{}]",
-                                                entry.getRubricaCodigo(), entry.getRubricaDescricao(), entry.getValor(),
-                                                entry.getReferencia(), entry.getMesPagamento());
-                                    } else {
-                                        log.warn(
-                                                "  └─ ⚠️ Entry NÃO foi criada (createEntryFromParsedLine retornou null)");
-                                    }
-                                }
-
-                                log.info(
-                                        "════════════════════════════════════════════════════════════════════════════════");
-                                log.info("📊 Página {} - {} rubricas extraídas, {} entries criadas", pageNumber,
-                                        parsedLines.size(), entries.size());
-                                log.info(
-                                        "════════════════════════════════════════════════════════════════════════════════");
-                                return new PageResult(entries);
-                            });
+                    // Se é String (texto extraído), processar com parser regex
+                    String pageText = (String) result;
+                    return processPageTextWithParser(document, pageText, pageNumber);
                 })
                 .onErrorResume(error -> {
                     log.error("Erro ao processar página {}", pageNumber, error);
                     // Continuar processamento mesmo com erro em uma página
                     return Mono.just(new PageResult(new ArrayList<>()));
+                });
+    }
+
+    /**
+     * Processa texto extraído usando o parser regex tradicional.
+     * Usado para PDFs digitais ou como fallback quando o Gemini JSON falha.
+     */
+    private Mono<PageResult> processPageTextWithParser(PayrollDocument document, String pageText, int pageNumber) {
+        // Se texto vazio, retornar resultado vazio
+        if (pageText == null || pageText.isEmpty()) {
+            return Mono.just(new PageResult(new ArrayList<>()));
+        }
+
+        // Determinar origem da página
+        String origem = determinePageOrigin(document, pageNumber);
+        log.debug("Página {} - Origem: {}", pageNumber, origem);
+
+        // Determinar tipo do documento para esta página
+        DocumentType pageType = determinePageType(document, origem);
+
+        // Extrair referência (mês/ano) da página
+        return monthYearDetectionService.detectMonthYear(pageText)
+                .map(monthYearOpt -> {
+                    String referencia = monthYearOpt.orElse(null);
+                    if (referencia == null) {
+                        log.warn("Não foi possível detectar referência na página {}", pageNumber);
+                        if (!document.getMesesDetectados().isEmpty()) {
+                            referencia = document.getMesesDetectados().get(0);
+                        }
+                    }
+
+                    log.info("════════════════════════════════════════════════════════════════════════════════");
+                    log.info("🔍 EXTRAINDO RUBRICAS DA PÁGINA {} (tipo: {}, referência: {}) — Parser Regex",
+                            pageNumber, pageType, referencia);
+                    log.info("════════════════════════════════════════════════════════════════════════════════");
+
+                    List<PdfLineParser.ParsedLine> parsedLines;
+                    if (pageType == DocumentType.FUNCEF) {
+                        parsedLines = lineParser.parseLinesFuncef(pageText, referencia);
+                    } else {
+                        parsedLines = lineParser.parseLines(pageText, pageType);
+                    }
+
+                    log.info("📊 Total de linhas parseadas: {}", parsedLines.size());
+
+                    List<PayrollEntry> entries = new ArrayList<>();
+                    for (int idx = 0; idx < parsedLines.size(); idx++) {
+                        PdfLineParser.ParsedLine parsedLine = parsedLines.get(idx);
+                        log.debug("Processando linha [{}]: código=[{}], valor=[{}]",
+                                idx + 1, parsedLine.getCodigo(), parsedLine.getValorStr());
+
+                        String finalReferencia = parsedLine.getReferencia() != null
+                                ? parsedLine.getReferencia()
+                                : referencia;
+
+                        PayrollEntry entry = createEntryFromParsedLine(
+                                document.getId(),
+                                document.getTenantId(),
+                                parsedLine,
+                                finalReferencia,
+                                origem,
+                                pageNumber,
+                                referencia);
+
+                        if (entry != null) {
+                            entries.add(entry);
+                        }
+                    }
+
+                    log.info("📊 Página {} - {} rubricas extraídas (parser), {} entries criadas",
+                            pageNumber, parsedLines.size(), entries.size());
+
+                    return new PageResult(entries);
                 });
     }
 

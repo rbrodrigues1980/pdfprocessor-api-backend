@@ -36,6 +36,11 @@ steps:
       - '--image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_IMAGE_NAME}:$COMMIT_SHA'
       - '--region=${_REGION}'
       - '--platform=managed'
+      - '--memory=2Gi'
+      - '--cpu=1'
+      - '--concurrency=10'
+      - '--timeout=900'
+      - '--max-instances=3'
 
 options:
   logging: CLOUD_LOGGING_ONLY

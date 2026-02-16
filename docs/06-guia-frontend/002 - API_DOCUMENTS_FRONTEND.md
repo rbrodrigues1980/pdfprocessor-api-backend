@@ -598,6 +598,8 @@ X-Tenant-ID: {tenantId}  // Opcional: apenas para SUPER_ADMIN
     "tipo": "CAIXA",
     "ano": 2018,
     "entriesCount": 25,
+    "confidenceScore": null,
+    "validationRecommendation": null,
     "dataUpload": "2024-01-15T10:30:00Z",
     "dataProcessamento": "2024-01-15T10:35:00Z",
     "erro": null
@@ -609,6 +611,8 @@ X-Tenant-ID: {tenantId}  // Opcional: apenas para SUPER_ADMIN
     "tipo": "FUNCEF",
     "ano": 2019,
     "entriesCount": 30,
+    "confidenceScore": 0.92,
+    "validationRecommendation": "ACCEPT",
     "dataUpload": "2024-01-16T14:20:00Z",
     "dataProcessamento": "2024-01-16T14:25:00Z",
     "erro": null
@@ -626,6 +630,8 @@ interface DocumentResponse {
   tipo: 'CAIXA' | 'FUNCEF' | 'CAIXA_FUNCEF';
   ano: number | null;
   entriesCount: number | null;
+  confidenceScore: number | null;              // Score de confiança da IA (0.0-1.0) — null para PDFs digitais
+  validationRecommendation: string | null;     // "ACCEPT", "REVIEW" ou "REJECT" — null para PDFs digitais
   dataUpload: string;
   dataProcessamento: string | null;
   erro: string | null;
@@ -716,11 +722,20 @@ Authorization: Bearer {accessToken}
   "tipo": "CAIXA",
   "ano": 2018,
   "entriesCount": 25,
+  "confidenceScore": 0.92,
+  "validationRecommendation": "ACCEPT",
   "dataUpload": "2024-01-15T10:30:00Z",
   "dataProcessamento": "2024-01-15T10:35:00Z",
   "erro": null
 }
 ```
+
+> **Nota sobre `confidenceScore` e `validationRecommendation`:**
+> - Para PDFs **digitais** (processados por iText/PDFBox): ambos são `null`
+> - Para PDFs **escaneados** (processados por Gemini IA): preenchidos com o score e recomendação
+> - `"ACCEPT"` (score >= 0.85): dados confiáveis
+> - `"REVIEW"` (score 0.60-0.84): sugerir revisão manual
+> - `"REJECT"` (score < 0.60): dados não confiáveis, sugerir reprocessamento
 
 #### Códigos de Status
 
@@ -1261,11 +1276,17 @@ interface DocumentResponse {
   tipo: 'CAIXA' | 'FUNCEF' | 'CAIXA_FUNCEF';
   ano: number | null;
   entriesCount: number | null;
+  confidenceScore: number | null;              // Score de confiança da IA (0.0-1.0) — Fase 2
+  validationRecommendation: string | null;     // "ACCEPT" | "REVIEW" | "REJECT" — Fase 2
   dataUpload: string;  // ISO 8601
   dataProcessamento: string | null;  // ISO 8601
   erro: string | null;
 }
 ```
+
+> **Novos campos (Fases 2+3):**
+> - `confidenceScore` — Score de confiança atribuído pela validação por regras de negócio (0.0 a 1.0). Null para PDFs digitais.
+> - `validationRecommendation` — Recomendação baseada no score: `"ACCEPT"` (>= 0.85), `"REVIEW"` (0.60-0.84), `"REJECT"` (< 0.60). Null para PDFs digitais.
 
 ### ProcessDocumentResponse
 
@@ -1601,7 +1622,18 @@ async function gerenciarDocumento(
 - Documentos `PROCESSED` ou `ERROR` podem ser reprocessados
 - Documentos `PROCESSING` não podem ser processados novamente até concluir
 
-### 6. CORS
+### 6. Extração com IA (Fases 2+3)
+
+- Documentos processados com IA terão `confidenceScore` e `validationRecommendation` preenchidos
+- PDFs digitais (texto extraível por iText/PDFBox) **não usam IA** — esses campos ficam `null`
+- O frontend pode usar `confidenceScore` para exibir indicadores visuais de confiança:
+  - **Verde (ACCEPT)**: >= 85% — dados confiáveis
+  - **Laranja (REVIEW)**: 60-84% — sugerir revisão manual ao usuário
+  - **Vermelho (REJECT)**: < 60% — sugerir reprocessamento
+- A IA precisa estar habilitada (`GET /api/v1/config/ai` → `enabled: true`) para funcionar
+- Veja [API de Configuração de IA](./API_AI_CONFIG_FRONTEND.md) para mais detalhes
+
+### 7. CORS
 
 - Certifique-se de que o backend está configurado para aceitar requisições do seu domínio frontend
 - Verifique as configurações de CORS no `SecurityConfig.java`
@@ -1614,9 +1646,10 @@ async function gerenciarDocumento(
 - [Documentação de Autenticação](./API_AUTH_FRONTEND.md)
 - [Documentação de Tenants](./API_TENANTS_FRONTEND.md)
 - [Documentação de Rubricas](./API_RUBRICAS_FRONTEND.md)
+- [Configuração de IA (Gemini)](./API_AI_CONFIG_FRONTEND.md)
 - Swagger UI: `http://localhost:8081/swagger-ui.html`
 
 ---
 
-**Última atualização**: Janeiro 2024
+**Última atualização**: Fevereiro 2026
 

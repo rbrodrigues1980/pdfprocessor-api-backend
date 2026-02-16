@@ -3,12 +3,12 @@ package br.com.verticelabs.pdfprocessor.interfaces.rest.dto;
 import java.time.Instant;
 
 /**
- * Record de resposta para configuração de IA.
- * 
+ * Record de resposta para configuração de IA (Gemini 2.5).
+ *
  * @param enabled               Se a IA está habilitada
- * @param model                 Modelo de IA configurado
- * @param credentialsConfigured Se as credenciais do Google Cloud estão
- *                              configuradas
+ * @param model                 Modelo principal configurado (ex: gemini-2.5-flash)
+ * @param fallbackModel         Modelo fallback configurado (ex: gemini-2.5-pro)
+ * @param credentialsConfigured Se as credenciais do Google Cloud estão configuradas
  * @param projectId             ID do projeto no Google Cloud
  * @param location              Região do Vertex AI
  * @param updatedAt             Data da última atualização
@@ -18,6 +18,7 @@ import java.time.Instant;
 public record AiConfigResponse(
         Boolean enabled,
         String model,
+        String fallbackModel,
         Boolean credentialsConfigured,
         String projectId,
         String location,
