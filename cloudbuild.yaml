@@ -41,6 +41,7 @@ steps:
       - '--concurrency=10'
       - '--timeout=900'
       - '--max-instances=3'
+      - '--update-env-vars=GOOGLE_CLOUD_PROJECT=$PROJECT_ID'
 
 options:
   logging: CLOUD_LOGGING_ONLY
