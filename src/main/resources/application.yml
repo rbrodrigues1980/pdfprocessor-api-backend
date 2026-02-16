@@ -28,13 +28,18 @@ app:
   security:
     force2fa-global: false # Forçar 2FA globalmente (pode ser ativado por tenant ou usuário)
   cors:
+    # Origens locais (desenvolvimento)
     allowed-origins:
       - http://localhost:5173
       - http://127.0.0.1:5173
+      - http://localhost:3000
+      - http://127.0.0.1:3000
       - http://localhost
       - http://localhost:80
       - http://127.0.0.1
       - http://127.0.0.1:80
+    # Para Cloud Run / produção, defina a variável de ambiente:
+    # APP_CORS_EXTRA_ORIGINS=https://meu-frontend.us-central1.run.app,https://meudominio.com
   logging:
     mongo:
       enabled: false
