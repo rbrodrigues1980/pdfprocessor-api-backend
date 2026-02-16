@@ -65,8 +65,8 @@
     </appender>
 
     <!-- MongoDB Appender Configuration -->
-    <springProperty scope="context" name="MONGO_URI" source="spring.data.mongodb.uri"/>
-    <springProperty scope="context" name="MONGO_LOGGING_ENABLED" source="app.logging.mongo.enabled" defaultValue="true"/>
+    <springProperty scope="context" name="MONGO_URI" source="spring.data.mongodb.uri" defaultValue=""/>
+    <springProperty scope="context" name="MONGO_LOGGING_ENABLED" source="app.logging.mongo.enabled" defaultValue="false"/>
 
     <appender name="MONGO" class="br.com.verticelabs.pdfprocessor.infrastructure.logging.MongoAppender">
         <uri>${MONGO_URI}</uri>

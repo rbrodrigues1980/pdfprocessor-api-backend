@@ -16,7 +16,7 @@ services:
       - SPRING_PROFILES_ACTIVE=docker
 
       # MongoDB Atlas (substitua pela sua URI)
-      - SPRING_DATA_MONGODB_URI=${MONGODB_URI:-mongodb://localhost:27017/pdfprocessor}
+      - SPRING_DATA_MONGODB_URI=${MONGODB_URI:-mongodb://localhost:27017/pdfprocessor-hml}
 
       # JWT Configuration
       - JWT_SECRET=${JWT_SECRET:-your-super-secret-key-change-in-production}
@@ -55,7 +55,7 @@ services:
     environment:
       - MONGO_INITDB_ROOT_USERNAME=${MONGO_ROOT_USER:-admin}
       - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD:-admin123}
-      - MONGO_INITDB_DATABASE=pdfprocessor
+      - MONGO_INITDB_DATABASE=pdfprocessor-hml
     volumes:
       - mongodb_data:/data/db
       - mongodb_config:/data/configdb

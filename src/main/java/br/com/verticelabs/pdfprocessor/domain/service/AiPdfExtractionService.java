@@ -50,4 +50,14 @@ public interface AiPdfExtractionService {
      * @return Mono contendo JSON com resultado da validação
      */
     Mono<String> validatePayrollData(String extractedDataJson);
+
+    /**
+     * Extrai dados estruturados de um contracheque usando o modelo fallback (Pro).
+     * Chamado na Fase 4 quando Flash + Cross-Validation não são suficientes.
+     *
+     * @param pdfBytes   bytes do PDF
+     * @param pageNumber número da página (1-indexed)
+     * @return Mono contendo JSON com dados estruturados do contracheque
+     */
+    Mono<String> extractPayrollDataWithFallback(byte[] pdfBytes, int pageNumber);
 }

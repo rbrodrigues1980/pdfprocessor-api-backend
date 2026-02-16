@@ -304,7 +304,45 @@ URL scheme must be "http" or "https" for CORS request.
 
 ---
 
-### Problema 3: Perfil Spring fixo no Dockerfile (`docker` em vez de `prod`)
+### Problema 3: Memory limit exceeded (OOMKilled) — 1024 MiB insuficiente
+
+**Erro** (13/02/2026):
+```
+Memory limit of 1024 MiB exceeded with 1051 MiB used.
+Consider increasing the memory limit, see https://cloud.google.com/run/docs/configuring/memory-limits
+```
+
+**Causa**: O serviço estava configurado com 1024 MiB no Cloud Run, mas a JVM com `MaxRAMPercentage=75.0` consumia ~768 MiB de heap + ~280 MiB de non-heap (metaspace, code cache, direct memory, thread stacks), totalizando ~1048 MiB. Qualquer pico (processamento de PDF grande, chamada Gemini) estourava o limite.
+
+A stack de dependências é pesada em memória: PDFBox + Tika + iText 8 + Apache POI + Vertex AI SDK + Spring WebFlux + MongoDB Reactive.
+
+**Solução** (3 alterações):
+
+1. **`cloudbuild.yaml`**: Adicionado `--memory=2Gi` no step de deploy para garantir que toda nova revisão use 2 GiB. Também adicionados `--cpu`, `--concurrency`, `--timeout` e `--max-instances` para que a infra fique versionada como código (IaC).
+
+2. **`Dockerfile`**: `MaxRAMPercentage` reduzido de 75% para 70% e adicionados limites explícitos de non-heap:
+   - `-XX:MaxMetaspaceSize=200m` — limita classes carregadas
+   - `-XX:ReservedCodeCacheSize=64m` — limita JIT compiled code
+   - `-XX:MaxDirectMemorySize=128m` — limita NIO buffers (WebFlux/MongoDB)
+
+3. **Fix imediato em prod** (sem esperar deploy):
+   ```bash
+   gcloud run services update pdfprocessor-api-backend --region us-central1 --memory 2Gi
+   ```
+
+**Distribuição de memória com 2 GiB (2048 MiB):**
+
+| Componente | Limite | Descrição |
+|---|---|---|
+| Heap (70%) | ~1433 MiB | Objetos da app (PDFBox, Tika, POI, etc.) |
+| Metaspace | max 200 MiB | Classes carregadas (Spring + libs pesadas) |
+| Code Cache | 64 MiB | Código compilado pelo JIT |
+| Direct Memory | 128 MiB | NIO buffers (WebFlux, MongoDB driver) |
+| Thread stacks + outros | ~223 MiB | Margem de segurança |
+
+---
+
+### Problema 4: Perfil Spring fixo no Dockerfile (`docker` em vez de `prod`)
 
 **Causa**: `-Dspring.profiles.active=docker` no `JAVA_OPTS` do Dockerfile. System property (`-D`) tem prioridade sobre variável de ambiente no Spring Boot, impedindo que `SPRING_PROFILES_ACTIVE=prod` fosse respeitado.
 
@@ -408,6 +446,7 @@ O arquivo `cloudbuild.yaml` na raiz do projeto usa o [kaniko](https://cloud.goog
 
 ```yaml
 steps:
+  # Build com kaniko (cache automático de layers)
   - name: 'gcr.io/kaniko-project/executor:latest'
     args:
       - '--destination=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_IMAGE_NAME}:$COMMIT_SHA'
@@ -416,6 +455,22 @@ steps:
       - '--cache-ttl=168h'     # cache válido por 7 dias
       - '--dockerfile=Dockerfile'
       - '--context=.'
+
+  # Deploy no Cloud Run (infra como código — todos os limites versionados)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'pdfprocessor-api-backend'
+      - '--image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_IMAGE_NAME}:$COMMIT_SHA'
+      - '--region=${_REGION}'
+      - '--platform=managed'
+      - '--memory=2Gi'          # PDFBox + Tika + POI + JVM precisam de RAM
+      - '--cpu=1'
+      - '--concurrency=10'      # Cada request de PDF consome muita RAM/CPU
+      - '--timeout=900'         # PDFs grandes podem demorar
+      - '--max-instances=3'     # Controle de custo
 ```
 
 ### Como ativar
@@ -529,6 +584,8 @@ gcloud run services update pdfprocessor-api-backend --region us-central1 \
 - [x] `.gitignore`: `gradle-wrapper.jar` com exceção APÓS `*.jar`
 - [x] `gradle/wrapper/gradle-wrapper.jar`: presente no repositório
 - [x] `cloudbuild.yaml`: kaniko com cache (opcional, para builds rápidos)
+- [x] `cloudbuild.yaml`: `--memory=2Gi` e demais limites no step de deploy (infra como código)
+- [x] `Dockerfile`: limites explícitos de non-heap (metaspace, code cache, direct memory)
 
 ### Console (Google Cloud)
 
@@ -561,6 +618,7 @@ gcloud run services update pdfprocessor-api-backend --region us-central1 \
 | `8703f33` | fix: incluir gradle-wrapper.jar no repositório | Build falhava por falta do wrapper JAR |
 | `d84e389` | fix: habilitar forward-headers-strategy para HTTPS | Swagger gerava URLs `http://` causando erro CORS |
 | `cffe816` | feat: adicionar cloudbuild.yaml com kaniko cache | Otimização de tempo de build (~7 min → ~2-3 min) |
+| — | fix: aumentar memória Cloud Run para 2Gi e otimizar JVM | OOMKilled com 1024 MiB; infra como código no cloudbuild.yaml |
 
 ---
 

@@ -59,11 +59,22 @@ EXPOSE 8081
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT:-8081}/actuator/health || exit 1
 
-# Configurações JVM otimizadas para container
+# Configurações JVM otimizadas para container (Cloud Run = 2 GiB)
 # NOTA: NÃO definir spring.profiles.active aqui via -D (system property tem prioridade
 # sobre env var e impediria trocar o perfil no Cloud Run). Use a env var SPRING_PROFILES_ACTIVE.
+#
+# Distribuição de memória para 2 GiB (2048 MiB):
+#   Heap (70% de 2048):   ~1433 MiB  — para objetos da app (PDFBox, Tika, POI, etc.)
+#   Metaspace:              max 200 MiB — classes carregadas (Spring + libs pesadas)
+#   Code Cache:              64 MiB    — JIT compiled code
+#   Direct Memory:          128 MiB    — NIO buffers (WebFlux, MongoDB driver)
+#   Thread stacks + outros: ~223 MiB   — margem de segurança
+#   Total estimado:        ~2048 MiB
 ENV JAVA_OPTS="-XX:+UseContainerSupport \
-    -XX:MaxRAMPercentage=75.0 \
+    -XX:MaxRAMPercentage=70.0 \
+    -XX:MaxMetaspaceSize=200m \
+    -XX:ReservedCodeCacheSize=64m \
+    -XX:MaxDirectMemorySize=128m \
     -XX:+UseG1GC \
     -XX:+UseStringDeduplication \
     -Djava.security.egd=file:/dev/./urandom"

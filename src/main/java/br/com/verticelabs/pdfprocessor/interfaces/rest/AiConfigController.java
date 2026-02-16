@@ -20,14 +20,22 @@ import reactor.core.publisher.Mono;
 import java.time.Instant;
 
 /**
- * Controller para gerenciar configurações de IA.
- * Permite habilitar/desabilitar o uso de IA para PDFs escaneados via frontend.
+ * Controller para gerenciar configurações de IA (Gemini 2.5).
+ *
+ * <p>Permite habilitar/desabilitar o uso de IA para PDFs escaneados via frontend,
+ * e configurar os modelos principal e fallback.</p>
+ *
+ * <p><strong>Modelos disponíveis:</strong></p>
+ * <ul>
+ *   <li>{@code gemini-2.5-flash} — Modelo principal (rápido e econômico)</li>
+ *   <li>{@code gemini-2.5-pro} — Modelo fallback (mais preciso, mais caro)</li>
+ * </ul>
  */
 @Slf4j
 @RestController
 @RequestMapping("/config/ai")
 @RequiredArgsConstructor
-@Tag(name = "Configuração de IA", description = "APIs para gerenciar configurações de Inteligência Artificial")
+@Tag(name = "Configuração de IA", description = "APIs para gerenciar configurações de Inteligência Artificial (Gemini 2.5)")
 @SecurityRequirement(name = "bearerAuth")
 public class AiConfigController {
 
@@ -38,7 +46,8 @@ public class AiConfigController {
      * Obtém o status atual da configuração de IA.
      */
     @GetMapping
-    @Operation(summary = "Obter configuração de IA", description = "Retorna o status atual da configuração de IA para PDFs escaneados")
+    @Operation(summary = "Obter configuração de IA",
+            description = "Retorna o status atual da configuração de IA, incluindo modelos principal e fallback")
     public Mono<ResponseEntity<AiConfigResponse>> getConfig() {
         return configRepository.findByKeyAndTenantIdIsNull(SystemConfig.KEY_AI_ENABLED)
                 .map(config -> buildResponse(config, true))
@@ -52,13 +61,14 @@ public class AiConfigController {
      */
     @PutMapping
     @PreAuthorize("hasRole('SUPER_ADMIN')")
-    @Operation(summary = "Atualizar configuração de IA", description = "Habilita ou desabilita o uso de IA. Requer role SUPER_ADMIN.")
+    @Operation(summary = "Atualizar configuração de IA",
+            description = "Habilita ou desabilita o uso de IA e configura modelos. Requer role SUPER_ADMIN.")
     public Mono<ResponseEntity<AiConfigResponse>> updateConfig(
             @RequestBody AiConfigRequest request,
             @AuthenticationPrincipal UserDetails userDetails) {
 
-        log.info("Atualizando configuração de IA: enabled={}, model={}, user={}",
-                request.enabled(), request.model(),
+        log.info("Atualizando configuração de IA: enabled={}, model={}, fallbackModel={}, user={}",
+                request.enabled(), request.model(), request.fallbackModel(),
                 userDetails != null ? userDetails.getUsername() : "unknown");
 
         return configRepository.findByKeyAndTenantIdIsNull(SystemConfig.KEY_AI_ENABLED)
@@ -68,37 +78,50 @@ public class AiConfigController {
                         .build()))
                 .flatMap(config -> {
                     config.setValue(String.valueOf(request.enabled()));
-                    config.setDescription("Habilita uso de IA para PDFs escaneados");
+                    config.setDescription("Habilita uso de IA (Gemini 2.5) para PDFs escaneados e extração inteligente");
                     config.setUpdatedAt(Instant.now());
                     config.setUpdatedBy(userDetails != null ? userDetails.getUsername() : "system");
                     return configRepository.save(config);
                 })
                 .flatMap(savedConfig -> {
-                    // Se também tiver modelo, salvar
+                    // Salvar modelo principal se fornecido
+                    Mono<SystemConfig> modelSave = Mono.just(savedConfig);
                     if (request.model() != null && !request.model().isEmpty()) {
-                        return saveModelConfig(request.model(), userDetails)
+                        modelSave = saveModelConfig(SystemConfig.KEY_AI_MODEL,
+                                request.model(), "Modelo principal de IA (Flash)", userDetails)
                                 .thenReturn(savedConfig);
                     }
-                    return Mono.just(savedConfig);
+                    return modelSave;
+                })
+                .flatMap(savedConfig -> {
+                    // Salvar modelo fallback se fornecido
+                    Mono<SystemConfig> fallbackSave = Mono.just(savedConfig);
+                    if (request.fallbackModel() != null && !request.fallbackModel().isEmpty()) {
+                        fallbackSave = saveModelConfig(SystemConfig.KEY_AI_FALLBACK_MODEL,
+                                request.fallbackModel(), "Modelo fallback de IA (Pro)", userDetails)
+                                .thenReturn(savedConfig);
+                    }
+                    return fallbackSave;
                 })
                 .map(config -> {
-                    log.info("✅ Configuração de IA atualizada com sucesso");
+                    log.info("Configuração de IA atualizada com sucesso");
                     return ResponseEntity.ok(buildResponse(config, true));
                 });
     }
 
     /**
-     * Salva configuração do modelo.
+     * Salva configuração de modelo no banco de dados.
      */
-    private Mono<SystemConfig> saveModelConfig(String model, UserDetails userDetails) {
-        return configRepository.findByKeyAndTenantIdIsNull(SystemConfig.KEY_AI_MODEL)
+    private Mono<SystemConfig> saveModelConfig(String key, String value,
+                                                String description, UserDetails userDetails) {
+        return configRepository.findByKeyAndTenantIdIsNull(key)
                 .switchIfEmpty(Mono.just(SystemConfig.builder()
-                        .key(SystemConfig.KEY_AI_MODEL)
+                        .key(key)
                         .createdAt(Instant.now())
                         .build()))
                 .flatMap(config -> {
-                    config.setValue(model);
-                    config.setDescription("Modelo de IA a ser usado");
+                    config.setValue(value);
+                    config.setDescription(description);
                     config.setUpdatedAt(Instant.now());
                     config.setUpdatedBy(userDetails != null ? userDetails.getUsername() : "system");
                     return configRepository.save(config);
@@ -119,22 +142,24 @@ public class AiConfigController {
             updatedBy = config.getUpdatedBy();
         }
 
-        // Verificar se credenciais estão configuradas
         boolean credentialsConfigured = geminiConfig.getProjectId() != null
                 && !geminiConfig.getProjectId().isEmpty();
 
         String statusMessage;
         if (!enabled) {
-            statusMessage = "IA desabilitada. PDFs escaneados não serão processados.";
+            statusMessage = "IA desabilitada. PDFs escaneados não serão processados pela IA.";
         } else if (!credentialsConfigured) {
-            statusMessage = "⚠️ IA habilitada, mas credenciais do Google Cloud não configuradas.";
+            statusMessage = "IA habilitada, mas credenciais do Google Cloud não configuradas. "
+                    + "Configure GOOGLE_CLOUD_PROJECT e GOOGLE_APPLICATION_CREDENTIALS.";
         } else {
-            statusMessage = "✅ IA habilitada e pronta para uso.";
+            statusMessage = "IA habilitada e pronta. Modelo principal: " + geminiConfig.getModel()
+                    + ", Fallback: " + geminiConfig.getFallbackModel() + ".";
         }
 
         return new AiConfigResponse(
                 enabled,
                 geminiConfig.getModel(),
+                geminiConfig.getFallbackModel(),
                 credentialsConfigured,
                 geminiConfig.getProjectId(),
                 geminiConfig.getLocation(),

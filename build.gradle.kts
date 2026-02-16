@@ -71,8 +71,10 @@ dependencies {
     // OpenAPI
     implementation("org.springdoc:springdoc-openapi-starter-webflux-ui:2.6.0")
 
-    // Spring AI - Google Gemini (Vertex AI)
-    implementation("com.google.cloud:google-cloud-vertexai:1.2.0")
+    // Google Gemini AI (Vertex AI) — Extração inteligente de PDFs escaneados
+    // NOTA: O pacote google-cloud-vertexai será descontinuado em Junho/2026.
+    // Migração futura para com.google.genai:google-genai (ver docs/PLANO_UPGRADE_GEMINI_AI.md)
+    implementation("com.google.cloud:google-cloud-vertexai:1.43.0")
 
     // Test
     testImplementation("org.springframework.boot:spring-boot-starter-test")

@@ -50,6 +50,10 @@ public class PayrollDocument {
     
     private Long totalEntries; // Número total de entries extraídas
     
+    private Double confidenceScore; // Score de confiança da extração (0.0 a 1.0) — Fase 2
+    
+    private String validationRecommendation; // "ACCEPT", "REVIEW" ou "REJECT" — Fase 2
+    
     private String erro; // Mensagem de erro se status = ERROR
     
     private String uploadedBy; // ID do usuário que fez o upload
