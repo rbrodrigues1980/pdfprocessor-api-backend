@@ -5,6 +5,7 @@ import br.com.verticelabs.pdfprocessor.domain.exceptions.PersonNotFoundException
 import br.com.verticelabs.pdfprocessor.domain.model.DocumentStatus;
 import br.com.verticelabs.pdfprocessor.domain.model.DocumentType;
 import br.com.verticelabs.pdfprocessor.domain.model.PayrollDocument;
+import br.com.verticelabs.pdfprocessor.domain.model.ProcessingEvent;
 import br.com.verticelabs.pdfprocessor.domain.repository.PayrollDocumentRepository;
 import br.com.verticelabs.pdfprocessor.domain.repository.PersonRepository;
 import br.com.verticelabs.pdfprocessor.infrastructure.security.ReactiveSecurityContextHelper;
@@ -12,12 +13,16 @@ import br.com.verticelabs.pdfprocessor.interfaces.documents.dto.DocumentListResp
 import br.com.verticelabs.pdfprocessor.interfaces.documents.dto.DocumentListItemResponse;
 import br.com.verticelabs.pdfprocessor.interfaces.documents.dto.DocumentPageResponse;
 import br.com.verticelabs.pdfprocessor.interfaces.documents.dto.DocumentResponse;
+import br.com.verticelabs.pdfprocessor.interfaces.documents.dto.ProcessingStatusResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -40,12 +45,48 @@ public class DocumentQueryUseCase {
                     log.warn("Documento não encontrado: {}", id);
                     return Mono.error(new DocumentNotFoundException("Documento não encontrado: " + id));
                 }))
-                .map(this::toDocumentResponse)
+                .map(doc -> {
+                    DocumentResponse response = toDocumentResponse(doc);
+                    // Incluir processingLog apenas no detalhe (não em listagens)
+                    response.setProcessingLog(doc.getProcessingLog());
+                    return response;
+                })
                 .doOnSuccess(response -> {
-                    log.info("✓ Documento encontrado: {} - Status: {}", response.getId(), response.getStatus());
+                    log.info("✓ Documento encontrado: {} - Status: {} - ProcessingLog: {} eventos",
+                            response.getId(), response.getStatus(),
+                            response.getProcessingLog() != null ? response.getProcessingLog().size() : 0);
                 })
                 .doOnError(error -> {
                     log.error("Erro ao buscar documento: {}", id, error);
+                });
+    }
+
+    /**
+     * Retorna o status de processamento de um documento (endpoint leve para polling).
+     * Inclui status, totalPages e processingLog.
+     */
+    public Mono<ProcessingStatusResponse> getProcessingStatus(String id) {
+        return documentRepository.findById(id)
+                .switchIfEmpty(Mono.defer(() ->
+                        Mono.error(new DocumentNotFoundException("Documento não encontrado: " + id))))
+                .map(doc -> {
+                    // Extrair totalPages do primeiro evento PROCESSING_STARTED que tenha a info
+                    Integer totalPages = null;
+                    if (doc.getProcessingLog() != null) {
+                        totalPages = doc.getProcessingLog().stream()
+                                .filter(e -> e.getDetails() != null && e.getDetails().containsKey("totalPages"))
+                                .findFirst()
+                                .map(e -> ((Number) e.getDetails().get("totalPages")).intValue())
+                                .orElse(null);
+                    }
+
+                    return ProcessingStatusResponse.builder()
+                            .documentId(doc.getId())
+                            .status(doc.getStatus())
+                            .totalPages(totalPages)
+                            .erro(doc.getErro())
+                            .processingLog(doc.getProcessingLog())
+                            .build();
                 });
     }
 
@@ -83,16 +124,7 @@ public class DocumentQueryUseCase {
                     log.info("✓ Pessoa encontrada: {} ({})", person.getNome(), person.getCpf());
                     // Buscar documentos usando tenantId e CPF da pessoa encontrada
                     return documentRepository.findByTenantIdAndCpf(person.getTenantId(), person.getCpf())
-                            .map(doc -> DocumentListItemResponse.builder()
-                                    .id(doc.getId())
-                                    .ano(doc.getAnoDetectado())
-                                    .status(doc.getStatus())
-                                    .tipo(documentTypeToString(doc.getTipo()))
-                                    .mesesDetectados(doc.getMesesDetectados())
-                                    .dataUpload(doc.getDataUpload())
-                                    .dataProcessamento(doc.getDataProcessamento())
-                                    .totalEntries(doc.getTotalEntries())
-                                    .build())
+                            .map(this::toDocumentListItemResponse)
                             .collectList()
                             .map(docs -> {
                                 log.info("✓ {} documentos encontrados para personId: {} (SUPER_ADMIN)", docs.size(), personId);
@@ -121,16 +153,7 @@ public class DocumentQueryUseCase {
                     log.info("✓ Pessoa encontrada: {} ({})", person.getNome(), person.getCpf());
                     // Buscar documentos usando tenantId e CPF da pessoa
                     return documentRepository.findByTenantIdAndCpf(tenantId, person.getCpf())
-                            .map(doc -> DocumentListItemResponse.builder()
-                                    .id(doc.getId())
-                                    .ano(doc.getAnoDetectado())
-                                    .status(doc.getStatus())
-                                    .tipo(documentTypeToString(doc.getTipo()))
-                                    .mesesDetectados(doc.getMesesDetectados())
-                                    .dataUpload(doc.getDataUpload())
-                                    .dataProcessamento(doc.getDataProcessamento())
-                                    .totalEntries(doc.getTotalEntries())
-                                    .build())
+                            .map(this::toDocumentListItemResponse)
                             .collectList()
                             .map(docs -> {
                                 log.info("✓ {} documentos encontrados para personId: {} no tenant: {}", docs.size(), personId, tenantId);
@@ -168,16 +191,7 @@ public class DocumentQueryUseCase {
     private Mono<DocumentListResponse> findDocumentsByCpfForSuperAdmin(String cpf) {
         // SUPER_ADMIN: buscar documentos diretamente pelo CPF (sem filtrar por tenantId)
         return documentRepository.findByCpf(cpf)
-                .map(doc -> DocumentListItemResponse.builder()
-                        .id(doc.getId())
-                        .ano(doc.getAnoDetectado())
-                        .status(doc.getStatus())
-                        .tipo(documentTypeToString(doc.getTipo()))
-                        .mesesDetectados(doc.getMesesDetectados())
-                        .dataUpload(doc.getDataUpload())
-                        .dataProcessamento(doc.getDataProcessamento())
-                        .totalEntries(doc.getTotalEntries())
-                        .build())
+                .map(this::toDocumentListItemResponse)
                 .collectList()
                 .map(docs -> {
                     log.info("✓ {} documentos encontrados para CPF: {} (SUPER_ADMIN)", docs.size(), cpf);
@@ -199,16 +213,7 @@ public class DocumentQueryUseCase {
                     log.info("✓ Pessoa encontrada: {} ({})", person.getNome(), person.getCpf());
                     // Buscar documentos filtrando por tenantId e CPF
                     return documentRepository.findByTenantIdAndCpf(tenantId, cpf)
-                            .map(doc -> DocumentListItemResponse.builder()
-                                    .id(doc.getId())
-                                    .ano(doc.getAnoDetectado())
-                                    .status(doc.getStatus())
-                                    .tipo(documentTypeToString(doc.getTipo()))
-                                    .mesesDetectados(doc.getMesesDetectados())
-                                    .dataUpload(doc.getDataUpload())
-                                    .dataProcessamento(doc.getDataProcessamento())
-                                    .totalEntries(doc.getTotalEntries())
-                                    .build())
+                            .map(this::toDocumentListItemResponse)
                             .collectList()
                             .map(docs -> {
                                 log.info("✓ {} documentos encontrados para CPF: {} no tenant: {}", docs.size(), cpf, tenantId);
@@ -320,6 +325,61 @@ public class DocumentQueryUseCase {
                 .dataProcessamento(document.getDataProcessamento())
                 .erro(document.getErro())
                 .build();
+    }
+
+    /**
+     * Converte PayrollDocument para DocumentListItemResponse, incluindo campos de progresso
+     * quando o documento está em PROCESSING.
+     */
+    private DocumentListItemResponse toDocumentListItemResponse(PayrollDocument doc) {
+        DocumentListItemResponse.DocumentListItemResponseBuilder builder = DocumentListItemResponse.builder()
+                .id(doc.getId())
+                .ano(doc.getAnoDetectado())
+                .status(doc.getStatus())
+                .tipo(documentTypeToString(doc.getTipo()))
+                .mesesDetectados(doc.getMesesDetectados())
+                .dataUpload(doc.getDataUpload())
+                .dataProcessamento(doc.getDataProcessamento())
+                .totalEntries(doc.getTotalEntries());
+
+        // Incluir campos de progresso quando está processando ou já processou
+        List<ProcessingEvent> processingLog = doc.getProcessingLog();
+        if (processingLog != null && !processingLog.isEmpty()) {
+            builder.eventsCount(processingLog.size());
+
+            // Extrair totalPages do evento PROCESSING_STARTED
+            Integer totalPages = processingLog.stream()
+                    .filter(e -> e.getDetails() != null && e.getDetails().containsKey("totalPages"))
+                    .findFirst()
+                    .map(e -> ((Number) e.getDetails().get("totalPages")).intValue())
+                    .orElse(null);
+            builder.totalPages(totalPages);
+
+            // Contar páginas já processadas (distintas com GEMINI_EXTRACTION_COMPLETED ou TEXT_EXTRACTED)
+            Set<Integer> processedPages = new HashSet<>();
+            for (ProcessingEvent event : processingLog) {
+                if (event.getPage() != null &&
+                    ("GEMINI_EXTRACTION_COMPLETED".equals(event.getType().name()) ||
+                     "TEXT_EXTRACTED".equals(event.getType().name()) ||
+                     "ESCALATION_COMPLETED".equals(event.getType().name()))) {
+                    processedPages.add(event.getPage());
+                }
+            }
+            int pagesProcessed = processedPages.size();
+            builder.pagesProcessed(pagesProcessed);
+
+            // Calcular percentual de progresso
+            if (totalPages != null && totalPages > 0) {
+                builder.progressPercent(Math.round((float) pagesProcessed / totalPages * 100));
+            }
+
+            // Último evento significativo (não-debug)
+            ProcessingEvent lastEvent = processingLog.get(processingLog.size() - 1);
+            builder.lastEventMessage(lastEvent.getMessage());
+            builder.lastEventType(lastEvent.getType().name());
+        }
+
+        return builder.build();
     }
 }
 

@@ -1,6 +1,5 @@
 package br.com.verticelabs.pdfprocessor.application.documents;
 
-import br.com.verticelabs.pdfprocessor.domain.exceptions.PersonNotFoundException;
 import br.com.verticelabs.pdfprocessor.domain.repository.PayrollDocumentRepository;
 import br.com.verticelabs.pdfprocessor.domain.repository.PayrollEntryRepository;
 import br.com.verticelabs.pdfprocessor.domain.repository.PersonRepository;
@@ -95,9 +94,13 @@ public class DeleteDocumentUseCase {
                     String docId = document.getId();
 
                     // 4. Remover referência do documento na lista de documentos da Person
+                    if (cpf == null || cpf.isBlank()) {
+                        log.warn("⚠ Documento sem CPF associado, pulando remoção de referência na Person");
+                        return Mono.just(document);
+                    }
+
                     log.info("Removendo referência do documento na Person (CPF: {})", cpf);
                     return personRepository.findByTenantIdAndCpf(tenantId, cpf)
-                            .switchIfEmpty(Mono.error(new PersonNotFoundException("CPF: " + cpf)))
                             .flatMap(person -> {
                                 // Remover documentId da lista de documentos
                                 if (person.getDocumentos() != null && person.getDocumentos().contains(docId)) {
@@ -116,7 +119,11 @@ public class DeleteDocumentUseCase {
                                     log.warn("⚠ Documento {} não estava na lista de documentos da Person", docId);
                                     return Mono.just(document);
                                 }
-                            });
+                            })
+                            .switchIfEmpty(Mono.defer(() -> {
+                                log.warn("⚠ Person não encontrada para CPF: {}. Continuando exclusão do documento.", cpf);
+                                return Mono.just(document);
+                            }));
                 })
                 .flatMap(document -> {
                     String tenantId = document.getTenantId();

@@ -60,6 +60,11 @@ app:
     mongo:
       enabled: false
 
+# Netty — reduzir ruído do ByteBuf LEAK warning (comum em Spring WebFlux + MongoDB reativo)
+logging:
+  level:
+    io.netty.util.ResourceLeakDetector: ERROR
+
 # Gemini AI Configuration (para PDFs escaneados e extração inteligente)
 # Documentação completa: docs/API_GEMINI_AI.md
 gemini:
@@ -68,6 +73,6 @@ gemini:
   location: ${GEMINI_LOCATION:us-central1}
   model: ${GEMINI_MODEL:gemini-2.5-flash}
   fallback-model: ${GEMINI_FALLBACK_MODEL:gemini-2.5-pro}
-  max-output-tokens: 8192
+  max-output-tokens: 16384
   temperature: 0.1
   timeout-seconds: 120

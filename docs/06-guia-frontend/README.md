@@ -21,6 +21,8 @@
 | Config IA | [009 - API_AI_CONFIG_FRONTEND.md](./009%20-%20API_AI_CONFIG_FRONTEND.md) | `/api/v1/config/ai` | Ativar/desativar Gemini AI, selecionar modelo (Flash/Pro), status. Sugestões de UI. |
 | Imposto Renda | [010 - API_INCOME_TAX_FRONTEND.md](./010%20-%20API_INCOME_TAX_FRONTEND.md) | `/api/v1/documents/upload-income-tax` | Upload de declaração IR com processamento automático. Exemplos React/Vue. |
 | Sistema | [011 - API_SYSTEM_CLEAN_UPLOADS_FRONTEND.md](./011%20-%20API_SYSTEM_CLEAN_UPLOADS_FRONTEND.md) | `/api/v1/system/clean-uploads` | Limpar todos os uploads (exceto rubricas). Operação irreversível, com confirmação e estatísticas. |
+| Secrets | [012 - API_SECRET_GENERATOR_FRONTEND.md](./012%20-%20API_SECRET_GENERATOR_FRONTEND.md) | `/system/secrets` | Gerador de chaves criptográficas fortes (JWT, API keys, tokens). Presets e customização. |
+| **Processing Log** | [013 - API_PROCESSING_LOG_FRONTEND.md](./013%20-%20API_PROCESSING_LOG_FRONTEND.md) | `/api/v1/documents/{id}` | **Log de processamento / auditoria.** Timeline de eventos por página: dados extraídos pela IA, validações, cross-validation, escalação, rubricas não cadastradas. |
 
 ---
 
@@ -36,6 +38,7 @@
 7. Config IA               → Configuração do Gemini (admin)
 8. Imposto de Renda        → Upload de declarações IR
 9. Sistema (Clean)         → Operações de manutenção (admin)
+10. Gerador de Secrets     → Gerar chaves fortes (admin)
 ```
 
 ## Padrões comuns nos documentos

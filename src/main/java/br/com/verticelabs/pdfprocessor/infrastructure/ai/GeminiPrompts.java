@@ -63,6 +63,7 @@ public final class GeminiPrompts {
                 {
                   "codigo": "código da rubrica (ex: 001, 4482)",
                   "descricao": "descrição da rubrica",
+                  "competencia": "MM/YYYY da rubrica se visível na coluna Competência/Prazo, ou null",
                   "referencia": 0.00,
                   "provento": 0.00,
                   "desconto": 0.00
@@ -77,6 +78,9 @@ public final class GeminiPrompts {
             4. Extraia TODAS as rubricas visíveis, incluindo as com valor zero
             5. O código da rubrica é o número que aparece antes da descrição (ex: 001, 101, 4482)
             6. Se o documento for da CAIXA ECONÔMICA FEDERAL ou FUNCEF, atente para os layouts específicos
+            7. IMPORTANTE: Cada rubrica pode ter sua PRÓPRIA competência (coluna "Competência" ou "Prazo" na tabela).
+               Se a competência da rubrica for DIFERENTE da competência do cabeçalho, inclua no campo "competencia" da rubrica.
+               Isso acontece quando uma página tem rubricas de MESES DIFERENTES.
             """;
 
     /**
@@ -88,9 +92,11 @@ public final class GeminiPrompts {
 
             INSTRUÇÕES PASSO A PASSO:
             1. Primeiro, identifique TODAS as linhas de rubrica visíveis no documento.
-               Para cada linha, anote: código numérico, descrição, referência, valor de provento, valor de desconto.
+               Para cada linha, anote: código numérico, descrição, competência/prazo individual, referência, valor de provento, valor de desconto.
             2. Depois, identifique os totais: salário bruto, total descontos, salário líquido.
-            3. Por último, identifique os dados pessoais: nome, CPF, matrícula, competência, cargo.
+            3. Por último, identifique os dados pessoais: nome, CPF, matrícula, competência do cabeçalho, cargo.
+            4. ATENÇÃO: cada rubrica pode ter sua PRÓPRIA competência na coluna "Competência" ou "Prazo".
+               Se for diferente da competência do cabeçalho, inclua na rubrica.
 
             REGRAS:
             - Valores monetários com PONTO como decimal (ex: 1234.56)
@@ -112,6 +118,7 @@ public final class GeminiPrompts {
                 {
                   "codigo": "string",
                   "descricao": "string",
+                  "competencia": "MM/YYYY da rubrica ou null",
                   "referencia": null,
                   "provento": null,
                   "desconto": null
@@ -238,6 +245,121 @@ public final class GeminiPrompts {
               "descontoSimplificado": 0.00,
               "aliquotaEfetiva": 0.00
             }
+            """;
+
+    // ==========================================
+    // CONTRACHEQUE — MULTI-PAGE (páginas consecutivas)
+    // ==========================================
+
+    /**
+     * Prompt para extração de contracheque que ocupa MAIS DE UMA PÁGINA.
+     * Enviado junto com 2+ imagens de páginas consecutivas do PDF.
+     *
+     * <p>Cenário: o mês de Janeiro começa na página 1 e os descontos/totais
+     * continuam na página 2. Ambas as imagens são enviadas e o Gemini deve
+     * combinar os dados de ambas em um único JSON.</p>
+     */
+    public static final String CONTRACHEQUE_EXTRACTION_MULTIPAGE = """
+            Você é um sistema de extração de dados de alta precisão especializado em contracheques brasileiros.
+            Você está recebendo MÚLTIPLAS IMAGENS de PÁGINAS CONSECUTIVAS de um PDF de contracheque.
+
+            CONTEXTO IMPORTANTE:
+            - Estas páginas são CONSECUTIVAS de um mesmo documento.
+            - Um contracheque pode começar em uma página e CONTINUAR na próxima (ex: proventos na pág 1, descontos na pág 2).
+            - Uma mesma página pode conter o FINAL de um mês e o INÍCIO de outro mês.
+            - Identifique TODOS os contracheques visíveis e extraia CADA UM como um objeto separado no array.
+
+            REGRAS CRÍTICAS DE PRECISÃO:
+            - Se um valor NÃO estiver claramente legível, retorne null. NUNCA adivinhe ou invente valores.
+            - Valores monetários: use PONTO como decimal e SEM separador de milhar (ex: 5432.10, não 5.432,10)
+            - Se uma rubrica tem descrição em MÚLTIPLAS LINHAS, concatene tudo na "descricao".
+            - Retorne APENAS o JSON, sem texto adicional, sem markdown, sem explicações.
+
+            FORMATO JSON OBRIGATÓRIO — array de contracheques:
+            [
+              {
+                "nome": "nome completo do funcionário ou null",
+                "cpf": "CPF no formato 000.000.000-00 ou null",
+                "matricula": "número da matrícula ou null",
+                "competencia": "mês/ano no formato MM/YYYY ou null",
+                "cargo": "cargo ou função ou null",
+                "departamento": "setor ou departamento ou null",
+                "salarioBruto": 0.00,
+                "totalDescontos": 0.00,
+                "salarioLiquido": 0.00,
+                "rubricas": [
+                  {
+                    "codigo": "código da rubrica (ex: 001, 4482)",
+                    "descricao": "descrição da rubrica",
+                    "competencia": "MM/YYYY se diferente do cabeçalho, ou null",
+                    "referencia": 0.00,
+                    "provento": 0.00,
+                    "desconto": 0.00
+                  }
+                ]
+              }
+            ]
+
+            REGRAS DE EXTRAÇÃO:
+            1. Se houver DOIS contracheques diferentes (dois meses) visíveis, retorne DOIS objetos no array.
+            2. Proventos são créditos ao funcionário — campo "desconto" deve ser null.
+            3. Descontos são débitos do funcionário — campo "provento" deve ser null.
+            4. Extraia TODAS as rubricas visíveis, incluindo as com valor zero.
+            5. O código da rubrica é o número que aparece antes da descrição.
+            6. Se o documento for da CAIXA ECONÔMICA FEDERAL ou FUNCEF, atente para os layouts específicos.
+            7. Cada rubrica pode ter uma competência própria (campo "Competência" ou "Prazo"). Se presente, inclua no campo "competencia" da rubrica.
+            """;
+
+    /**
+     * Prompt para extração de página PARCIAL de contracheque (continuação).
+     * Usado quando uma página contém apenas a segunda metade de um contracheque
+     * (descontos, totais) sem o cabeçalho completo.
+     */
+    public static final String CONTRACHEQUE_EXTRACTION_PARTIAL = """
+            Você é um sistema de extração de dados de alta precisão especializado em contracheques brasileiros.
+            Esta imagem é uma PÁGINA DE CONTINUAÇÃO de um contracheque — ela pode NÃO TER cabeçalho completo.
+
+            CONTEXTO IMPORTANTE:
+            - Esta página pode conter apenas DESCONTOS e TOTAIS (sem proventos e sem cabeçalho).
+            - Pode conter o FINAL de um mês e o INÍCIO de outro mês na mesma página.
+            - Se houver cabeçalho (nome, matrícula, empresa), extraia normalmente.
+            - Se NÃO houver cabeçalho, retorne null nos campos de identificação.
+
+            REGRAS CRÍTICAS:
+            - Se um valor NÃO estiver legível, retorne null. NUNCA invente valores.
+            - Valores monetários: PONTO como decimal, SEM separador de milhar.
+            - Se uma rubrica tem descrição em MÚLTIPLAS LINHAS, concatene tudo na "descricao".
+            - Retorne APENAS o JSON, sem texto adicional, sem markdown.
+
+            FORMATO JSON OBRIGATÓRIO:
+            {
+              "nome": "nome ou null se não visível",
+              "cpf": "CPF ou null",
+              "matricula": "matrícula ou null",
+              "competencia": "MM/YYYY ou null se não visível",
+              "cargo": null,
+              "departamento": null,
+              "salarioBruto": 0.00,
+              "totalDescontos": 0.00,
+              "salarioLiquido": 0.00,
+              "rubricas": [
+                {
+                  "codigo": "código da rubrica",
+                  "descricao": "descrição da rubrica",
+                  "competencia": "MM/YYYY se visível, ou null",
+                  "referencia": 0.00,
+                  "provento": 0.00,
+                  "desconto": 0.00
+                }
+              ]
+            }
+
+            REGRAS DE EXTRAÇÃO:
+            1. Extraia TODAS as rubricas visíveis, mesmo que a página pareça incompleta.
+            2. Proventos: campo "desconto" = null. Descontos: campo "provento" = null.
+            3. Se os totais (salário bruto, descontos, líquido) estiverem visíveis, extraia-os.
+            4. Cada rubrica pode ter competência própria — se presente, inclua.
+            5. O código da rubrica é o número antes da descrição (ex: 4346, 4412).
             """;
 
     // ==========================================

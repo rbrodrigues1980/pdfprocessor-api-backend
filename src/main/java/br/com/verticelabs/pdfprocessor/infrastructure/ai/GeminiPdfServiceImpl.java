@@ -5,6 +5,7 @@ import br.com.verticelabs.pdfprocessor.domain.repository.SystemConfigRepository;
 import br.com.verticelabs.pdfprocessor.domain.service.AiPdfExtractionService;
 import br.com.verticelabs.pdfprocessor.infrastructure.config.GeminiConfig;
 import com.google.cloud.vertexai.VertexAI;
+import com.google.cloud.vertexai.api.Candidate;
 import com.google.cloud.vertexai.api.GenerateContentResponse;
 import com.google.cloud.vertexai.api.GenerationConfig;
 import com.google.cloud.vertexai.generativeai.ContentMaker;
@@ -24,6 +25,8 @@ import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Implementação do serviço de extração de PDFs usando Google Gemini 2.5 (Vertex AI).
@@ -265,6 +268,38 @@ public class GeminiPdfServiceImpl implements AiPdfExtractionService {
     }
 
     // ==========================================
+    // MÉTODOS PÚBLICOS — MULTI-PAGE EXTRACTION
+    // ==========================================
+
+    /**
+     * Extrai dados de contracheque de múltiplas páginas consecutivas usando o modelo principal (Flash).
+     * Usado quando um contracheque se divide entre 2+ páginas e a extração individual falha.
+     *
+     * @param pdfBytes bytes do PDF
+     * @param pages    lista de números de página (1-indexed) a processar juntas
+     * @return Mono contendo JSON com dados estruturados do contracheque
+     */
+    @Override
+    public Mono<String> extractPayrollDataMultiPage(byte[] pdfBytes, List<Integer> pages) {
+        return processMultiPageWithModel(primaryModel, config.getModel(), pdfBytes, pages,
+                GeminiPrompts.CONTRACHEQUE_EXTRACTION_MULTIPAGE);
+    }
+
+    /**
+     * Extrai dados de uma página parcial de contracheque (continuação) usando o modelo principal.
+     * Usado para páginas que são a segunda metade de um contracheque (sem cabeçalho).
+     *
+     * @param pdfBytes   bytes do PDF
+     * @param pageNumber número da página (1-indexed)
+     * @return Mono contendo JSON com dados estruturados
+     */
+    @Override
+    public Mono<String> extractPayrollDataPartialPage(byte[] pdfBytes, int pageNumber) {
+        return processWithModel(primaryModel, config.getModel(), pdfBytes, pageNumber,
+                GeminiPrompts.CONTRACHEQUE_EXTRACTION_PARTIAL);
+    }
+
+    // ==========================================
     // MÉTODOS DE CONSULTA
     // ==========================================
 
@@ -322,6 +357,9 @@ public class GeminiPdfServiceImpl implements AiPdfExtractionService {
                                 prompt,
                                 PartMaker.fromMimeTypeAndData("image/png", imageBytes)));
 
+                // 3. Verificar finishReason para detectar truncamento
+                checkFinishReason(response, modelName, pageNumber);
+
                 String result = ResponseHandler.getText(response);
                 long duration = System.currentTimeMillis() - startTime;
 
@@ -337,6 +375,83 @@ public class GeminiPdfServiceImpl implements AiPdfExtractionService {
                 throw new RuntimeException("Falha ao processar PDF com Gemini AI [" + modelName + "]", e);
             }
         }).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    /**
+     * Processa MÚLTIPLAS páginas consecutivas do PDF com um modelo Gemini.
+     * Envia todas as imagens em uma única request multi-modal para que o Gemini
+     * possa ver o contexto completo de um contracheque que ocupa mais de uma página.
+     *
+     * @param model      instância do GenerativeModel a usar
+     * @param modelName  nome do modelo para logging
+     * @param pdfBytes   bytes do PDF
+     * @param pages      lista de números de página (1-indexed) a processar juntas
+     * @param prompt     prompt de extração (deve instruir sobre multi-page)
+     * @return Mono contendo a resposta processada
+     */
+    private Mono<String> processMultiPageWithModel(GenerativeModel model, String modelName,
+                                                    byte[] pdfBytes, List<Integer> pages, String prompt) {
+        if (!isEnabled()) {
+            log.warn("Gemini AI desabilitado. Retornando vazio para páginas {}.", pages);
+            return Mono.just("");
+        }
+
+        return Mono.fromCallable(() -> {
+            log.info("Processando páginas {} com Gemini [{}] (multi-page)...", pages, modelName);
+            long startTime = System.currentTimeMillis();
+
+            try {
+                // 1. Converter cada página para imagem PNG
+                List<Object> multiModalParts = new ArrayList<>();
+                multiModalParts.add(prompt);
+                for (int pageNumber : pages) {
+                    byte[] imageBytes = convertPdfPageToImage(pdfBytes, pageNumber);
+                    log.debug("  Página {} - Imagem: {} bytes ({} KB)", pageNumber, imageBytes.length, imageBytes.length / 1024);
+                    multiModalParts.add(PartMaker.fromMimeTypeAndData("image/png", imageBytes));
+                }
+
+                // 2. Enviar todas as imagens + prompt em uma única request
+                GenerateContentResponse response = model.generateContent(
+                        ContentMaker.fromMultiModalData(multiModalParts.toArray()));
+
+                // 3. Verificar finishReason
+                checkFinishReason(response, modelName, pages.get(0));
+
+                String result = ResponseHandler.getText(response);
+                long duration = System.currentTimeMillis() - startTime;
+
+                log.info("Gemini [{}] processou páginas {} (multi-page) em {}ms ({} chars na resposta)",
+                        modelName, pages, duration, result != null ? result.length() : 0);
+
+                return cleanResponse(result);
+
+            } catch (Exception e) {
+                long duration = System.currentTimeMillis() - startTime;
+                log.error("Erro ao processar páginas {} com Gemini [{}] (multi-page) após {}ms: {}",
+                        pages, modelName, duration, e.getMessage());
+                throw new RuntimeException("Falha ao processar PDF multi-page com Gemini AI [" + modelName + "]", e);
+            }
+        }).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    /**
+     * Verifica o finishReason da resposta do Gemini para detectar truncamento.
+     * Se a resposta foi truncada por MAX_TOKENS, loga um warning.
+     */
+    private void checkFinishReason(GenerateContentResponse response, String modelName, int pageNumber) {
+        try {
+            if (response.getCandidatesCount() > 0) {
+                Candidate candidate = response.getCandidates(0);
+                Candidate.FinishReason finishReason = candidate.getFinishReason();
+                if (finishReason != null && finishReason != Candidate.FinishReason.STOP
+                        && finishReason != Candidate.FinishReason.FINISH_REASON_UNSPECIFIED) {
+                    log.warn("⚠️ Gemini [{}] página {}: finishReason={} — resposta pode estar truncada!",
+                            modelName, pageNumber, finishReason);
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Não foi possível verificar finishReason: {}", e.getMessage());
+        }
     }
 
     /**
