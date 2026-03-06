@@ -8,6 +8,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
+/**
+ * @deprecated Usar {@link DeleteDocumentUseCase} que é tenant-aware,
+ * remove referência da Person e deleta entries/GridFS corretamente.
+ */
+@Deprecated
 @Slf4j
 @Service
 @RequiredArgsConstructor

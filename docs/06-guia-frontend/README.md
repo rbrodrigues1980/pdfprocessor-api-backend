@@ -22,6 +22,7 @@
 | Imposto Renda | [010 - API_INCOME_TAX_FRONTEND.md](./010%20-%20API_INCOME_TAX_FRONTEND.md) | `/api/v1/documents/upload-income-tax` | Upload de declaração IR com processamento automático. Exemplos React/Vue. |
 | Sistema | [011 - API_SYSTEM_CLEAN_UPLOADS_FRONTEND.md](./011%20-%20API_SYSTEM_CLEAN_UPLOADS_FRONTEND.md) | `/api/v1/system/clean-uploads` | Limpar todos os uploads (exceto rubricas). Operação irreversível, com confirmação e estatísticas. |
 | Secrets | [012 - API_SECRET_GENERATOR_FRONTEND.md](./012%20-%20API_SECRET_GENERATOR_FRONTEND.md) | `/system/secrets` | Gerador de chaves criptográficas fortes (JWT, API keys, tokens). Presets e customização. |
+| **Processing Log** | [013 - API_PROCESSING_LOG_FRONTEND.md](./013%20-%20API_PROCESSING_LOG_FRONTEND.md) | `/api/v1/documents/{id}` | **Log de processamento / auditoria.** Timeline de eventos por página: dados extraídos pela IA, validações, cross-validation, escalação, rubricas não cadastradas. |
 
 ---
 

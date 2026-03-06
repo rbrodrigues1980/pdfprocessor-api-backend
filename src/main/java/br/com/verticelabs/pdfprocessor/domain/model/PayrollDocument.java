@@ -57,5 +57,8 @@ public class PayrollDocument {
     private String erro; // Mensagem de erro se status = ERROR
     
     private String uploadedBy; // ID do usuário que fez o upload
+
+    @Builder.Default
+    private List<ProcessingEvent> processingLog = new ArrayList<>(); // Log de eventos do processamento
 }
 

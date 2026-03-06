@@ -1,7 +1,7 @@
 package br.com.verticelabs.pdfprocessor.interfaces.documents;
 
 import br.com.verticelabs.pdfprocessor.application.documents.BulkDocumentUploadUseCase;
-import br.com.verticelabs.pdfprocessor.application.documents.DocumentDeleteUseCase;
+import br.com.verticelabs.pdfprocessor.application.documents.DeleteDocumentUseCase;
 import br.com.verticelabs.pdfprocessor.application.documents.DocumentProcessUseCase;
 import br.com.verticelabs.pdfprocessor.application.documents.DocumentQueryUseCase;
 import br.com.verticelabs.pdfprocessor.application.documents.DocumentSummaryUseCase;
@@ -34,7 +34,7 @@ public class DocumentController {
         private final DocumentUploadUseCase documentUploadUseCase;
         private final BulkDocumentUploadUseCase bulkDocumentUploadUseCase;
         private final DocumentProcessUseCase documentProcessUseCase;
-        private final DocumentDeleteUseCase documentDeleteUseCase;
+        private final DeleteDocumentUseCase deleteDocumentUseCase;
         private final DocumentQueryUseCase documentQueryUseCase;
         private final DocumentSummaryUseCase documentSummaryUseCase;
         private final EntryQueryUseCase entryQueryUseCase;
@@ -86,7 +86,7 @@ public class DocumentController {
 
         @DeleteMapping("/{id}")
         public Mono<ResponseEntity<Object>> deleteDocument(@PathVariable String id) {
-                return documentDeleteUseCase.deleteDocument(id)
+                return deleteDocumentUseCase.execute(id)
                                 .then(Mono.just(ResponseEntity.noContent().<Object>build()));
         }
 
@@ -143,6 +143,17 @@ public class DocumentController {
                                                                 return ResponseEntity.ok(response);
                                                         });
                                 });
+        }
+
+        /**
+         * GET /api/v1/documents/{id}/processing-status
+         * Retorna status de processamento leve para polling do frontend.
+         * Inclui status, totalPages e processingLog.
+         */
+        @GetMapping("/{id}/processing-status")
+        public Mono<ResponseEntity<Object>> getProcessingStatus(@PathVariable String id) {
+                return documentQueryUseCase.getProcessingStatus(id)
+                                .<ResponseEntity<Object>>map(ResponseEntity::ok);
         }
 
         /**

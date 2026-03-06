@@ -72,7 +72,108 @@ public class GeminiResponseParser {
     }
 
     /**
+     * Tenta reparar JSON truncado fechando arrays e objetos abertos.
+     * Útil quando o Gemini retorna resposta cortada por MAX_TOKENS.
+     *
+     * @param json JSON possivelmente incompleto
+     * @return JSON reparado (pode ainda ser inválido se muito corrompido)
+     */
+    public static String tryRepairTruncatedJson(String json) {
+        if (json == null || json.trim().isEmpty()) return json;
+
+        String trimmed = json.trim();
+
+        // Se já termina com }, provavelmente está completo
+        if (trimmed.endsWith("}")) return trimmed;
+
+        log.info("🔧 Tentando reparar JSON truncado ({} chars)...", trimmed.length());
+
+        // Contar brackets/braces abertos
+        int openBraces = 0;
+        int openBrackets = 0;
+        boolean inString = false;
+        boolean escaped = false;
+
+        for (int i = 0; i < trimmed.length(); i++) {
+            char c = trimmed.charAt(i);
+
+            if (escaped) {
+                escaped = false;
+                continue;
+            }
+
+            if (c == '\\' && inString) {
+                escaped = true;
+                continue;
+            }
+
+            if (c == '"') {
+                inString = !inString;
+                continue;
+            }
+
+            if (!inString) {
+                switch (c) {
+                    case '{': openBraces++; break;
+                    case '}': openBraces--; break;
+                    case '[': openBrackets++; break;
+                    case ']': openBrackets--; break;
+                }
+            }
+        }
+
+        // Se estamos dentro de uma string, fechar a string primeiro
+        StringBuilder repaired = new StringBuilder(trimmed);
+        if (inString) {
+            repaired.append("\"");
+        }
+
+        // Remover possível rubrica incompleta (última entrada do array pode estar cortada)
+        String current = repaired.toString();
+        int lastCompleteEntry = current.lastIndexOf("},");
+        int lastOpenBrace = current.lastIndexOf("{");
+        if (lastOpenBrace > lastCompleteEntry && openBraces > 1) {
+            // Há uma rubrica incompleta no final — remover até a última completa
+            repaired = new StringBuilder(current.substring(0, lastCompleteEntry + 1));
+            // Recalcular brackets
+            openBraces = 0;
+            openBrackets = 0;
+            inString = false;
+            escaped = false;
+            for (int i = 0; i < repaired.length(); i++) {
+                char c = repaired.charAt(i);
+                if (escaped) { escaped = false; continue; }
+                if (c == '\\' && inString) { escaped = true; continue; }
+                if (c == '"') { inString = !inString; continue; }
+                if (!inString) {
+                    switch (c) {
+                        case '{': openBraces++; break;
+                        case '}': openBraces--; break;
+                        case '[': openBrackets++; break;
+                        case ']': openBrackets--; break;
+                    }
+                }
+            }
+        }
+
+        // Fechar brackets e braces na ordem correta
+        for (int i = 0; i < openBrackets; i++) {
+            repaired.append("]");
+        }
+        for (int i = 0; i < openBraces; i++) {
+            repaired.append("}");
+        }
+
+        String result = repaired.toString();
+        log.info("🔧 JSON reparado: {} chars -> {} chars (adicionados {} brackets, {} braces)",
+                trimmed.length(), result.length(), openBrackets, openBraces);
+
+        return result;
+    }
+
+    /**
      * Parseia a resposta JSON do Gemini e cria PayrollEntry objects.
+     * Se o JSON estiver truncado, tenta reparar antes de parsear.
      *
      * @param jsonResponse   resposta JSON do Gemini
      * @param documentId     ID do documento
@@ -93,8 +194,14 @@ public class GeminiResponseParser {
             return null;
         }
 
+        // Tentar reparar JSON truncado antes de parsear
+        String jsonToParse = jsonResponse.trim();
+        if (!jsonToParse.endsWith("}")) {
+            jsonToParse = tryRepairTruncatedJson(jsonToParse);
+        }
+
         try {
-            JsonNode root = mapper.readTree(jsonResponse);
+            JsonNode root = mapper.readTree(jsonToParse);
 
             // Extrair metadados
             String nome = getTextOrNull(root, "nome");

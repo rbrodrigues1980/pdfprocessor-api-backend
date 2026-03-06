@@ -2,6 +2,8 @@ package br.com.verticelabs.pdfprocessor.domain.service;
 
 import reactor.core.publisher.Mono;
 
+import java.util.List;
+
 /**
  * Interface para serviço de extração de PDFs usando IA.
  * Usado como fallback quando PDFBox/iText não consegue extrair texto
@@ -60,4 +62,40 @@ public interface AiPdfExtractionService {
      * @return Mono contendo JSON com dados estruturados do contracheque
      */
     Mono<String> extractPayrollDataWithFallback(byte[] pdfBytes, int pageNumber);
+
+    /**
+     * Extrai dados de contracheque de MÚLTIPLAS páginas consecutivas.
+     * Envia todas as imagens em uma única request para que o modelo
+     * combine dados de um contracheque que se divide entre páginas.
+     *
+     * @param pdfBytes bytes do PDF
+     * @param pages    lista de números de página (1-indexed) a processar juntas
+     * @return Mono contendo JSON (array) com dados estruturados
+     */
+    Mono<String> extractPayrollDataMultiPage(byte[] pdfBytes, List<Integer> pages);
+
+    /**
+     * Extrai dados de uma página PARCIAL de contracheque (continuação).
+     * Usa prompt otimizado para páginas que são a segunda metade de um contracheque,
+     * podendo não ter cabeçalho (nome, CPF, competência).
+     *
+     * @param pdfBytes   bytes do PDF
+     * @param pageNumber número da página (1-indexed)
+     * @return Mono contendo JSON com dados estruturados
+     */
+    Mono<String> extractPayrollDataPartialPage(byte[] pdfBytes, int pageNumber);
+
+    /**
+     * Retorna o nome do modelo principal (ex: "gemini-2.5-flash").
+     */
+    default String getPrimaryModelName() {
+        return "unknown";
+    }
+
+    /**
+     * Retorna o nome do modelo fallback (ex: "gemini-2.5-pro").
+     */
+    default String getFallbackModelName() {
+        return "unknown";
+    }
 }
