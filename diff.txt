@@ -1,0 +1,309 @@
+diff --git a/src/main/java/br/com/verticelabs/pdfprocessor/application/documents/DocumentProcessUseCase.java b/src/main/java/br/com/verticelabs/pdfprocessor/application/documents/DocumentProcessUseCase.java
+index 5ecc788..1ea8ddb 100644
+--- a/src/main/java/br/com/verticelabs/pdfprocessor/application/documents/DocumentProcessUseCase.java
++++ b/src/main/java/br/com/verticelabs/pdfprocessor/application/documents/DocumentProcessUseCase.java
+@@ -713,304 +713,6 @@ public class DocumentProcessUseCase {
+                                 String.format("Texto ilegível (%d chars). Fontes sem mapeamento Unicode ou PDF escaneado.", textLen),
+                                 Map.of("textLength", textLen));
+ 
+-                        // Verificar se Gemini está habilitado
+-                        if (aiPdfExtractionService.isEnabled()) {
+-                            String modelName = aiPdfExtractionService.getPrimaryModelName();
+-                            log.info("🤖 Usando Gemini AI [{}] para extração ESTRUTURADA (JSON) da página {}...", modelName, pageNumber);
+-                            long geminiStart = System.currentTimeMillis();
+-
+-                            addInfoEvent(document, pageNumber, ProcessingEventType.GEMINI_EXTRACTION_STARTED,
+-                                    String.format("Extração via Gemini AI [%s] iniciada.", modelName),
+-                                    Map.of("model", modelName));
+-
+-                            // Fase 2: Usar extractPayrollData (JSON) ao invés de extractTextFromScannedPage (texto cru)
+-                            return aiPdfExtractionService.extractPayrollData(pdfBytes, pageNumber)
+-                                    .flatMap(jsonResponse -> {
+-                                        long geminiElapsed = System.currentTimeMillis() - geminiStart;
+-
+-                                        if (jsonResponse == null || jsonResponse.trim().isEmpty()) {
+-                                            log.warn("⚠️ Gemini não retornou dados da página {}", pageNumber);
+-                                            addWarnEvent(document, pageNumber, ProcessingEventType.GEMINI_EXTRACTION_COMPLETED,
+-                                                    String.format("Gemini não retornou dados (%dms).", geminiElapsed),
+-                                                    Map.of("processingTimeMs", geminiElapsed, "rubricasCount", 0));
+-                                            return Mono.just(new PageResult(new ArrayList<>()));
+-                                        }
+-
+-                                        log.info("✅ Gemini retornou {} chars de JSON estruturado da página {}",
+-                                                jsonResponse.length(), pageNumber);
+-
+-                                        // Parsear JSON do Gemini em entries
+-                                        String origem = determinePageOrigin(document, pageNumber);
+-                                        GeminiResponseParser.ParsedPayrollData parsedData =
+-                                                GeminiResponseParser.parsePayrollResponse(
+-                                                        jsonResponse,
+-                                                        document.getId(),
+-                                                        document.getTenantId(),
+-                                                        origem,
+-                                                        pageNumber);
+-
+-                                        if (parsedData == null || parsedData.getEntries().isEmpty()) {
+-                                            log.warn("⚠️ Gemini JSON não contém rubricas válidas na página {}", pageNumber);
+-                                            addWarnEvent(document, pageNumber, ProcessingEventType.GEMINI_EXTRACTION_COMPLETED,
+-                                                    String.format("Gemini retornou JSON mas sem rubricas válidas (%dms).", geminiElapsed),
+-                                                    Map.of("processingTimeMs", geminiElapsed, "rubricasCount", 0,
+-                                                            "responseLength", jsonResponse.length()));
+-                                            return Mono.just(new PageResult(new ArrayList<>()));
+-                                        }
+-
+-                                        int rubricasCount = parsedData.getEntries().size();
+-
+-                                        // Dados reais extraídos pela IA — visíveis para auditoria
+-                                        Map<String, Object> extractedDetails = new HashMap<>();
+-                                        extractedDetails.put("model", modelName);
+-                                        extractedDetails.put("processingTimeMs", geminiElapsed);
+-                                        extractedDetails.put("rubricasCount", rubricasCount);
+-                                        extractedDetails.put("responseLength", jsonResponse.length());
+-                                        if (parsedData.getNome() != null) extractedDetails.put("nome", parsedData.getNome());
+-                                        if (parsedData.getCpf() != null) extractedDetails.put("cpf", parsedData.getCpf());
+-                                        if (parsedData.getMatricula() != null) extractedDetails.put("matricula", parsedData.getMatricula());
+-                                        if (parsedData.getCompetencia() != null) extractedDetails.put("competencia", parsedData.getCompetencia());
+-                                        if (parsedData.getSalarioBruto() != null) extractedDetails.put("salarioBruto", parsedData.getSalarioBruto());
+-                                        if (parsedData.getTotalDescontos() != null) extractedDetails.put("totalDescontos", parsedData.getTotalDescontos());
+-                                        if (parsedData.getSalarioLiquido() != null) extractedDetails.put("salarioLiquido", parsedData.getSalarioLiquido());
+-
+-                                        // Salvar TODAS as rubricas extraídas para histórico/auditoria
+-                                        List<Map<String, Object>> rubricasList = parsedData.getEntries().stream()
+-                                                .map(entry -> {
+-                                                    Map<String, Object> r = new HashMap<>();
+-                                                    r.put("codigo", entry.getRubricaCodigo());
+-                                                    if (entry.getRubricaDescricao() != null) r.put("descricao", entry.getRubricaDescricao());
+-                                                    if (entry.getValor() != null) r.put("valor", entry.getValor());
+-                                                    if (entry.getReferencia() != null) r.put("referencia", entry.getReferencia());
+-                                                    return r;
+-                                                })
+-                                                .collect(java.util.stream.Collectors.toList());
+-                                        extractedDetails.put("rubricas", rubricasList);
+-
+-                                        String extractedSummary = String.format(
+-                                                "Gemini [%s] extraiu %d rubricas em %dms. nome=%s, cpf=%s, competencia=%s, bruto=%s, descontos=%s, líquido=%s",
+-                                                modelName, rubricasCount, geminiElapsed,
+-                                                parsedData.getNome(), parsedData.getCpf(), parsedData.getCompetencia(),
+-                                                parsedData.getSalarioBruto(), parsedData.getTotalDescontos(), parsedData.getSalarioLiquido());
+-
+-                                        addInfoEvent(document, pageNumber, ProcessingEventType.GEMINI_EXTRACTION_COMPLETED,
+-                                                extractedSummary, extractedDetails);
+-
+-                                        // Validação Fase 2: verificar consistência dos dados extraídos
+-                                        ValidationResult validation = validationService.validatePayrollExtraction(
+-                                                parsedData.getEntries(),
+-                                                parsedData.getSalarioBruto(),
+-                                                parsedData.getTotalDescontos(),
+-                                                parsedData.getSalarioLiquido(),
+-                                                parsedData.getCpf(),
+-                                                parsedData.getCompetencia()
+-                                        );
+-
+-                                        double score = validation.confidenceScore();
+-                                        String scoreStr = String.format("%.2f", score);
+-
+-                                        log.info("📊 Página {} (Gemini JSON) - {} rubricas extraídas, score={}, recommendation={}",
+-                                                pageNumber, parsedData.getEntries().size(),
+-                                                scoreStr, validation.recommendation());
+-
+-                                        if (!validation.issues().isEmpty()) {
+-                                            List<String> issueMessages = new ArrayList<>();
+-                                            List<Map<String, Object>> issueDetails = new ArrayList<>();
+-                                            for (ValidationIssue issue : validation.issues()) {
+-                                                log.warn("  ⚠️ Validação: [{}] {} — esperado={}, encontrado={}",
+-                                                        issue.type(), issue.message(),
+-                                                        issue.expected(), issue.found());
+-                                                issueMessages.add(issue.type() + ": " + issue.message());
+-                                                Map<String, Object> issueMap = new HashMap<>();
+-                                                issueMap.put("type", issue.type());
+-                                                issueMap.put("message", issue.message());
+-                                                if (issue.expected() != null) issueMap.put("expected", issue.expected());
+-                                                if (issue.found() != null) issueMap.put("found", issue.found());
+-                                                issueDetails.add(issueMap);
+-                                            }
+-
+-                                            Map<String, Object> valDetails = new HashMap<>();
+-                                            valDetails.put("score", score);
+-                                            valDetails.put("recommendation", validation.recommendation());
+-                                            valDetails.put("issues", issueDetails);
+-                                            valDetails.put("rubricasCount", rubricasCount);
+-                                            if (parsedData.getSalarioBruto() != null) valDetails.put("salarioBruto", parsedData.getSalarioBruto());
+-                                            if (parsedData.getTotalDescontos() != null) valDetails.put("totalDescontos", parsedData.getTotalDescontos());
+-                                            if (parsedData.getSalarioLiquido() != null) valDetails.put("salarioLiquido", parsedData.getSalarioLiquido());
+-
+-                                            if (validation.isValid()) {
+-                                                addInfoEvent(document, pageNumber, ProcessingEventType.VALIDATION_PASSED,
+-                                                        String.format("Validação aprovada (score %s). %d issues menores.",
+-                                                                scoreStr, issueMessages.size()),
+-                                                        valDetails);
+-                                            } else {
+-                                                addWarnEvent(document, pageNumber, ProcessingEventType.VALIDATION_FAILED,
+-                                                        String.format("Validação reprovada (score %s). %d issues: %s",
+-                                                                scoreStr, issueMessages.size(), String.join("; ", issueMessages)),
+-                                                        valDetails);
+-                                            }
+-                                        } else {
+-                                            addInfoEvent(document, pageNumber, ProcessingEventType.VALIDATION_PASSED,
+-                                                    String.format("Validação aprovada (score %s). Sem issues.", scoreStr),
+-                                                    Map.of("score", score, "recommendation", validation.recommendation(),
+-                                                            "rubricasCount", rubricasCount));
+-                                        }
+-
+-                                        // Fase 3: Cross-Validation — se score < 0.85, executar 2ª extração
+-                                        if (!validation.isValid()) {
+-                                            log.info("🔄 Score {} < 0.85 — Acionando CROSS-VALIDATION (Fase 3) na página {}...",
+-                                                    scoreStr, pageNumber);
+-
+-                                            addInfoEvent(document, pageNumber, ProcessingEventType.CROSS_VALIDATION_STARTED,
+-                                                    String.format("Cross-validation iniciada (score %s < 0.85).", scoreStr));
+-
+-                                            return crossValidationService.crossValidate(
+-                                                    pdfBytes, pageNumber,
+-                                                    parsedData.getEntries(),
+-                                                    jsonResponse,
+-                                                    document.getId(),
+-                                                    document.getTenantId(),
+-                                                    origem
+-                                            ).flatMap(crossResult -> {
+-                                                log.info("📊 Cross-validation página {}: score={}, matched={}/{}, revisão={}",
+-                                                        pageNumber,
+-                                                        String.format("%.2f", crossResult.confidenceScore()),
+-                                                        crossResult.matchedFields(),
+-                                                        crossResult.totalFields(),
+-                                                        crossResult.requiresManualReview());
+-
+-                                                addInfoEvent(document, pageNumber, ProcessingEventType.CROSS_VALIDATION_COMPLETED,
+-                                                        String.format("Cross-validation concluída. %d/%d campos coincidem (%.0f%%). Revisão manual: %s.",
+-                                                                crossResult.matchedFields(), crossResult.totalFields(),
+-                                                                crossResult.confidenceScore() * 100,
+-                                                                crossResult.requiresManualReview() ? "sim" : "não"),
+-                                                        Map.of("score", crossResult.confidenceScore(),
+-                                                                "matchedFields", crossResult.matchedFields(),
+-                                                                "totalFields", crossResult.totalFields(),
+-                                                                "requiresManualReview", crossResult.requiresManualReview(),
+-                                                                "consolidatedEntries", crossResult.consolidatedEntries().size()));
+-
+-                                                // Fase 4: Se cross-validation indica revisão manual, escalar para Gemini Pro
+-                                                if (crossResult.requiresManualReview()) {
+-                                                    log.info("⬆️ ESCALAÇÃO PARA GEMINI PRO (Fase 4) — Página {} com campos críticos divergentes",
+-                                                            pageNumber);
+-
+-                                                    String proModelName = aiPdfExtractionService.getFallbackModelName();
+-                                                    addWarnEvent(document, pageNumber, ProcessingEventType.ESCALATION_TO_PRO,
+-                                                            String.format("Escalação para Gemini Pro [%s]. Campos críticos divergentes na cross-validation.", proModelName),
+-                                                            Map.of("reason", "Campos críticos divergentes", "model", proModelName));
+-
+-                                                    long proStart = System.currentTimeMillis();
+-                                                    return aiPdfExtractionService.extractPayrollDataWithFallback(pdfBytes, pageNumber)
+-                                                            .map(proJsonResponse -> {
+-                                                                long proElapsed = System.currentTimeMillis() - proStart;
+-
+-                                                                if (proJsonResponse == null || proJsonResponse.trim().isEmpty()) {
+-                                                                    log.warn("⚠️ Gemini Pro não retornou dados da página {}. Usando resultado da cross-validation.",
+-                                                                            pageNumber);
+-                                                                    addWarnEvent(document, pageNumber, ProcessingEventType.ESCALATION_FAILED,
+-                                                                            String.format("Gemini Pro não retornou dados (%dms). Usando cross-validation.", proElapsed),
+-                                                                            Map.of("processingTimeMs", proElapsed));
+-                                                                    return new PageResult(crossResult.consolidatedEntries());
+-                                                                }
+-
+-                                                                log.info("✅ Gemini Pro retornou {} chars de JSON da página {}",
+-                                                                        proJsonResponse.length(), pageNumber);
+-
+-                                                                GeminiResponseParser.ParsedPayrollData proData =
+-                                                                        GeminiResponseParser.parsePayrollResponse(
+-                                                                                proJsonResponse,
+-                                                                                document.getId(),
+-                                                                                document.getTenantId(),
+-                                                                                origem,
+-                                                                                pageNumber);
+-
+-                                                                if (proData != null && !proData.getEntries().isEmpty()) {
+-                                                                    log.info("📊 Gemini Pro página {}: {} rubricas extraídas (substituindo resultado da cross-validation)",
+-                                                                            pageNumber, proData.getEntries().size());
+-
+-                                                                    Map<String, Object> proDetails = new HashMap<>();
+-                                                                    proDetails.put("processingTimeMs", proElapsed);
+-                                                                    proDetails.put("rubricasCount", proData.getEntries().size());
+-                                                                    proDetails.put("model", "gemini-pro");
+-                                                                    if (proData.getNome() != null) proDetails.put("nome", proData.getNome());
+-                                                                    if (proData.getCpf() != null) proDetails.put("cpf", proData.getCpf());
+-                                                                    if (proData.getCompetencia() != null) proDetails.put("competencia", proData.getCompetencia());
+-                                                                    if (proData.getSalarioBruto() != null) proDetails.put("salarioBruto", proData.getSalarioBruto());
+-                                                                    if (proData.getTotalDescontos() != null) proDetails.put("totalDescontos", proData.getTotalDescontos());
+-                                                                    if (proData.getSalarioLiquido() != null) proDetails.put("salarioLiquido", proData.getSalarioLiquido());
+-
+-                                                                    // Salvar TODAS as rubricas extraídas pelo Pro para histórico/auditoria
+-                                                                    List<Map<String, Object>> proRubricasList = proData.getEntries().stream()
+-                                                                            .map(entry -> {
+-                                                                                Map<String, Object> r = new HashMap<>();
+-                                                                                r.put("codigo", entry.getRubricaCodigo());
+-                                                                                if (entry.getRubricaDescricao() != null) r.put("descricao", entry.getRubricaDescricao());
+-                                                                                if (entry.getValor() != null) r.put("valor", entry.getValor());
+-                                                                                if (entry.getReferencia() != null) r.put("referencia", entry.getReferencia());
+-                                                                                return r;
+-                                                                            })
+-                                                                            .collect(java.util.stream.Collectors.toList());
+-                                                                    proDetails.put("rubricas", proRubricasList);
+-
+-                                                                    addInfoEvent(document, pageNumber, ProcessingEventType.ESCALATION_COMPLETED,
+-                                                                            String.format("Gemini Pro extraiu %d rubricas em %dms. nome=%s, competencia=%s, bruto=%s, descontos=%s, líquido=%s",
+-                                                                                    proData.getEntries().size(), proElapsed,
+-                                                                                    proData.getNome(), proData.getCompetencia(),
+-                                                                                    proData.getSalarioBruto(), proData.getTotalDescontos(), proData.getSalarioLiquido()),
+-                                                                            proDetails);
+-                                                                    return new PageResult(proData.getEntries());
+-                                                                }
+-
+-                                                                log.warn("⚠️ Gemini Pro não extraiu rubricas da página {}. Usando cross-validation.",
+-                                                                        pageNumber);
+-                                                                addWarnEvent(document, pageNumber, ProcessingEventType.ESCALATION_FAILED,
+-                                                                        String.format("Gemini Pro retornou JSON mas sem rubricas (%dms). Usando cross-validation.", proElapsed),
+-                                                                        Map.of("processingTimeMs", proElapsed));
+-                                                                return new PageResult(crossResult.consolidatedEntries());
+-                                                            })
+-                                                            .onErrorResume(proError -> {
+-                                                                long proElapsed = System.currentTimeMillis() - proStart;
+-                                                                log.error("❌ Erro ao escalar para Gemini Pro na página {}: {}. Usando cross-validation.",
+-                                                                        pageNumber, proError.getMessage());
+-                                                                addErrorEvent(document, pageNumber, ProcessingEventType.ESCALATION_FAILED,
+-                                                                        String.format("Erro no Gemini Pro (%dms): %s. Usando cross-validation.",
+-                                                                                proElapsed, proError.getMessage()),
+-                                                                        Map.of("processingTimeMs", proElapsed,
+-                                                                                "errorMessage", proError.getMessage()));
+-                                                                return Mono.just(new PageResult(crossResult.consolidatedEntries()));
+-                                                            });
+-                                                }
+-
+-                                                // Cross-validation OK — usar entries consolidadas
+-                                                return Mono.just(new PageResult(crossResult.consolidatedEntries()));
+-                                            });
+-                                        }
+-
+-                                        // Score >= 0.85 — dados confiáveis, usar direto
+-                                        return Mono.just(new PageResult(parsedData.getEntries()));
+-                                    })
+-                                    .onErrorResume(error -> {
+-                                        long geminiElapsed = System.currentTimeMillis() - geminiStart;
+-                                        log.error("❌ Erro ao usar Gemini [{}] na página {}: {}. Tentando extração de texto...",
+-                                                modelName, pageNumber, error.getMessage());
+-
+-                                        addErrorEvent(document, pageNumber, ProcessingEventType.GEMINI_EXTRACTION_FAILED,
+-                                                String.format("Erro no Gemini [%s] (%dms): %s. Tentando fallback.",
+-                                                        modelName, geminiElapsed, error.getMessage()),
+-                                                Map.of("model", modelName, "processingTimeMs", geminiElapsed,
+-                                                        "errorMessage", error.getMessage()));
+-
+-                                        // Fallback: tentar extração de texto cru como antes
+-                                        return aiPdfExtractionService.extractTextFromScannedPage(pdfBytes, pageNumber)
+-                                                .map(extractedText -> {
+-                                                    if (extractedText != null && !extractedText.trim().isEmpty()) {
+-                                                        log.info("✅ Fallback: Gemini extraiu {} caracteres (texto) da página {}",
+-                                                                extractedText.length(), pageNumber);
+-                                                        return extractedText;
+-                                                    }
+-                                                    return "";
+-                                                })
+                                                 .flatMap(text -> processPageTextWithParser(document, text, pageNumber))
+                                                 .onErrorResume(err -> {
+                                                     log.error("❌ Fallback também falhou na página {}: {}", pageNumber, err.getMessage());

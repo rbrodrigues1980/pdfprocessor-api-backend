@@ -1,0 +1,627 @@
+DEMONSTRATIVO DE PROVENTOS PREVIDENCIÁRIOS
+Ano Pagamento / Mês
+2025/01
+Nº Benefício INSS
+1445883179
+Nome
+ELIZETE DE ALMEIDA LINS SANTOS
+Matrícula
+0192710
+CPF
+18522068453
+Agência Bancária
+24585
+Nº da Conta
+000996040022-6
+IR Compensado
+0,00
+Bruto
+9.266,22
+IR Informativo
+0
+Descontos
+1.605,52
+Excesso de Débito
+0,00
+Tipo Benefício
+REG/REPLAN - Suplem Apos Tempo Contrib
+Tipo Benefício INSS
+INSS - Aposentadoria Tempo Contribuição
+Líquido
+7.660,70
+Tipo / 
+Rubrica
+Referência Discriminação Prazo Valor
+2 125 2025/01 SUPLEMENTACAO APOSENTADORIA 9.266,22
+ 
+4 327 2025/01 IMPOSTO RENDA FONTE (FUNCEF) 1.017,63
+4 309 2025/01 FUNCEF CONTRIBUICAO 403,60
+4 729 2025/01 UNEICEF - MENSALIDADE 75,00
+4 771 2025/01 APCEF MENSALIDADE - AL 46,33
+4 776 2025/01 ASSOC. APOSENT./MENSALIDADE - AL 45,00
+4 730 2025/01 UNEICEF - DIVERSOS 999 17,96
+ 
+OBS
+Dep IR
+0
+Renda Base
+9.266,22
+Margem Consignável
+2.953,70
+Base Deficit
+0,00
+DEMONSTRATIVO DE PROVENTOS PREVIDENCIÁRIOS
+Ano Pagamento / Mês
+2025/02
+Nº Benefício INSS
+1445883179
+Nome
+ELIZETE DE ALMEIDA LINS SANTOS
+Matrícula
+0192710
+CPF
+18522068453
+Agência Bancária
+24585
+Nº da Conta
+000996040022-6
+IR Compensado
+0,00
+Bruto
+13.899,33
+IR Informativo
+0
+Descontos
+1.876,92
+Excesso de Débito
+0,00
+Tipo Benefício
+REG/REPLAN - Suplem Apos Tempo Contrib
+Tipo Benefício INSS
+INSS - Aposentadoria Tempo Contribuição
+Líquido
+12.022,41
+Tipo / 
+Rubrica
+Referência Discriminação Prazo Valor
+2 125 2025/02 SUPLEMENTACAO APOSENTADORIA 9.266,22
+2 130 2025/13 ADIANT. SUPL. ABONO ANUAL 4.633,11
+ 
+4 327 2025/02 IMPOSTO RENDA FONTE (FUNCEF) 1.017,63
+4 309 2025/02 FUNCEF CONTRIBUICAO 403,60
+4 310 2025/13 CONTR.FUNCEF SUPL. AB. ANUAL 201,80
+4 729 2025/02 UNEICEF - MENSALIDADE 75,00
+4 771 2025/02 APCEF MENSALIDADE - AL 46,33
+4 776 2025/02 ASSOC. APOSENT./MENSALIDADE - AL 45,00
+4 729 2025/13 UNEICEF - MENSALIDADE 64,40
+4 771 2025/13 APCEF MENSALIDADE - AL 23,16
+ 
+OBS
+Dep IR
+0
+Renda Base
+9.266,22
+Margem Consignável
+2.971,66
+Base Deficit
+0,00
+DEMONSTRATIVO DE PROVENTOS PREVIDENCIÁRIOS
+Ano Pagamento / Mês
+2025/03
+Nº Benefício INSS
+1445883179
+Nome
+ELIZETE DE ALMEIDA LINS SANTOS
+Matrícula
+0192710
+CPF
+18522068453
+Agência Bancária
+24585
+Nº da Conta
+000996040022-6
+IR Compensado
+0,00
+Bruto
+9.266,22
+IR Informativo
+0
+Descontos
+1.587,56
+Excesso de Débito
+0,00
+Tipo Benefício
+REG/REPLAN - Suplem Apos Tempo Contrib
+Tipo Benefício INSS
+INSS - Aposentadoria Tempo Contribuição
+Líquido
+7.678,66
+Tipo / 
+Rubrica
+Referência Discriminação Prazo Valor
+2 125 2025/03 SUPLEMENTACAO APOSENTADORIA 9.266,22
+ 
+4 327 2025/03 IMPOSTO RENDA FONTE (FUNCEF) 1.017,63
+4 309 2025/03 FUNCEF CONTRIBUICAO 403,60
+4 729 2025/03 UNEICEF - MENSALIDADE 75,00
+4 771 2025/03 APCEF MENSALIDADE - AL 46,33
+4 776 2025/03 ASSOC. APOSENT./MENSALIDADE - AL 45,00
+ 
+OBS
+Dep IR
+0
+Renda Base
+9.266,22
+Margem Consignável
+2.971,66
+Base Deficit
+0,00
+DEMONSTRATIVO DE PROVENTOS PREVIDENCIÁRIOS
+Ano Pagamento / Mês
+2025/04
+Nº Benefício INSS
+1445883179
+Nome
+ELIZETE DE ALMEIDA LINS SANTOS
+Matrícula
+0192710
+CPF
+18522068453
+Agência Bancária
+24585
+Nº da Conta
+000996040022-6
+IR Compensado
+0,00
+Bruto
+9.266,22
+IR Informativo
+0
+Descontos
+1.587,56
+Excesso de Débito
+0,00
+Tipo Benefício
+REG/REPLAN - Suplem Apos Tempo Contrib
+Tipo Benefício INSS
+INSS - Aposentadoria Tempo Contribuição
+Líquido
+7.678,66
+Tipo / 
+Rubrica
+Referência Discriminação Prazo Valor
+2 125 2025/04 SUPLEMENTACAO APOSENTADORIA 9.266,22
+ 
+4 327 2025/04 IMPOSTO RENDA FONTE (FUNCEF) 1.017,63
+4 309 2025/04 FUNCEF CONTRIBUICAO 403,60
+4 729 2025/04 UNEICEF - MENSALIDADE 75,00
+4 771 2025/04 APCEF MENSALIDADE - AL 46,33
+4 776 2025/04 ASSOC. APOSENT./MENSALIDADE - AL 45,00
+ 
+OBS
+Dep IR
+0
+Renda Base
+9.266,22
+Margem Consignável
+2.971,66
+Base Deficit
+0,00
+DEMONSTRATIVO DE PROVENTOS PREVIDENCIÁRIOS
+Ano Pagamento / Mês
+2025/05
+Nº Benefício INSS
+1445883179
+Nome
+ELIZETE DE ALMEIDA LINS SANTOS
+Matrícula
+0192710
+CPF
+18522068453
+Agência Bancária
+24585
+Nº da Conta
+000996040022-6
+IR Compensado
+0,00
+Bruto
+9.266,22
+IR Informativo
+0
+Descontos
+1.574,83
+Excesso de Débito
+0,00
+Tipo Benefício
+REG/REPLAN - Suplem Apos Tempo Contrib
+Tipo Benefício INSS
+INSS - Aposentadoria Tempo Contribuição
+Líquido
+7.691,39
+Tipo / 
+Rubrica
+Referência Discriminação Prazo Valor
+2 125 2025/05 SUPLEMENTACAO APOSENTADORIA 9.266,22
+ 
+4 327 2025/05 IMPOSTO RENDA FONTE (FUNCEF) 1.004,90
+4 309 2025/05 FUNCEF CONTRIBUICAO 403,60
+4 729 2025/05 UNEICEF - MENSALIDADE 75,00
+4 771 2025/05 APCEF MENSALIDADE - AL 46,33
+4 776 2025/05 ASSOC. APOSENT./MENSALIDADE - AL 45,00
+ 
+OBS
+Dep IR
+0
+Renda Base
+9.266,22
+Margem Consignável
+2.976,75
+Base Deficit
+0,00
+DEMONSTRATIVO DE PROVENTOS PREVIDENCIÁRIOS
+Ano Pagamento / Mês
+2025/06
+Nº Benefício INSS
+1445883179
+Nome
+ELIZETE DE ALMEIDA LINS SANTOS
+Matrícula
+0192710
+CPF
+18522068453
+Agência Bancária
+24585
+Nº da Conta
+000996040022-6
+IR Compensado
+0,00
+Bruto
+9.266,22
+IR Informativo
+0
+Descontos
+1.574,83
+Excesso de Débito
+0,00
+Tipo Benefício
+REG/REPLAN - Suplem Apos Tempo Contrib
+Tipo Benefício INSS
+INSS - Aposentadoria Tempo Contribuição
+Líquido
+7.691,39
+Tipo / 
+Rubrica
+Referência Discriminação Prazo Valor
+2 125 2025/06 SUPLEMENTACAO APOSENTADORIA 9.266,22
+ 
+4 327 2025/06 IMPOSTO RENDA FONTE (FUNCEF) 1.004,90
+4 309 2025/06 FUNCEF CONTRIBUICAO 403,60
+4 729 2025/06 UNEICEF - MENSALIDADE 75,00
+4 771 2025/06 APCEF MENSALIDADE - AL 46,33
+4 776 2025/06 ASSOC. APOSENT./MENSALIDADE - AL 45,00
+ 
+OBS
+Dep IR
+0
+Renda Base
+9.266,22
+Margem Consignável
+2.976,75
+Base Deficit
+0,00
+DEMONSTRATIVO DE PROVENTOS PREVIDENCIÁRIOS
+Ano Pagamento / Mês
+2025/07
+Nº Benefício INSS
+1445883179
+Nome
+ELIZETE DE ALMEIDA LINS SANTOS
+Matrícula
+0192710
+CPF
+18522068453
+Agência Bancária
+24585
+Nº da Conta
+000996040022-6
+IR Compensado
+0,00
+Bruto
+9.266,22
+IR Informativo
+0
+Descontos
+1.574,83
+Excesso de Débito
+0,00
+Tipo Benefício
+REG/REPLAN - Suplem Apos Tempo Contrib
+Tipo Benefício INSS
+INSS - Aposentadoria Tempo Contribuição
+Líquido
+7.691,39
+Tipo / 
+Rubrica
+Referência Discriminação Prazo Valor
+2 125 2025/07 SUPLEMENTACAO APOSENTADORIA 9.266,22
+ 
+4 327 2025/07 IMPOSTO RENDA FONTE (FUNCEF) 1.004,90
+4 309 2025/07 FUNCEF CONTRIBUICAO 403,60
+4 729 2025/07 UNEICEF - MENSALIDADE 75,00
+4 771 2025/07 APCEF MENSALIDADE - AL 46,33
+4 776 2025/07 ASSOC. APOSENT./MENSALIDADE - AL 45,00
+ 
+OBS
+Dep IR
+0
+Renda Base
+9.266,22
+Margem Consignável
+2.976,75
+Base Deficit
+0,00
+DEMONSTRATIVO DE PROVENTOS PREVIDENCIÁRIOS
+Ano Pagamento / Mês
+2025/08
+Nº Benefício INSS
+1445883179
+Nome
+ELIZETE DE ALMEIDA LINS SANTOS
+Matrícula
+0192710
+CPF
+18522068453
+Agência Bancária
+24585
+Nº da Conta
+000996040022-6
+IR Compensado
+0,00
+Bruto
+9.266,22
+IR Informativo
+0
+Descontos
+1.574,83
+Excesso de Débito
+0,00
+Tipo Benefício
+REG/REPLAN - Suplem Apos Tempo Contrib
+Tipo Benefício INSS
+INSS - Aposentadoria Tempo Contribuição
+Líquido
+7.691,39
+Tipo / 
+Rubrica
+Referência Discriminação Prazo Valor
+2 125 2025/08 SUPLEMENTACAO APOSENTADORIA 9.266,22
+ 
+4 327 2025/08 IMPOSTO RENDA FONTE (FUNCEF) 1.004,90
+4 309 2025/08 FUNCEF CONTRIBUICAO 403,60
+4 729 2025/08 UNEICEF - MENSALIDADE 75,00
+4 771 2025/08 APCEF MENSALIDADE - AL 46,33
+4 776 2025/08 ASSOC. APOSENT./MENSALIDADE - AL 45,00
+ 
+OBS
+Dep IR
+0
+Renda Base
+9.266,22
+Margem Consignável
+2.976,75
+Base Deficit
+0,00
+DEMONSTRATIVO DE PROVENTOS PREVIDENCIÁRIOS
+Ano Pagamento / Mês
+2025/09
+Nº Benefício INSS
+1445883179
+Nome
+ELIZETE DE ALMEIDA LINS SANTOS
+Matrícula
+0192710
+CPF
+18522068453
+Agência Bancária
+24585
+Nº da Conta
+000996040022-6
+IR Compensado
+0,00
+Bruto
+9.266,22
+IR Informativo
+0
+Descontos
+1.584,83
+Excesso de Débito
+0,00
+Tipo Benefício
+REG/REPLAN - Suplem Apos Tempo Contrib
+Tipo Benefício INSS
+INSS - Aposentadoria Tempo Contribuição
+Líquido
+7.681,39
+Tipo / 
+Rubrica
+Referência Discriminação Prazo Valor
+2 125 2025/09 SUPLEMENTACAO APOSENTADORIA 9.266,22
+ 
+4 327 2025/09 IMPOSTO RENDA FONTE (FUNCEF) 1.004,90
+4 309 2025/09 FUNCEF CONTRIBUICAO 403,60
+4 729 2025/09 UNEICEF - MENSALIDADE 75,00
+4 771 2025/09 APCEF MENSALIDADE - AL 46,33
+4 776 2025/09 ASSOC. APOSENT./MENSALIDADE - AL 55,00
+ 
+OBS
+Dep IR
+0
+Renda Base
+9.266,22
+Margem Consignável
+2.966,75
+Base Deficit
+0,00
+DEMONSTRATIVO DE PROVENTOS PREVIDENCIÁRIOS
+Ano Pagamento / Mês
+2025/10
+Nº Benefício INSS
+1445883179
+Nome
+ELIZETE DE ALMEIDA LINS SANTOS
+Matrícula
+0192710
+CPF
+18522068453
+Agência Bancária
+24585
+Nº da Conta
+000996040022-6
+IR Compensado
+0,00
+Bruto
+9.266,22
+IR Informativo
+0
+Descontos
+1.584,83
+Excesso de Débito
+0,00
+Tipo Benefício
+REG/REPLAN - Suplem Apos Tempo Contrib
+Tipo Benefício INSS
+INSS - Aposentadoria Tempo Contribuição
+Líquido
+7.681,39
+Tipo / 
+Rubrica
+Referência Discriminação Prazo Valor
+2 125 2025/10 SUPLEMENTACAO APOSENTADORIA 9.266,22
+ 
+4 327 2025/10 IMPOSTO RENDA FONTE (FUNCEF) 1.004,90
+4 309 2025/10 FUNCEF CONTRIBUICAO 403,60
+4 729 2025/10 UNEICEF - MENSALIDADE 75,00
+4 771 2025/10 APCEF MENSALIDADE - AL 46,33
+4 776 2025/10 ASSOC. APOSENT./MENSALIDADE - AL 55,00
+ 
+OBS
+Dep IR
+0
+Renda Base
+9.266,22
+Margem Consignável
+2.966,75
+Base Deficit
+0,00
+DEMONSTRATIVO DE PROVENTOS PREVIDENCIÁRIOS
+Ano Pagamento / Mês
+2025/11
+Nº Benefício INSS
+1445883179
+Nome
+ELIZETE DE ALMEIDA LINS SANTOS
+Matrícula
+0192710
+CPF
+18522068453
+Agência Bancária
+24585
+Nº da Conta
+000996040022-6
+IR Compensado
+0,00
+Bruto
+18.821,80
+IR Informativo
+0
+Descontos
+7.802,77
+Excesso de Débito
+0,00
+Tipo Benefício
+REG/REPLAN - Suplem Apos Tempo Contrib
+Tipo Benefício INSS
+INSS - Aposentadoria Tempo Contribuição
+Líquido
+11.019,03
+Tipo / 
+Rubrica
+Referência Discriminação Prazo Valor
+2 125 2025/11 SUPLEMENTACAO APOSENTADORIA 9.266,22
+2 131 2025/13 SUPLEMENTACAO ABONO ANUAL 9.266,22
+1 317 2025/13 AC.  CONT.FUN.ADT.SUP.AB.ANU 201,80
+1 729 2025/13 AC.  UNEICEF - MENSALIDADE 1 64,40
+1 771 2025/13 AC.  APCEF MENSALIDADE - AL 1 23,16
+ 
+4 427 2025/13 IR ABONO ANUAL FUNCEF 1.004,90
+4 327 2025/11 IMPOSTO RENDA FONTE (FUNCEF) 1.004,90
+3 130 2025/13 REP. ADIANT.SUPL.ABONO ANUAL 4.633,11
+4 309 2025/11 FUNCEF CONTRIBUICAO 403,60
+4 310 2025/13 CONTR.FUNCEF SUPL. AB. ANUAL 403,60
+4 729 2025/11 UNEICEF - MENSALIDADE 75,00
+4 771 2025/11 APCEF MENSALIDADE - AL 46,33
+4 776 2025/11 ASSOC. APOSENT./MENSALIDADE - AL 55,00
+4 729 2025/13 UNEICEF - MENSALIDADE 75,00
+4 771 2025/13 APCEF MENSALIDADE - AL 46,33
+4 776 2025/13 ASSOC. APOSENT./MENSALIDADE - AL 55,00
+ 
+OBS
+Dep IR
+0
+Renda Base
+9.266,22
+Margem Consignável
+2.966,75
+Base Deficit
+0,00
+DEMONSTRATIVO DE PROVENTOS PREVIDENCIÁRIOS
+Ano Pagamento / Mês
+2025/12
+Nº Benefício INSS
+1445883179
+Nome
+ELIZETE DE ALMEIDA LINS SANTOS
+Matrícula
+0192710
+CPF
+18522068453
+Agência Bancária
+24585
+Nº da Conta
+000996040022-6
+IR Compensado
+0,00
+Bruto
+9.266,22
+IR Informativo
+0
+Descontos
+1.584,83
+Excesso de Débito
+0,00
+Tipo Benefício
+REG/REPLAN - Suplem Apos Tempo Contrib
+Tipo Benefício INSS
+INSS - Aposentadoria Tempo Contribuição
+Líquido
+7.681,39
+Tipo / 
+Rubrica
+Referência Discriminação Prazo Valor
+2 125 2025/12 SUPLEMENTACAO APOSENTADORIA 9.266,22
+ 
+4 327 2025/12 IMPOSTO RENDA FONTE (FUNCEF) 1.004,90
+4 309 2025/12 FUNCEF CONTRIBUICAO 403,60
+4 729 2025/12 UNEICEF - MENSALIDADE 75,00
+4 771 2025/12 APCEF MENSALIDADE - AL 46,33
+4 776 2025/12 ASSOC. APOSENT./MENSALIDADE - AL 55,00
+ 
+OBS
+Dep IR
+0
+Renda Base
+9.266,22
+Margem Consignável
+2.966,75
+Base Deficit
+0,00

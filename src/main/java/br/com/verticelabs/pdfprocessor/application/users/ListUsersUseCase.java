@@ -39,13 +39,14 @@ public class ListUsersUseCase {
 
     private Mono<ListUsersResult> listAsSuperAdmin(String tenantIdFilter, String roleFilter, Boolean ativoFilter,
             String emailFilter, String nomeFilter, int page, int size) {
-        Query query = buildQuery(tenantIdFilter, roleFilter, ativoFilter, emailFilter, nomeFilter);
+        Query countQuery = buildQuery(tenantIdFilter, roleFilter, ativoFilter, emailFilter, nomeFilter);
+        Query findQuery = buildQuery(tenantIdFilter, roleFilter, ativoFilter, emailFilter, nomeFilter);
 
         Pageable pageable = PageRequest.of(page, size);
-        query.with(pageable);
+        findQuery.with(pageable);
 
-        Mono<Long> countMono = Mono.from(mongoTemplate.count(query, User.class));
-        Flux<User> usersFlux = mongoTemplate.find(query, User.class);
+        Mono<Long> countMono = Mono.from(mongoTemplate.count(countQuery, User.class));
+        Flux<User> usersFlux = mongoTemplate.find(findQuery, User.class);
 
         return Mono.zip(usersFlux.collectList(), countMono)
                 .map(tuple -> {
@@ -60,13 +61,14 @@ public class ListUsersUseCase {
     private Mono<ListUsersResult> listAsTenantAdmin(String tenantId, String roleFilter, Boolean ativoFilter,
             String emailFilter, String nomeFilter, int page, int size) {
         // TENANT_ADMIN só vê usuários do seu tenant
-        Query query = buildQuery(tenantId, roleFilter, ativoFilter, emailFilter, nomeFilter);
+        Query countQuery = buildQuery(tenantId, roleFilter, ativoFilter, emailFilter, nomeFilter);
+        Query findQuery = buildQuery(tenantId, roleFilter, ativoFilter, emailFilter, nomeFilter);
 
         Pageable pageable = PageRequest.of(page, size);
-        query.with(pageable);
+        findQuery.with(pageable);
 
-        Mono<Long> countMono = Mono.from(mongoTemplate.count(query, User.class));
-        Flux<User> usersFlux = mongoTemplate.find(query, User.class);
+        Mono<Long> countMono = Mono.from(mongoTemplate.count(countQuery, User.class));
+        Flux<User> usersFlux = mongoTemplate.find(findQuery, User.class);
 
         return Mono.zip(usersFlux.collectList(), countMono)
                 .map(tuple -> {

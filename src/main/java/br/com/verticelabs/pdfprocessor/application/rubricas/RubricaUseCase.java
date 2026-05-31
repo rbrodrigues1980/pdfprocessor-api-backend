@@ -67,5 +67,22 @@ public class RubricaUseCase {
                 })
                 .then();
     }
+
+    public Mono<Void> ativar(String codigo) {
+        return rubricaRepository.findByCodigo(codigo)
+                .switchIfEmpty(Mono.error(new RubricaNotFoundException(codigo)))
+                .flatMap(rubrica -> {
+                    rubrica.setAtivo(true);
+                    return rubricaRepository.save(rubrica);
+                })
+                .then();
+    }
+
+    public Mono<Void> excluir(String codigo) {
+        return rubricaRepository.findByCodigo(codigo)
+                .switchIfEmpty(Mono.error(new RubricaNotFoundException(codigo)))
+                .flatMap(rubrica -> rubricaRepository.deleteByCodigo(codigo))
+                .then();
+    }
 }
 

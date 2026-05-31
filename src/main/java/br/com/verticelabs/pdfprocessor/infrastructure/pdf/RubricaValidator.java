@@ -16,35 +16,26 @@ public class RubricaValidator {
 
     /**
      * Valida se uma rubrica existe e está ativa no banco de dados.
-     * Retorna Mono<Rubrica> se encontrada e ativa, ou Mono.empty() se não
-     * encontrada ou inativa.
+     * Retorna Mono<Rubrica> se encontrada e ativa, ou Mono.empty() caso contrário.
      */
     public Mono<Rubrica> validateRubrica(String codigo, String descricaoExtraida) {
         if (codigo == null || codigo.trim().isEmpty()) {
             return Mono.empty();
         }
 
-        // Normalizar código: remover espaços (ex: "4 416" → "4416")
         String codigoNormalizado = codigo.trim().replaceAll("\\s+", "");
 
-        // Buscar rubrica GLOBAL primeiro (todas as rubricas padrão são GLOBAL)
-        return rubricaRepository.findByCodigo(codigoNormalizado, "GLOBAL")
+        return rubricaRepository.findByCodigo(codigoNormalizado)
                 .flatMap(rubrica -> {
                     if (rubrica.getAtivo() == null || !rubrica.getAtivo()) {
                         log.warn("Rubrica {} encontrada mas está inativa", codigoNormalizado);
                         return Mono.empty();
                     }
-
-                    // Aceita apenas pelo código - descrição pode variar entre CAIXA e FUNCEF
-                    log.debug("✅ Rubrica {} validada (código encontrado no banco). " +
-                            "Descrição no banco: '{}', Descrição extraída: '{}'",
-                            codigoNormalizado, rubrica.getDescricao(), descricaoExtraida);
+                    log.debug("✅ Rubrica {} validada: '{}'", codigoNormalizado, rubrica.getDescricao());
                     return Mono.just(rubrica);
                 })
                 .switchIfEmpty(Mono.defer(() -> {
-                    log.warn("⚠️ Rubrica {} não encontrada no banco de dados. " +
-                            "Cadastre a rubrica na API 1 (POST /api/v1/rubricas) para que seja salva.",
-                            codigoNormalizado);
+                    log.warn("⚠️ Rubrica {} não encontrada no banco. Cadastre via POST /api/v1/rubricas.", codigoNormalizado);
                     return Mono.empty();
                 }));
     }

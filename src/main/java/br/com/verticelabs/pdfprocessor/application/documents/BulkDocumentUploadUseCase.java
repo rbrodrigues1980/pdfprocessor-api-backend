@@ -1,5 +1,6 @@
 package br.com.verticelabs.pdfprocessor.application.documents;
 
+import br.com.verticelabs.pdfprocessor.domain.exceptions.DocumentoDuplicadoException;
 import br.com.verticelabs.pdfprocessor.domain.exceptions.InvalidCpfException;
 import br.com.verticelabs.pdfprocessor.domain.exceptions.PersonNotFoundException;
 import br.com.verticelabs.pdfprocessor.domain.repository.PersonRepository;
@@ -41,6 +42,15 @@ public class BulkDocumentUploadUseCase {
             String cpf,
             String nome,
             String matricula) {
+        return uploadBulk(files, cpf, nome, matricula, false);
+    }
+
+    public Mono<BulkUploadResponse> uploadBulk(
+            List<FilePart> files,
+            String cpf,
+            String nome,
+            String matricula,
+            boolean replaceIfDuplicate) {
         
         log.info("=== INÍCIO: BulkDocumentUploadUseCase.uploadBulk() ===");
         log.info("Total de arquivos: {}, CPF: {}, Nome: {}, Matrícula: {}", 
@@ -88,7 +98,7 @@ public class BulkDocumentUploadUseCase {
                     log.info("Processando arquivo {}/{}: {}", index + 1, files.size(), filename);
                     
                     // 1. Fazer upload do arquivo
-                    return documentUploadUseCase.upload(file, normalizedCpf, nome, matricula)
+                    return documentUploadUseCase.upload(file, normalizedCpf, nome, matricula, replaceIfDuplicate)
                             .flatMap(uploadResponse -> {
                                 log.info("✓ Upload concluído para arquivo {}. DocumentId: {}, Status: {}", 
                                         filename, uploadResponse.getDocumentId(), uploadResponse.getStatus());
@@ -121,6 +131,16 @@ public class BulkDocumentUploadUseCase {
                                                     .erro("Upload concluído, mas processamento não pôde ser iniciado: " + processError.getMessage())
                                                     .build());
                                         });
+                            })
+                            .onErrorResume(DocumentoDuplicadoException.class, dup -> {
+                                log.warn("✗ Arquivo duplicado {}: documento existente {}", filename, dup.getExistingDocumentId());
+                                return Mono.just(BulkUploadItemResponse.builder()
+                                        .filename(filename)
+                                        .documentId(dup.getExistingDocumentId())
+                                        .sucesso(false)
+                                        .erro(dup.getMessage())
+                                        .codigoErro("DOCUMENTO_DUPLICADO")
+                                        .build());
                             })
                             .onErrorResume(error -> {
                                 log.error("✗ Erro ao fazer upload do arquivo {}: {}", filename, error.getMessage());
@@ -161,7 +181,14 @@ public class BulkDocumentUploadUseCase {
     public Mono<BulkUploadResponse> uploadBulkByPersonId(
             List<FilePart> files,
             String personId) {
-        
+        return uploadBulkByPersonId(files, personId, false);
+    }
+
+    public Mono<BulkUploadResponse> uploadBulkByPersonId(
+            List<FilePart> files,
+            String personId,
+            boolean replaceIfDuplicate) {
+
         log.info("=== INÍCIO: BulkDocumentUploadUseCase.uploadBulkByPersonId() ===");
         log.info("Total de arquivos: {}, PersonId: {}", 
                 files != null ? files.size() : 0, personId);
@@ -204,7 +231,7 @@ public class BulkDocumentUploadUseCase {
                     
                     // Usar o tenantId da pessoa e configurá-lo no contexto reativo antes de fazer upload
                     return ReactiveTenantContext.withTenant(
-                            uploadBulk(files, normalizedCpf, person.getNome(), person.getMatricula()),
+                            uploadBulk(files, normalizedCpf, person.getNome(), person.getMatricula(), replaceIfDuplicate),
                             person.getTenantId()
                     );
                 });

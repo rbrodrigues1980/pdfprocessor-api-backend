@@ -156,7 +156,7 @@ public class DashboardUseCase {
         Mono<Long> totalPessoasMono = personRepository.countByTenantId(tenantId)
                 .defaultIfEmpty(0L);
 
-        Mono<Long> totalRubricasMono = rubricaRepository.countByAtivoTrue(tenantId)
+        Mono<Long> totalRubricasMono = rubricaRepository.countAllAtivoTrue()
                 .defaultIfEmpty(0L);
 
         // Buscar totais por ano e por mês

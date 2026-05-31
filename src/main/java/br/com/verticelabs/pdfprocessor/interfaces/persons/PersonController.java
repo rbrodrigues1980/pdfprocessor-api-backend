@@ -278,11 +278,12 @@ public class PersonController {
         @PostMapping(value = "/{personId}/documents/bulk-upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
         public Mono<ResponseEntity<Object>> bulkUploadDocumentsByPersonId(
                         @PathVariable String personId,
-                        @RequestPart("files") List<FilePart> files) {
+                        @RequestPart("files") List<FilePart> files,
+                        @RequestParam(value = "replace", defaultValue = "false") boolean replace) {
                 log.info("📥 POST /api/v1/persons/{}/documents/bulk-upload - Upload múltiplo de documentos", personId);
                 log.info("Total de arquivos: {}", files != null ? files.size() : 0);
 
-                return bulkDocumentUploadUseCase.uploadBulkByPersonId(files, personId)
+                return bulkDocumentUploadUseCase.uploadBulkByPersonId(files, personId, replace)
                                 .<ResponseEntity<Object>>map(response -> {
                                         log.debug("✓ BulkUpload concluído: Total={}, Sucessos={}, Falhas={}",
                                                         response.getTotalArquivos(), response.getSucessos(),

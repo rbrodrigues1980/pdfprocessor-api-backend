@@ -9,7 +9,8 @@
 5. [Endpoints](#endpoints)
 6. [Modelos de Dados](#modelos-de-dados)
 7. [Exemplos de Implementação](#exemplos-de-implementação)
-8. [Tratamento de Erros](#tratamento-de-erros)
+8. [Documento duplicado e reenvio (`replace`)](#documento-duplicado-e-reenvio-replace)
+9. [Tratamento de Erros](#tratamento-de-erros)
 
 ---
 
@@ -130,6 +131,9 @@ Authorization: Bearer {accessToken}
 Content-Type: multipart/form-data
 ```
 
+**Query params (opcional):**
+- `replace` (boolean, default `false`): Se `true`, exclui documento existente com mesmo hash e faz novo upload
+
 **Form Data:**
 - `file` (obrigatório): Arquivo PDF
 - `cpf` (obrigatório): CPF da pessoa (com ou sem formatação)
@@ -157,7 +161,7 @@ Content-Type: multipart/form-data
 - `201 Created`: Upload bem-sucedido
 - `400 Bad Request`: Arquivo inválido ou não é PDF
 - `401 Unauthorized`: Token inválido ou ausente
-- `409 Conflict`: Documento duplicado (mesmo hash no mesmo tenant)
+- `409 Conflict`: Documento duplicado (mesmo hash no mesmo tenant) — ver [Documento duplicado e reenvio](#documento-duplicado-e-reenvio-replace)
 - `422 Unprocessable Entity`: CPF inválido
 - `500 Internal Server Error`: Erro interno do servidor
 
@@ -273,6 +277,9 @@ Authorization: Bearer {accessToken}
 Content-Type: multipart/form-data
 ```
 
+**Query params (opcional):**
+- `replace` (boolean, default `false`): Se `true`, substitui documentos duplicados automaticamente
+
 **Form Data:**
 - `files` (obrigatório): Array de arquivos PDF
 - `cpf` (obrigatório): CPF da pessoa
@@ -337,6 +344,7 @@ interface BulkUploadItemResponse {
   tipoDetectado: string | null;
   sucesso: boolean;
   erro: string | null;
+  codigoErro?: string | null;  // ex.: "DOCUMENTO_DUPLICADO"
 }
 
 interface BulkUploadResponse {
@@ -1255,6 +1263,7 @@ interface BulkUploadItemResponse {
   tipoDetectado: string | null;
   sucesso: boolean;
   erro: string | null;
+  codigoErro?: string | null;  // ex.: "DOCUMENTO_DUPLICADO"
 }
 
 interface BulkUploadResponse {
@@ -1507,6 +1516,207 @@ export function useDocuments(accessToken: string, filters?: DocumentFilters) {
 
 ---
 
+## Documento duplicado e reenvio (`replace`)
+
+### Regra de negócio
+
+O backend calcula **hash SHA-256** de cada PDF. No **mesmo tenant**, o mesmo arquivo não pode existir duas vezes.
+
+Para reenviar o **mesmo PDF**:
+
+1. **Excluir** o documento antigo (com todas as referências), **ou**
+2. Enviar upload com **`replace=true`** (o backend exclui e sobe de novo).
+
+### Erro 409 (upload simples — sem `replace`)
+
+**Status:** `409 Conflict`
+
+**Body (`ApiErrorResponse`):**
+```json
+{
+  "timestamp": "2026-02-16T19:00:00",
+  "status": 409,
+  "error": "Conflict",
+  "message": "Este arquivo já foi enviado anteriormente. Exclua o documento existente e envie novamente, ou use replace=true no upload para substituir automaticamente.",
+  "path": "/api/v1/documents/upload",
+  "details": {
+    "existingDocumentId": "69939480600d151a455ace9b",
+    "code": "DOCUMENTO_DUPLICADO"
+  }
+}
+```
+
+| Campo | Uso no frontend |
+|-------|-------------------|
+| `details.existingDocumentId` | ID para chamar `DELETE` antes de reenviar |
+| `details.code` | Sempre `DOCUMENTO_DUPLICADO` — usar em `switch` / i18n |
+
+### Bulk upload — item duplicado (sem `replace`)
+
+O bulk retorna **201** com itens mistos (sucesso + falha). Item duplicado:
+
+```json
+{
+  "filename": "contracheque_2016.pdf",
+  "documentId": "69939480600d151a455ace9b",
+  "status": null,
+  "tipoDetectado": null,
+  "sucesso": false,
+  "erro": "Este arquivo já foi enviado anteriormente...",
+  "codigoErro": "DOCUMENTO_DUPLICADO"
+}
+```
+
+### Parâmetro `replace=true`
+
+| Endpoint | Exemplo |
+|----------|---------|
+| Upload simples | `POST /api/v1/documents/upload?replace=true` |
+| Bulk por CPF | `POST /api/v1/documents/bulk-upload?replace=true` |
+| Bulk por pessoa | `POST /api/v1/persons/{personId}/documents/bulk-upload?replace=true` |
+
+Com `replace=true`, o backend:
+
+1. Detecta duplicata pelo hash
+2. Executa exclusão completa (`DeleteDocumentUseCase`: entries, GridFS, referência na Person, documento)
+3. Cria novo documento e inicia processamento
+
+### Exclusão manual (Opção A)
+
+**DELETE** `/api/v1/documents/{documentId}`
+
+ou
+
+**DELETE** `/api/v1/persons/{personId}/documents/{documentId}`
+
+**Status:** `204 No Content`
+
+Remove: `PayrollDocument`, `PayrollEntry`, arquivo no GridFS, referência em `Person.documentos`.
+
+Depois do 204, o mesmo PDF pode ser enviado normalmente.
+
+### TypeScript — interfaces
+
+```typescript
+interface ApiErrorResponse {
+  timestamp: string;
+  status: number;
+  error: string;
+  message: string;
+  path: string;
+  details?: {
+    existingDocumentId?: string;
+    code?: 'DOCUMENTO_DUPLICADO';
+  };
+}
+
+interface BulkUploadItemResponse {
+  filename: string;
+  documentId: string | null;
+  status: string | null;
+  tipoDetectado: string | null;
+  sucesso: boolean;
+  erro: string | null;
+  codigoErro?: string | null;
+}
+```
+
+### Fluxos recomendados (UI)
+
+#### Opção A — Excluir e enviar de novo
+
+```mermaid
+sequenceDiagram
+    participant UI
+    participant API
+
+    UI->>API: POST bulk-upload (replace=false)
+    API-->>UI: 201 item sucesso=false, codigoErro=DOCUMENTO_DUPLICADO, documentId=abc
+    UI->>UI: Modal: "Arquivo já enviado. Substituir?"
+    UI->>API: DELETE /persons/{personId}/documents/abc
+    API-->>UI: 204
+    UI->>API: POST bulk-upload (mesmo arquivo)
+    API-->>UI: 201 sucesso=true, novo documentId
+```
+
+#### Opção B — Substituir em um passo (recomendado)
+
+```typescript
+async function bulkUploadWithReplace(
+  accessToken: string,
+  personId: string,
+  files: File[]
+): Promise<BulkUploadResponse> {
+  const formData = new FormData();
+  files.forEach(f => formData.append('files', f));
+
+  const response = await fetch(
+    `${API_BASE}/persons/${personId}/documents/bulk-upload?replace=true`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}` },
+      body: formData,
+    }
+  );
+
+  if (!response.ok) {
+    throw await parseApiError(response);
+  }
+  return response.json();
+}
+```
+
+### Tratamento no upload — exemplo 409
+
+```typescript
+async function parseApiError(response: Response): Promise<Error> {
+  const body = await response.json().catch(() => ({})) as ApiErrorResponse;
+
+  if (response.status === 409 && body.details?.code === 'DOCUMENTO_DUPLICADO') {
+    const err = new Error(body.message) as Error & {
+      code: string;
+      existingDocumentId?: string;
+    };
+    err.code = 'DOCUMENTO_DUPLICADO';
+    err.existingDocumentId = body.details.existingDocumentId;
+    return err;
+  }
+
+  return new Error(body.message || response.statusText);
+}
+
+// Uso na tela de upload
+try {
+  await uploadDocument(token, file, cpf);
+} catch (e) {
+  if (e.code === 'DOCUMENTO_DUPLICADO' && e.existingDocumentId) {
+    const substituir = await confirm(
+      'Este arquivo já foi enviado. Deseja substituir o documento anterior?'
+    );
+    if (substituir) {
+      await deleteDocument(token, personId, e.existingDocumentId);
+      await uploadDocument(token, file, cpf);
+      // ou: await uploadDocument(token, file, cpf, { replace: true });
+    }
+  }
+}
+```
+
+### Checklist frontend
+
+- [ ] Tratar `409` com `details.existingDocumentId` e `details.code === 'DOCUMENTO_DUPLICADO'`
+- [ ] No bulk, tratar `resultados[].codigoErro === 'DOCUMENTO_DUPLICADO'` e `documentId` do existente
+- [ ] Botão **"Substituir arquivo"** usando `?replace=true` **ou** `DELETE` + novo upload
+- [ ] Usar `DELETE /persons/{personId}/documents/{documentId}` (não só remover da lista local)
+- [ ] Após reenvio, iniciar **polling** de progresso (ver guia [013 - API_PROCESSING_LOG_FRONTEND.md](./013%20-%20API_PROCESSING_LOG_FRONTEND.md))
+
+### Relacionado
+
+- Progresso em tempo real durante processamento: [013 - API_PROCESSING_LOG_FRONTEND.md](./013%20-%20API_PROCESSING_LOG_FRONTEND.md)
+- Exclusão por pessoa: [003 - API_PERSONS_FRONTEND.md](./003%20-%20API_PERSONS_FRONTEND.md) — `DELETE /persons/{personId}/documents/{documentId}`
+
+---
+
 ## ⚠️ Tratamento de Erros
 
 ### Códigos de Status HTTP
@@ -1598,10 +1808,10 @@ async function gerenciarDocumento(
 
 ### 2. Duplicidade de Arquivos
 
-- O sistema verifica duplicidade por hash SHA-256
-- Arquivos duplicados são detectados **por tenant**
-- Mesmo arquivo pode existir em tenants diferentes
-- Tentativa de upload duplicado retorna `409 Conflict`
+- O sistema verifica duplicidade por hash SHA-256 **por tenant**
+- Upload duplicado retorna `409` com `details.existingDocumentId` ou item bulk com `codigoErro: DOCUMENTO_DUPLICADO`
+- Para reenviar: `DELETE` do documento antigo **ou** upload com `?replace=true`
+- Detalhes completos: [Documento duplicado e reenvio](#documento-duplicado-e-reenvio-replace)
 
 ### 3. Processamento Assíncrono
 

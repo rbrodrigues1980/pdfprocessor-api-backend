@@ -313,18 +313,56 @@ public class DocumentQueryUseCase {
         return tipo.name();
     }
 
-    private DocumentResponse toDocumentResponse(PayrollDocument document) {
-        return DocumentResponse.builder()
-                .id(document.getId())
-                .cpf(document.getCpf())
-                .status(document.getStatus())
-                .tipo(document.getTipo())
-                .ano(document.getAnoDetectado())
-                .entriesCount(document.getTotalEntries())
-                .dataUpload(document.getDataUpload())
-                .dataProcessamento(document.getDataProcessamento())
-                .erro(document.getErro())
-                .build();
+    private DocumentResponse toDocumentResponse(PayrollDocument doc) {
+        DocumentResponse.DocumentResponseBuilder builder = DocumentResponse.builder()
+                .id(doc.getId())
+                .cpf(doc.getCpf())
+                .status(doc.getStatus())
+                .tipo(doc.getTipo())
+                .ano(doc.getAnoDetectado())
+                .entriesCount(doc.getTotalEntries())
+                .dataUpload(doc.getDataUpload())
+                .dataProcessamento(doc.getDataProcessamento())
+                .erro(doc.getErro());
+
+        // Incluir campos de progresso
+        List<ProcessingEvent> processingLog = doc.getProcessingLog();
+        if (processingLog != null && !processingLog.isEmpty()) {
+            builder.eventsCount(processingLog.size());
+
+            // Extrair totalPages do primeiro evento PROCESSING_STARTED que tenha a info
+            Integer totalPages = processingLog.stream()
+                    .filter(e -> e.getDetails() != null && e.getDetails().containsKey("totalPages"))
+                    .findFirst()
+                    .map(e -> ((Number) e.getDetails().get("totalPages")).intValue())
+                    .orElse(null);
+            builder.totalPages(totalPages);
+
+            // Contar páginas já processadas
+            Set<Integer> processedPages = new HashSet<>();
+            for (ProcessingEvent event : processingLog) {
+                if (event.getPage() != null &&
+                    ("GEMINI_EXTRACTION_COMPLETED".equals(event.getType().name()) ||
+                     "TEXT_EXTRACTED".equals(event.getType().name()) ||
+                     "ESCALATION_COMPLETED".equals(event.getType().name()))) {
+                    processedPages.add(event.getPage());
+                }
+            }
+            int pagesProcessed = processedPages.size();
+            builder.pagesProcessed(pagesProcessed);
+
+            // Calcular percentual de progresso
+            if (totalPages != null && totalPages > 0) {
+                builder.progressPercent(Math.round((float) pagesProcessed / totalPages * 100));
+            }
+
+            // Último evento
+            ProcessingEvent lastEvent = processingLog.get(processingLog.size() - 1);
+            builder.lastEventMessage(lastEvent.getMessage());
+            builder.lastEventType(lastEvent.getType().name());
+        }
+
+        return builder.build();
     }
 
     /**

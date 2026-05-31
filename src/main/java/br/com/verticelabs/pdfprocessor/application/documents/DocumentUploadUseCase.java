@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -47,12 +48,17 @@ public class DocumentUploadUseCase {
     private final PersonRepository personRepository;
     private final PayrollDocumentRepository documentRepository;
     private final DocumentProcessUseCase documentProcessUseCase;
+    private final DeleteDocumentUseCase deleteDocumentUseCase;
 
     private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
     private static final String PDF_CONTENT_TYPE = "application/pdf";
 
     public Mono<UploadDocumentResponse> upload(FilePart filePart, String cpf, String nome) {
-        return upload(filePart, cpf, nome, null);
+        return upload(filePart, cpf, nome, null, false);
+    }
+
+    public Mono<UploadDocumentResponse> upload(FilePart filePart, String cpf, String nome, boolean replaceIfDuplicate) {
+        return upload(filePart, cpf, nome, null, replaceIfDuplicate);
     }
 
     /**
@@ -60,6 +66,10 @@ public class DocumentUploadUseCase {
      * Processa automaticamente o documento após o upload
      */
     public Mono<UploadDocumentResponse> uploadByPersonId(FilePart filePart, String personId) {
+        return uploadByPersonId(filePart, personId, false);
+    }
+
+    public Mono<UploadDocumentResponse> uploadByPersonId(FilePart filePart, String personId, boolean replaceIfDuplicate) {
         log.info("=== INÍCIO DO UPLOAD POR PERSONID ===");
         log.info("Arquivo: {}, PersonId: {}", filePart.filename(), personId);
         
@@ -90,7 +100,7 @@ public class DocumentUploadUseCase {
                     log.info("CPF validado: {}", normalizedCpf);
                     
                     // Usar o tenantId da pessoa diretamente e fazer upload
-                    return processUpload(filePart, normalizedCpf, person.getNome(), person.getMatricula(), person.getTenantId())
+                    return processUpload(filePart, normalizedCpf, person.getNome(), person.getMatricula(), person.getTenantId(), replaceIfDuplicate)
                             .flatMap(uploadResponse -> {
                                 log.info("✓ Upload concluído. DocumentId: {}, Status: {}", 
                                         uploadResponse.getDocumentId(), uploadResponse.getStatus());
@@ -125,29 +135,33 @@ public class DocumentUploadUseCase {
     }
 
     public Mono<UploadDocumentResponse> upload(FilePart filePart, String cpf, String nome, String matricula) {
+        return upload(filePart, cpf, nome, matricula, false);
+    }
+
+    public Mono<UploadDocumentResponse> upload(FilePart filePart, String cpf, String nome, String matricula,
+            boolean replaceIfDuplicate) {
         log.info("=== INÍCIO DO UPLOAD ===");
-        log.info("Arquivo: {}, CPF: {}, Nome: {}, Matrícula: {}", 
-                filePart.filename(), cpf, nome != null ? nome : "não informado", 
-                matricula != null ? matricula : "não informada");
-        
-        // Obter tenantId do contexto reativo
+        log.info("Arquivo: {}, CPF: {}, Nome: {}, Matrícula: {}, replaceIfDuplicate: {}",
+                filePart.filename(), cpf, nome != null ? nome : "não informado",
+                matricula != null ? matricula : "não informada", replaceIfDuplicate);
+
         return ReactiveTenantContext.getTenantId()
                 .flatMap(tenantId -> {
                     log.info("🔐 Upload para tenant: {}", tenantId);
-                    
-                    // 1. Validar CPF
+
                     String normalizedCpf = cpfValidationService.normalize(cpf);
                     if (!cpfValidationService.isValid(normalizedCpf)) {
                         log.error("CPF inválido: {}", cpf);
                         return Mono.error(new InvalidCpfException("CPF inválido: " + cpf));
                     }
                     log.info("CPF validado: {}", normalizedCpf);
-                    
-                    return processUpload(filePart, normalizedCpf, nome, matricula, tenantId);
+
+                    return processUpload(filePart, normalizedCpf, nome, matricula, tenantId, replaceIfDuplicate);
                 });
     }
-    
-    private Mono<UploadDocumentResponse> processUpload(FilePart filePart, String cpf, String nome, String matricula, String tenantId) {
+
+    private Mono<UploadDocumentResponse> processUpload(FilePart filePart, String cpf, String nome, String matricula,
+            String tenantId, boolean replaceIfDuplicate) {
 
         // 2. Validar arquivo
         return validateFile(filePart)
@@ -179,16 +193,12 @@ public class DocumentUploadUseCase {
                                 log.info("Hash calculado: {}", fileHash);
                                 log.info("Verificando duplicidade para tenant: {}", tenantId);
                                 return documentRepository.findByTenantIdAndFileHash(tenantId, fileHash)
-                                    .flatMap(existingDoc -> {
-                                        log.warn("Arquivo duplicado detectado! DocumentId existente: {}", existingDoc.getId());
-                                        return Mono.<UploadDocumentResponse>error(new DocumentoDuplicadoException(
-                                                "Este arquivo já foi enviado anteriormente. DocumentId: " + existingDoc.getId()));
-                                    })
+                                    .flatMap(existingDoc -> handleDuplicateDocument(
+                                            existingDoc.getId(), replaceIfDuplicate,
+                                            () -> processNewDocument(fileBytes, cpf, nome, matricula, fileHash, filePart.filename(), tenantId)))
                                     .switchIfEmpty(
-                                            // Se não existe duplicado, continuar processamento
                                             Mono.defer(() -> {
                                                 log.info("Arquivo não é duplicado. Iniciando processamento...");
-                                                log.info("Passando matrícula para processNewDocument: {}", matricula != null ? matricula : "null");
                                                 return processNewDocument(fileBytes, cpf, nome, matricula, fileHash, filePart.filename(), tenantId);
                                             })
                                     );
@@ -508,6 +518,23 @@ public class DocumentUploadUseCase {
                                         return new PageData(mesesDetectados, detectedPages, anoDetectado);
                                     });
                 });
+    }
+
+    /**
+     * Trata arquivo duplicado: substitui (exclui + novo upload) ou retorna 409 com ID do documento existente.
+     */
+    private Mono<UploadDocumentResponse> handleDuplicateDocument(
+            String existingDocumentId,
+            boolean replaceIfDuplicate,
+            Supplier<Mono<UploadDocumentResponse>> createNewDocument) {
+        log.warn("Arquivo duplicado detectado! DocumentId existente: {}", existingDocumentId);
+        if (replaceIfDuplicate) {
+            log.info("replaceIfDuplicate=true — excluindo documento {} (entries, GridFS, Person) e reenviando...",
+                    existingDocumentId);
+            return deleteDocumentUseCase.execute(existingDocumentId)
+                    .then(Mono.defer(createNewDocument));
+        }
+        return Mono.error(new DocumentoDuplicadoException(existingDocumentId));
     }
 
     private static class PageResult {

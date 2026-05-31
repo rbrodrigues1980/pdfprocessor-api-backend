@@ -161,8 +161,9 @@ public class PdfLineParser {
      * Nota: Referência vem ANTES da descrição no formato FUNCEF
      * Nota: A descrição usa .+? (non-greedy) para capturar tudo até encontrar o padrão de valor no final
      */
+    // Prazo (coluna opcional, ex: "58") fica entre descrição e valor
     private static final Pattern FUNCEF_PATTERN = Pattern.compile(
-            "^([0-9]\\s*[0-9]\\s*[0-9]\\s*[0-9]?)\\s+([0-9]{4}/[0-9]{1,2})\\s+(.+?)\\s+([0-9]{1,3}(?:\\.[0-9]{3})*,[0-9]{2})\\s*$",
+            "^([0-9]\\s*[0-9]\\s*[0-9]\\s*[0-9]?)\\s+([0-9]{4}/[0-9]{1,2})\\s+(.+?)\\s+(?:([0-9]{1,3})\\s+)?([0-9]{1,3}(?:\\.[0-9]{3})*,[0-9]{2})\\s*$",
             Pattern.MULTILINE);
 
     /**
@@ -443,16 +444,18 @@ public class PdfLineParser {
                             break;
                         }
                     } else {
-                        // FUNCEF: código(1), referência(2), descrição(3), valor(4)
-                        referencia = lineMatcher.group(2); // Referência YYYY/MM
+                        // FUNCEF: código(1), referência(2), descrição(3), prazo(4 opcional), valor(5)
+                        referencia = lineMatcher.group(2);
                         String descricaoRaw = lineMatcher.group(3);
                         descricao = normalizer.normalizeDescription(descricaoRaw);
-                        valorStr = lineMatcher.group(4);
+                        String prazo = lineMatcher.group(4);
+                        valorStr = lineMatcher.group(5);
 
                         log.info("  └─ ✅ RUBRICA FUNCEF EXTRAÍDA:");
                         log.info("      ├─ Código: [{}]", codigo);
                         log.info("      ├─ Referência: [{}]", referencia);
                         log.info("      ├─ Descrição: [{}]", descricao);
+                        log.info("      ├─ Prazo: [{}]", prazo != null ? prazo : "(vazio)");
                         log.info("      └─ Valor: [{}]", valorStr);
                     }
 

@@ -301,6 +301,38 @@ class RubricaControllerTest {
     }
 
     @Test
+    @DisplayName("Deve excluir rubrica com sucesso - 204 NO_CONTENT")
+    void deveExcluirRubricaComSucesso() {
+        // Arrange
+        when(rubricaUseCase.excluir("001"))
+                .thenReturn(Mono.empty());
+
+        // Act & Assert
+        webTestClient.delete()
+                .uri("/rubricas/001")
+                .exchange()
+                .expectStatus().isNoContent();
+    }
+
+    @Test
+    @DisplayName("Deve retornar 404 NOT_FOUND ao tentar excluir rubrica inexistente")
+    void deveRetornar404AoExcluirRubricaInexistente() {
+        // Arrange
+        when(rubricaUseCase.excluir("999"))
+                .thenReturn(Mono.error(new RubricaNotFoundException("999")));
+
+        // Act & Assert
+        webTestClient.delete()
+                .uri("/rubricas/999")
+                .exchange()
+                .expectStatus().isNotFound()
+                .expectHeader().contentType(MediaType.APPLICATION_JSON)
+                .expectBody()
+                .jsonPath("$.status").isEqualTo(404)
+                .jsonPath("$.error").exists();
+    }
+
+    @Test
     @DisplayName("Deve desativar rubrica com sucesso - 200 OK")
     void deveDesativarRubricaComSucesso() {
         // Arrange
@@ -308,22 +340,54 @@ class RubricaControllerTest {
                 .thenReturn(Mono.empty());
 
         // Act & Assert
-        webTestClient.delete()
-                .uri("/rubricas/001")
+        webTestClient.patch()
+                .uri("/rubricas/001/deactivate")
                 .exchange()
                 .expectStatus().isOk();
     }
 
     @Test
-    @DisplayName("Deve retornar 404 NOT_FOUND ao tentar desativar rubrica inexistente")
-    void deveRetornar404AoDesativarRubricaInexistente() {
+    @DisplayName("Deve retornar 404 NOT_FOUND ao tentar desativar rubrica inexistente via PATCH")
+    void deveRetornar404AoDesativarRubricaInexistenteViaPatch() {
         // Arrange
         when(rubricaUseCase.desativar("999"))
                 .thenReturn(Mono.error(new RubricaNotFoundException("999")));
 
         // Act & Assert
-        webTestClient.delete()
-                .uri("/rubricas/999")
+        webTestClient.patch()
+                .uri("/rubricas/999/deactivate")
+                .exchange()
+                .expectStatus().isNotFound()
+                .expectHeader().contentType(MediaType.APPLICATION_JSON)
+                .expectBody()
+                .jsonPath("$.status").isEqualTo(404)
+                .jsonPath("$.error").exists();
+    }
+
+    @Test
+    @DisplayName("Deve ativar rubrica com sucesso - 200 OK")
+    void deveAtivarRubricaComSucesso() {
+        // Arrange
+        when(rubricaUseCase.ativar("001"))
+                .thenReturn(Mono.empty());
+
+        // Act & Assert
+        webTestClient.patch()
+                .uri("/rubricas/001/activate")
+                .exchange()
+                .expectStatus().isOk();
+    }
+
+    @Test
+    @DisplayName("Deve retornar 404 NOT_FOUND ao tentar ativar rubrica inexistente via PATCH")
+    void deveRetornar404AoAtivarRubricaInexistenteViaPatch() {
+        // Arrange
+        when(rubricaUseCase.ativar("999"))
+                .thenReturn(Mono.error(new RubricaNotFoundException("999")));
+
+        // Act & Assert
+        webTestClient.patch()
+                .uri("/rubricas/999/activate")
                 .exchange()
                 .expectStatus().isNotFound()
                 .expectHeader().contentType(MediaType.APPLICATION_JSON)

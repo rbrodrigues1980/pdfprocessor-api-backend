@@ -129,8 +129,7 @@ public class IncomeTaxUploadUseCase {
                                                                                                                                                         existingDoc.getId());
                                                                                                                                         return Mono.<UploadDocumentResponse>error(
                                                                                                                                                         new DocumentoDuplicadoException(
-                                                                                                                                                                        "Este arquivo já foi enviado anteriormente. DocumentId: "
-                                                                                                                                                                                        + existingDoc.getId()));
+                                                                                                                                                                        existingDoc.getId()));
                                                                                                                                 })
                                                                                                                                 .switchIfEmpty(
                                                                                                                                                 // 6.

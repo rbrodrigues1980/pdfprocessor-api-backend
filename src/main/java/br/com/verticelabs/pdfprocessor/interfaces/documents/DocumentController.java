@@ -45,8 +45,9 @@ public class DocumentController {
         public Mono<ResponseEntity<Object>> upload(
                         @RequestPart("file") FilePart file,
                         @RequestPart("cpf") String cpf,
-                        @RequestPart(value = "nome", required = false) String nome) {
-                return documentUploadUseCase.upload(file, cpf, nome)
+                        @RequestPart(value = "nome", required = false) String nome,
+                        @RequestParam(value = "replace", defaultValue = "false") boolean replace) {
+                return documentUploadUseCase.upload(file, cpf, nome, replace)
                                 .<ResponseEntity<Object>>map(response -> ResponseEntity.status(HttpStatus.CREATED)
                                                 .body((Object) response));
         }
@@ -61,13 +62,14 @@ public class DocumentController {
                         @RequestPart("files") List<org.springframework.http.codec.multipart.FilePart> files,
                         @RequestPart("cpf") String cpf,
                         @RequestPart("nome") String nome,
-                        @RequestPart("matricula") String matricula) {
+                        @RequestPart("matricula") String matricula,
+                        @RequestParam(value = "replace", defaultValue = "false") boolean replace) {
 
                 log.debug("=== INÍCIO: POST /api/v1/documents/bulk-upload ===");
                 log.debug("Total de arquivos: {}, CPF: {}, Nome: {}, Matrícula: {}",
                                 files != null ? files.size() : 0, cpf, nome, matricula);
 
-                return bulkDocumentUploadUseCase.uploadBulk(files, cpf, nome, matricula)
+                return bulkDocumentUploadUseCase.uploadBulk(files, cpf, nome, matricula, replace)
                                 .<ResponseEntity<Object>>map(response -> {
                                         log.debug("=== SUCESSO: BulkUpload concluído ===");
                                         log.debug("CPF: {}, Total: {}, Sucessos: {}, Falhas: {}",

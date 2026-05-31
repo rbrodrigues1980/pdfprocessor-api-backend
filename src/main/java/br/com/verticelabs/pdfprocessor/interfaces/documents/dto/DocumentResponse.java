@@ -24,5 +24,13 @@ public class DocumentResponse {
 
     /** Log de eventos do processamento. Presente apenas no detalhe (GET /documents/{id}), ausente em listagens. */
     private List<ProcessingEvent> processingLog;
+
+    // Campos de progresso em tempo real
+    private Integer totalPages;
+    private Integer pagesProcessed;
+    private Integer progressPercent;
+    private String lastEventMessage;
+    private String lastEventType;
+    private Integer eventsCount;
 }
 

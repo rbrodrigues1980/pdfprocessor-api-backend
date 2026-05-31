@@ -19,4 +19,7 @@ public class ApiErrorResponse {
 
     // Optional: for validation errors
     private Map<String, String> errors;
+
+    /** Metadados extras (ex.: existingDocumentId em documento duplicado) */
+    private Map<String, Object> details;
 }

@@ -36,13 +36,14 @@ public class ListPersonsUseCase {
     }
     
     private Mono<ListPersonsResult> listAllPersons(String nomeFilter, String cpfFilter, String matriculaFilter, int page, int size) {
-        Query query = buildQuery(null, nomeFilter, cpfFilter, matriculaFilter);
+        Query countQuery = buildQuery(null, nomeFilter, cpfFilter, matriculaFilter);
+        Query findQuery = buildQuery(null, nomeFilter, cpfFilter, matriculaFilter);
         
         Pageable pageable = PageRequest.of(page, size);
-        query.with(pageable);
+        findQuery.with(pageable);
         
-        Mono<Long> countMono = Mono.from(mongoTemplate.count(query, Person.class));
-        Mono<List<Person>> personsMono = mongoTemplate.find(query, Person.class).collectList();
+        Mono<Long> countMono = Mono.from(mongoTemplate.count(countQuery, Person.class));
+        Mono<List<Person>> personsMono = mongoTemplate.find(findQuery, Person.class).collectList();
         
         return Mono.zip(personsMono, countMono)
                 .map(tuple -> {
@@ -55,13 +56,14 @@ public class ListPersonsUseCase {
     }
     
     private Mono<ListPersonsResult> listPersonsByTenant(String tenantId, String nomeFilter, String cpfFilter, String matriculaFilter, int page, int size) {
-        Query query = buildQuery(tenantId, nomeFilter, cpfFilter, matriculaFilter);
+        Query countQuery = buildQuery(tenantId, nomeFilter, cpfFilter, matriculaFilter);
+        Query findQuery = buildQuery(tenantId, nomeFilter, cpfFilter, matriculaFilter);
         
         Pageable pageable = PageRequest.of(page, size);
-        query.with(pageable);
+        findQuery.with(pageable);
         
-        Mono<Long> countMono = Mono.from(mongoTemplate.count(query, Person.class));
-        Mono<List<Person>> personsMono = mongoTemplate.find(query, Person.class).collectList();
+        Mono<Long> countMono = Mono.from(mongoTemplate.count(countQuery, Person.class));
+        Mono<List<Person>> personsMono = mongoTemplate.find(findQuery, Person.class).collectList();
         
         return Mono.zip(personsMono, countMono)
                 .map(tuple -> {
