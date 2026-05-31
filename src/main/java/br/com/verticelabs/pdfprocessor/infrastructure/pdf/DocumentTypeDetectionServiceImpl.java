@@ -46,6 +46,25 @@ public class DocumentTypeDetectionServiceImpl implements DocumentTypeDetectionSe
                           (hasCaixaSigla ? 1 : 0) +
                           (hasCaixaOperacao ? 1 : 0) >= 2;
         
+        // ===== PADRÕES FUNCEF DEMONSTRATIVO (novo layout) =====
+        // "DEMONSTRATIVO DE PAGAMENTO" + logo FUNCEF + "PATROCINADORA" ou "MÊS PAGTO"
+        // Colunas: Mês Ref. | Código (6 dígitos) | Descrição | Valor | Resíduo | Prazo
+        boolean hasFuncefDemonstrativoTitle = upperText.contains("DEMONSTRATIVO DE PAGAMENTO");
+        boolean hasFuncefDemonstrativoLogo  = upperText.contains("FUNCEF") &&
+                (upperText.contains("FUNDACAO DOS ECONOMIARIOS FEDERAIS") ||
+                 upperText.contains("FUNDAÇÃO DOS ECONOMIÁRIOS FEDERAIS"));
+        boolean hasFuncefDemonstrativoFields = upperText.contains("PATROCINADORA") ||
+                upperText.contains("MÊS PAGTO") ||
+                upperText.contains("MES PAGTO");
+        // Distingue do CAIXA: não tem "CAIXA ECONÔMICA FEDERAL"
+        boolean notCaixaEconomica = !upperText.contains("CAIXA ECONÔMICA FEDERAL") &&
+                                    !upperText.contains("CAIXA ECONOMICA FEDERAL");
+
+        boolean hasFuncefDemonstrativo = hasFuncefDemonstrativoTitle
+                && hasFuncefDemonstrativoLogo
+                && hasFuncefDemonstrativoFields
+                && notCaixaEconomica;
+
         // ===== PADRÕES ESPECÍFICOS DA FUNCEF =====
         // 1. Título do documento FUNCEF
         boolean hasFuncefTitle = upperText.contains("DEMONSTRATIVO DE PROVENTOS PREVIDENCIÁRIOS") ||
@@ -79,7 +98,10 @@ public class DocumentTypeDetectionServiceImpl implements DocumentTypeDetectionSe
                            (hasFuncefTipoBeneficio ? 1 : 0) >= 2;
         
         // ===== DECISÃO FINAL =====
-        if (hasCaixa && hasFuncef) {
+        // FUNCEF_DEMONSTRATIVO tem prioridade antes do CAIXA genérico (compartilham "DEMONSTRATIVO DE PAGAMENTO")
+        if (hasFuncefDemonstrativo) {
+            return Mono.just(DocumentType.FUNCEF_DEMONSTRATIVO);
+        } else if (hasCaixa && hasFuncef) {
             return Mono.just(DocumentType.CAIXA_FUNCEF);
         } else if (hasCaixa) {
             return Mono.just(DocumentType.CAIXA);

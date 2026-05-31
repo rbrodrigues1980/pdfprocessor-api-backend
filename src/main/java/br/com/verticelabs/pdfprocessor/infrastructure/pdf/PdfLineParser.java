@@ -143,6 +143,63 @@ public class PdfLineParser {
             Pattern.MULTILINE);
 
     /**
+     * Regex para FUNCEF_DEMONSTRATIVO — "Demonstrativo de Pagamento" FUNCEF.
+     *
+     * Formato da linha:
+     *   MM/YYYY [DD/MM/YYYY] XXXXXX DESCRIÇÃO VALOR 0,00 0
+     *   Exemplo: "01/2016 436204 TAXA ADMINISTRATIVA - SALDADO 57,08 0,00 0"
+     *   Exemplo: "13/2016 436404 TAXA ADM. AB. ANUAL FUNCEF - SALDADO 28,54 0,00 0"
+     *
+     * Coluna "Data Início" é normalmente vazia e não aparece no texto extraído.
+     * Código tem 6 dígitos mas somente os 4 primeiros identificam a rubrica.
+     *
+     * Grupos:
+     *   1 = Mês Ref (MM/YYYY) — vira a referência da entry
+     *   2 = Código completo (6 dígitos) — usar apenas substring(0,4)
+     *   3 = Descrição
+     *   4 = Valor
+     */
+    private static final Pattern FUNCEF_DEMONSTRATIVO_PATTERN = Pattern.compile(
+            "^(\\d{1,2}/\\d{4})" +           // Grupo 1: Mês Ref (MM/YYYY ou M/YYYY)
+            "\\s+(?:\\d{2}/\\d{2}/\\d{4}\\s+)?" + // Data Início (opcional, DD/MM/YYYY)
+            "(\\d{6})" +                       // Grupo 2: Código 6 dígitos
+            "\\s+(.+?)" +                      // Grupo 3: Descrição (non-greedy)
+            "\\s+(\\d{1,3}(?:\\.\\d{3})*,\\d{2})" + // Grupo 4: Valor
+            "\\s+\\d{1,3}(?:\\.\\d{3})*,\\d{2}" +   // Resíduo (ignorado)
+            "\\s+\\d+\\s*$",                   // Prazo (ignorado)
+            Pattern.MULTILINE);
+
+    /**
+     * Variante GLUED do FUNCEF_DEMONSTRATIVO.
+     *
+     * Em alguns PDFs o texto extraído sai com as colunas em ordem física
+     * diferente e SEM espaço entre Valor, Código e Competência. Exemplo real:
+     *   "TAXA ADMINISTRATIVA - SALDADO 57,0843620412/2016 0,00 0"
+     *   decompõe em: descrição="TAXA ADMINISTRATIVA - SALDADO",
+     *                valor="57,08", código6="436204", competência="12/2016"
+     *   "IMPOSTO RENDA FONTE (FUNCEF) 309,9543270409/2016 0,00 0"
+     *   decompõe em: valor="309,95", código6="432704", competência="09/2016"
+     *
+     * Ordem das colunas: DESCRIÇÃO VALOR CÓDIGO(6) MM/YYYY  0,00 0
+     * O valor é ancorado pela vírgula decimal; o código tem 6 dígitos; a
+     * competência é ancorada pela barra. As três últimas colunas vêm coladas.
+     *
+     * Grupos:
+     *   1 = Descrição
+     *   2 = Valor
+     *   3 = Código completo (6 dígitos) — usar apenas substring(0,4)
+     *   4 = Mês Ref (MM/YYYY)
+     */
+    private static final Pattern FUNCEF_DEMONSTRATIVO_PATTERN_GLUED = Pattern.compile(
+            "^(.+?)" +                              // Grupo 1: Descrição (non-greedy)
+            "\\s+(\\d{1,3}(?:\\.\\d{3})*,\\d{2})" + // Grupo 2: Valor (ancorado pela vírgula)
+            "(\\d{6})" +                            // Grupo 3: Código 6 dígitos (colado ao valor)
+            "(\\d{1,2}/\\d{4})" +                   // Grupo 4: Competência MM/YYYY (colada ao código)
+            "\\s+\\d{1,3}(?:\\.\\d{3})*,\\d{2}" +   // Resíduo (ignorado)
+            "\\s+\\d+\\s*$",                        // Prazo (ignorado)
+            Pattern.MULTILINE);
+
+    /**
      * Regex para FUNCEF:
      * Formato real encontrado: "2 033 2018/01 SUPL. APOS. TEMPO CONTRIB. BENEF.
      * SALD. 4.741,41"
@@ -266,20 +323,16 @@ public class PdfLineParser {
         // Determina quais padrões usar baseado no tipo
         List<Pattern> patternsToTry = new ArrayList<>();
         if (documentType == DocumentType.CAIXA || documentType == DocumentType.CAIXA_FUNCEF) {
-            // Tentar padrões CAIXA na ordem de especificidade (mais específico primeiro)
-            // 1. Linha única com todas as colunas (novo formato)
             patternsToTry.add(CAIXA_PATTERN_LINHA_UNICA);
-            // 2. Padrão simples (formato mais comum)
             patternsToTry.add(CAIXA_PATTERN_SIMPLES);
-            // 3. Padrão completo (com código intermediário)
             patternsToTry.add(CAIXA_PATTERN_DATA_SEPARADA);
-            // 4. Formato nativo (data colada no valor)
             patternsToTry.add(CAIXA_PATTERN_NATIVE);
-            // 5. Padrão ultra flexível (código + valor obrigatórios, resto opcional) -
-            // ÚLTIMO RECURSO
             patternsToTry.add(CAIXA_PATTERN_FLEXIVEL);
         } else if (documentType == DocumentType.FUNCEF) {
             patternsToTry.add(FUNCEF_PATTERN);
+        } else if (documentType == DocumentType.FUNCEF_DEMONSTRATIVO) {
+            patternsToTry.add(FUNCEF_DEMONSTRATIVO_PATTERN);
+            patternsToTry.add(FUNCEF_DEMONSTRATIVO_PATTERN_GLUED);
         }
 
         log.info("════════════════════════════════════════════════════════════════════════════════");
@@ -443,6 +496,33 @@ public class PdfLineParser {
                             log.warn("  └─ ⚠️ Padrão desconhecido! Não foi possível extrair rubrica.");
                             break;
                         }
+                    } else if (documentType == DocumentType.FUNCEF_DEMONSTRATIVO) {
+                        // Dois layouts possíveis:
+                        //  - PADRÃO: mesRef(1), codigo6(2), descricao(3), valor(4)
+                        //  - GLUED:  descricao(1), valor(2), codigo6(3), mesRef(4)
+                        //    (colunas reordenadas e coladas em alguns PDFs)
+                        // Apenas os 4 primeiros dígitos do código identificam a rubrica
+                        String codigo6;
+                        String descricaoRaw;
+                        if (pattern == FUNCEF_DEMONSTRATIVO_PATTERN_GLUED) {
+                            descricaoRaw = lineMatcher.group(1);
+                            valorStr = lineMatcher.group(2);
+                            codigo6 = lineMatcher.group(3);
+                            referencia = lineMatcher.group(4); // MM/YYYY — normalizado depois em createEntry
+                        } else {
+                            referencia = lineMatcher.group(1); // MM/YYYY — normalizado depois em createEntry
+                            codigo6 = lineMatcher.group(2);
+                            descricaoRaw = lineMatcher.group(3);
+                            valorStr = lineMatcher.group(4);
+                        }
+                        codigo = codigo6.length() >= 4 ? codigo6.substring(0, 4) : codigo6;
+                        descricao = normalizer.normalizeDescription(descricaoRaw);
+
+                        log.info("  └─ ✅ RUBRICA FUNCEF_DEMONSTRATIVO EXTRAÍDA:");
+                        log.info("      ├─ Código completo: [{}] → Código rubrica: [{}]", codigo6, codigo);
+                        log.info("      ├─ Referência: [{}]", referencia);
+                        log.info("      ├─ Descrição: [{}]", descricao);
+                        log.info("      └─ Valor: [{}]", valorStr);
                     } else {
                         // FUNCEF: código(1), referência(2), descrição(3), prazo(4 opcional), valor(5)
                         referencia = lineMatcher.group(2);

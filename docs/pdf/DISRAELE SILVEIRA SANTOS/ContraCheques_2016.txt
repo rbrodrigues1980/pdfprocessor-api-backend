@@ -1,0 +1,3846 @@
+ 📥 POST /api/v1/persons/6a1bae890c74d37e68ee0676/documents/bulk-upload - Upload múltiplo de documentos
+ Total de arquivos: 1
+ === INÍCIO: BulkDocumentUploadUseCase.uploadBulkByPersonId() ===
+ Total de arquivos: 1, PersonId: 6a1bae890c74d37e68ee0676
+ ✓ Pessoa encontrada: CPF=05738717600, Nome=DISRAELE SILVEIRA SANTOS, Matrícula=null, TenantId=GLOBAL
+ CPF validado: 05738717600
+ === INÍCIO: BulkDocumentUploadUseCase.uploadBulk() ===
+ Total de arquivos: 1, CPF: 05738717600, Nome: DISRAELE SILVEIRA SANTOS, Matrícula: null
+ ✓ Parâmetros validados. CPF normalizado: 05738717600
+ Processando arquivo 1/1: ContraCheques_2016.pdf
+ === INÍCIO DO UPLOAD ===
+ Arquivo: ContraCheques_2016.pdf, CPF: 05738717600, Nome: DISRAELE SILVEIRA SANTOS, Matrícula: não informada, replaceIfDuplicate: false
+ 🔐 Upload para tenant: GLOBAL
+ CPF validado: 05738717600
+ Lendo conteúdo do arquivo para calcular hash e processar...
+ Arquivo lido em memória. Tamanho: 3087860 bytes
+ Calculando hash SHA-256 do arquivo...
+ Hash calculado: 4911d00241d575a696e18437d31343bbcd62041178abc7167c5ec95c84f6c429
+ Verificando duplicidade para tenant: GLOBAL
+ Arquivo não é duplicado. Iniciando processamento...
+ Processando novo documento para tenant: GLOBAL
+ Arquivo em memória. Tamanho: 3087860 bytes
+ Extraindo texto do PDF...
+ Texto extraído. Tamanho: 22488 caracteres
+ Tipo detectado: FUNCEF_DEMONSTRATIVO
+ === ensurePersonExists() INICIADO ===
+ CPF: 05738717600, Nome: DISRAELE SILVEIRA SANTOS, Matrícula: null, TenantId: GLOBAL
+ Dados normalizados - Nome: DISRAELE SILVEIRA SANTOS, Matrícula: null
+ Person já existe. Nome atual: DISRAELE SILVEIRA SANTOS, Matrícula atual: null
+ Person já está atualizada (nome e matrícula corretos), não precisa salvar
+ Person atual - CPF: 05738717600, Nome: DISRAELE SILVEIRA SANTOS, Matrícula: null
+ Person encontrada/criada. CPF: 05738717600
+ Salvando arquivo no GridFS com deduplicação (hash: 4911d00241d575a6...)...
+ GridFS: Iniciando armazenamento do arquivo 'ContraCheques_2016.pdf' (tipo: application/pdf, hash: 4911d00241d575a6...)
+ GridFS: Arquivo lido. Tamanho: 3087860 bytes (3015 KB)
+ GridFS: Salvando novo arquivo no MongoDB (collections fs.files e fs.chunks)...
+ ✅ GridFS: Arquivo salvo com sucesso! ID: 6a1bb250fdee1e46d67fcdbe
+ GridFS: Hash '4911d00241d575a6...' armazenado nos metadados para deduplicação futura
+ Arquivo salvo no GridFS com ID: 6a1bb250fdee1e46d67fcdbe
+ Processando páginas do PDF para detectar meses/anos...
+ PDF possui 12 páginas. Processando cada página...
+ Páginas processadas: 12 páginas, 12 meses detectados
+ Meses detectados: [2016-01, 2016-02, 2016-03, 2016-04, 2016-05, 2016-06, 2016-07, 2016-08, 2016-09, 2016-10, 2016-11, 2016-12]
+ Criando PayrollDocument para tenant: GLOBAL
+ PayrollDocument salvo. ID: 6a1bb250fdee1e46d67fcdcb
+ Adicionando documento 6a1bb250fdee1e46d67fcdcb à lista de documentos da Person (CPF: 05738717600)
+ Person atual - Nome: DISRAELE SILVEIRA SANTOS, Matrícula: null
+ ✅ Person atualizada com novo documento. ID: 6a1bae890c74d37e68ee0676, Nome: DISRAELE SILVEIRA SANTOS, Matrícula: null, Total de documentos: 1
+ === UPLOAD CONCLUÍDO COM SUCESSO ===
+ DocumentId: 6a1bb250fdee1e46d67fcdcb, Tipo: FUNCEF_DEMONSTRATIVO, Status: PENDING
+ ✓ Upload concluído para arquivo ContraCheques_2016.pdf. DocumentId: 6a1bb250fdee1e46d67fcdcb, Status: PENDING
+ Iniciando processamento automático do documento: 6a1bb250fdee1e46d67fcdcb
+ === INÍCIO DO PROCESSAMENTO ===
+ DocumentId: 6a1bb250fdee1e46d67fcdcb
+ Status atualizado para PROCESSING. Iniciando processamento...
+ Processando documento 6a1bb250fdee1e46d67fcdcb (tipo: FUNCEF_DEMONSTRATIVO)
+ ✓ Processamento iniciado para arquivo ContraCheques_2016.pdf. DocumentId: 6a1bb250fdee1e46d67fcdcb, Status: PROCESSING
+ === BulkUpload CONCLUÍDO ===
+ Total: 1, Sucessos: 1, Falhas: 0
+ 📥 POST /api/v1/persons/6a1bae890c74d37e68ee0676/documents/bulk-upload - Upload múltiplo de documentos
+ Total de arquivos: 1
+ === INÍCIO: BulkDocumentUploadUseCase.uploadBulkByPersonId() ===
+ Total de arquivos: 1, PersonId: 6a1bae890c74d37e68ee0676
+ ✓ Pessoa encontrada: CPF=05738717600, Nome=DISRAELE SILVEIRA SANTOS, Matrícula=null, TenantId=GLOBAL
+ CPF validado: 05738717600
+ === INÍCIO: BulkDocumentUploadUseCase.uploadBulk() ===
+ Total de arquivos: 1, CPF: 05738717600, Nome: DISRAELE SILVEIRA SANTOS, Matrícula: null
+ ✓ Parâmetros validados. CPF normalizado: 05738717600
+ Processando arquivo 1/1: ContraCheques_2016.pdf
+ === INÍCIO DO UPLOAD ===
+ Arquivo: ContraCheques_2016.pdf, CPF: 05738717600, Nome: DISRAELE SILVEIRA SANTOS, Matrícula: não informada, replaceIfDuplicate: false
+ 🔐 Upload para tenant: GLOBAL
+ CPF validado: 05738717600
+ Lendo conteúdo do arquivo para calcular hash e processar...
+ ❌ Response already committed. Ignoring error: null
+ Arquivo lido em memória. Tamanho: 3087860 bytes
+ Calculando hash SHA-256 do arquivo...
+ PDF carregado do GridFS. Tamanho: 3087860 bytes
+ PDF possui 12 páginas. Processando cada página...
+ Hash calculado: 4911d00241d575a696e18437d31343bbcd62041178abc7167c5ec95c84f6c429
+ ❌ Response already committed. Ignoring error: null
+ Verificando duplicidade para tenant: GLOBAL
+ Arquivo duplicado detectado! DocumentId existente: 6a1bb250fdee1e46d67fcdcb
+ ✗ Arquivo duplicado ContraCheques_2016.pdf: documento existente 6a1bb250fdee1e46d67fcdcb
+ === BulkUpload CONCLUÍDO ===
+ Total: 1, Sucessos: 0, Falhas: 1
+ ❌ Response already committed. Ignoring error: null
+ ❌ Response already committed. Ignoring error: null
+ Primeira página tem 1718 caracteres (legível: true). Precisa de extração de texto de imagem: false
+ PDF precisa de extração de texto de imagem: false. Processamento será paralelo
+ ════════════════════════════════════════════════════════════════════════════════
+ 🔍 EXTRAINDO RUBRICAS DA PÁGINA 12 (tipo: FUNCEF_DEMONSTRATIVO, referência: 2016-12) — Parser Regex
+ ════════════════════════════════════════════════════════════════════════════════
+ ════════════════════════════════════════════════════════════════════════════════
+ 📄 TEXTO COMPLETO EXTRAÍDO DA PÁGINA (1831 caracteres):
+ ════════════════════════════════════════════════════════════════════════════════
+ FUNCEF
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ ════════════════════════════════════════════════════════════════════════════════
+ Processando página (tipo: FUNCEF_DEMONSTRATIVO, total de linhas: 65)
+ ════════════════════════════════════════════════════════════════════════════════
+ 📋 TODAS AS LINHAS DO TEXTO (65 linhas):
+ ════════════════════════════════════════════════════════════════════════════════
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ ════════════════════════════════════════════════════════════════════════════════
+ 🔍 EXTRAINDO RUBRICAS DA PÁGINA 1 (tipo: FUNCEF_DEMONSTRATIVO, referência: 2016-01) — Parser Regex
+ ════════════════════════════════════════════════════════════════════════════════
+
+ ════════════════════════════════════════════════════════════════════════════════
+ ════════════════════════════════════════════════════════════════════════════════
+
+ 📄 TEXTO COMPLETO EXTRAÍDO DA PÁGINA (1720 caracteres):
+ ════════════════════════════════════════════════════════════════════════════════
+ 🔍 EXTRAINDO RUBRICAS DA PÁGINA 7 (tipo: FUNCEF_DEMONSTRATIVO, referência: 2016-07) — Parser Regex
+ FUNCEF
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ ════════════════════════════════════════════════════════════════════════════════
+ ════════════════════════════════════════════════════════════════════════════════
+
+ ════════════════════════════════════════════════════════════════════════════════
+ 🔍 EXTRAINDO RUBRICAS DA PÁGINA 2 (tipo: FUNCEF_DEMONSTRATIVO, referência: 2016-02) — Parser Regex
+ ════════════════════════════════════════════════════════════════════════════════
+
+ ════════════════════════════════════════════════════════════════════════════════
+ ════════════════════════════════════════════════════════════════════════════════
+ 📄 TEXTO COMPLETO EXTRAÍDO DA PÁGINA (1882 caracteres):
+
+ 🔍 EXTRAINDO RUBRICAS DA PÁGINA 5 (tipo: FUNCEF_DEMONSTRATIVO, referência: 2016-05) — Parser Regex
+ ════════════════════════════════════════════════════════════════════════════════
+ ════════════════════════════════════════════════════════════════════════════════
+ Processando página (tipo: FUNCEF_DEMONSTRATIVO, total de linhas: 63)
+ ════════════════════════════════════════════════════════════════════════════════
+ ════════════════════════════════════════════════════════════════════════════════
+ 📄 TEXTO COMPLETO EXTRAÍDO DA PÁGINA (1891 caracteres):
+ ════════════════════════════════════════════════════════════════════════════════
+ ════════════════════════════════════════════════════════════════════════════════
+ ════════════════════════════════════════════════════════════════════════════════
+ FUNCEF
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 🔍 EXTRAINDO RUBRICAS DA PÁGINA 8 (tipo: FUNCEF_DEMONSTRATIVO, referência: 2016-08) — Parser Regex
+ ════════════════════════════════════════════════════════════════════════════════
+ ════════════════════════════════════════════════════════════════════════════════
+ ════════════════════════════════════════════════════════════════════════════════
+ ════════════════════════════════════════════════════════════════════════════════
+ 📄 TEXTO COMPLETO EXTRAÍDO DA PÁGINA (1881 caracteres):
+ ════════════════════════════════════════════════════════════════════════════════
+ ════════════════════════════════════════════════════════════════════════════════
+ 🔍 PROCURANDO LINHAS QUE PARECEM RUBRICAS:
+ FUNCEF
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ ════════════════════════════════════════════════════════════════════════════════
+ Processando página (tipo: FUNCEF_DEMONSTRATIVO, total de linhas: 66)
+ ════════════════════════════════════════════════════════════════════════════════
+ ════════════════════════════════════════════════════════════════════════════════
+ ════════════════════════════════════════════════════════════════════════════════
+ Processando página (tipo: FUNCEF_DEMONSTRATIVO, total de linhas: 66)
+ 🔍 EXTRAINDO RUBRICAS DA PÁGINA 4 (tipo: FUNCEF_DEMONSTRATIVO, referência: 2016-04) — Parser Regex
+ 🔍 EXTRAINDO RUBRICAS DA PÁGINA 3 (tipo: FUNCEF_DEMONSTRATIVO, referência: 2016-03) — Parser Regex
+ 📋 TODAS AS LINHAS DO TEXTO (63 linhas):
+ 📄 TEXTO COMPLETO EXTRAÍDO DA PÁGINA (1936 caracteres):
+ ════════════════════════════════════════════════════════════════════════════════
+ ════════════════════════════════════════════════════════════════════════════════
+ ════════════════════════════════════════════════════════════════════════════════
+ FUNCEF
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ FUNCEF
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ ════════════════════════════════════════════════════════════════════════════════
+ ════════════════════════════════════════════════════════════════════════════════
+ Processando página (tipo: FUNCEF_DEMONSTRATIVO, total de linhas: 66)
+ ════════════════════════════════════════════════════════════════════════════════
+ LINHA[  2] - INSPEÇÃO: [70712900]
+ ════════════════════════════════════════════════════════════════════════════════
+ ════════════════════════════════════════════════════════════════════════════════
+ 📋 TODAS AS LINHAS DO TEXTO (66 linhas):
+ ════════════════════════════════════════════════════════════════════════════════
+ 📄 TEXTO COMPLETO EXTRAÍDO DA PÁGINA (1774 caracteres):
+ ════════════════════════════════════════════════════════════════════════════════
+ 📋 TODAS AS LINHAS DO TEXTO (66 linhas):
+   └─ Começa com dígitos: true
+ Processando página (tipo: FUNCEF_DEMONSTRATIVO, total de linhas: 67)
+ ════════════════════════════════════════════════════════════════════════════════
+ ════════════════════════════════════════════════════════════════════════════════
+ 📋 TODAS AS LINHAS DO TEXTO (66 linhas):
+ ════════════════════════════════════════════════════════════════════════════════
+ ════════════════════════════════════════════════════════════════════════════════
+ ════════════════════════════════════════════════════════════════════════════════
+ 📄 TEXTO COMPLETO EXTRAÍDO DA PÁGINA (1774 caracteres):
+
+ ════════════════════════════════════════════════════════════════════════════════
+
+   └─ Tem valor monetário: false
+
+ 📋 TODAS AS LINHAS DO TEXTO (67 linhas):
+
+
+ ════════════════════════════════════════════════════════════════════════════════
+
+ FUNCEF
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ ════════════════════════════════════════════════════════════════════════════════
+
+
+ LINHA[ 13] - INSPEÇÃO: [2563003]
+ ════════════════════════════════════════════════════════════════════════════════
+
+
+ FUNCEF
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ Processando página (tipo: FUNCEF_DEMONSTRATIVO, total de linhas: 64)
+
+ ════════════════════════════════════════════════════════════════════════════════
+
+ ════════════════════════════════════════════════════════════════════════════════
+ 📋 TODAS AS LINHAS DO TEXTO (64 linhas):
+
+
+
+   └─ Começa com dígitos: true
+
+
+
+
+
+
+
+
+
+ Processando página (tipo: FUNCEF_DEMONSTRATIVO, total de linhas: 64)
+
+ ════════════════════════════════════════════════════════════════════════════════
+
+
+   └─ Tem valor monetário: false
+
+
+
+
+
+
+
+ LINHA[ 23] - INSPEÇÃO: [30310300]
+
+   └─ Começa com dígitos: true
+ ════════════════════════════════════════════════════════════════════════════════
+
+
+ 📋 TODAS AS LINHAS DO TEXTO (64 linhas):
+
+
+
+
+
+
+   └─ Tem valor monetário: false
+
+
+ ════════════════════════════════════════════════════════════════════════════════
+
+
+
+
+
+
+
+
+
+
+
+
+ LINHA[ 24] - INSPEÇÃO: [2563003]
+
+
+
+
+
+
+
+
+
+
+
+
+   └─ Começa com dígitos: true
+
+
+
+
+
+
+
+
+
+
+
+
+   └─ Tem valor monetário: false
+
+
+
+ LINHA[ 25] - INSPEÇÃO: [2016/12]
+
+
+
+
+
+
+
+
+
+
+   └─ Começa com dígitos: true
+
+   └─ Tem valor monetário: false
+
+
+
+
+
+
+
+
+
+
+
+
+
+ LINHA[ 30] - INSPEÇÃO: [0420253823]
+
+
+   └─ Começa com dígitos: true
+
+
+
+
+
+
+
+
+
+
+   └─ Tem valor monetário: false
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ LINHA[ 39] - INSPEÇÃO: [SUPL. APOS. TEMPO CONTRIB. BENEF. SALD. 6.342,1620330412/2016 0,00 0]
+
+
+
+
+
+
+
+
+
+
+
+
+
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ LINHA[ 40] - INSPEÇÃO: [PROVENTOS INSS 1.847,9721870412/2016 0,00 0]
+
+
+   └─ Começa com dígitos: false
+
+   └─ Tem valor monetário: true
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ LINHA[ 43] - INSPEÇÃO: [IMPOSTO RENDA FONTE (FUNCEF) 309,9543270412/2016 0,00 0]
+
+
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+
+
+ LINHA[ 44] - INSPEÇÃO: [CAIXA - CONSIGNACAO 494,1443358012/2016 0,00 0]
+
+
+   └─ Começa com dígitos: false
+
+   └─ Tem valor monetário: true
+
+ LINHA[ 45] - INSPEÇÃO: [CAIXA - CONSIGNACAO 419,9943358012/2016 0,00 0]
+
+
+
+
+
+
+
+
+
+
+
+   └─ Começa com dígitos: false
+
+
+
+
+
+
+
+
+
+
+
+   └─ Tem valor monetário: true
+
+ LINHA[ 46] - INSPEÇÃO: [CAIXA - CONSIGNACAO 70,5343358012/2016 0,00 0]
+
+
+   └─ Começa com dígitos: false
+
+
+   └─ Tem valor monetário: true
+
+
+ LINHA[ 47] - INSPEÇÃO: [TAXA ADMINISTRATIVA - SALDADO 57,0843620412/2016 0,00 0]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+
+
+
+ LINHA[ 48] - INSPEÇÃO: [CONTRIBUIÇÃO EXTRAORDINARIA 2014 176,3144300412/2016 0,00 0]
+
+
+
+
+
+
+
+
+
+
+
+
+   └─ Começa com dígitos: false
+
+
+
+
+
+
+
+
+
+
+
+
+
+   └─ Tem valor monetário: true
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ LINHA[ 49] - INSPEÇÃO: [EMPREST. NOVO CREDINAMICO FIXO - FGQC 86,2544320412/2016 0,00 0]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   └─ Começa com dígitos: false
+
+   └─ Tem valor monetário: true
+
+
+
+
+
+
+
+
+
+
+
+ ════════════════════════════════════════════════════════════════════════════════
+
+ LINHA[ 50] - INSPEÇÃO: [EMPREST. NOVO CREDINAMICO FIXO 1.219,8344370412/2016 0,00 0]
+
+
+   └─ Começa com dígitos: false
+
+   └─ Tem valor monetário: true
+
+
+ LINHA[ 51] - INSPEÇÃO: [SAUDE CAIXA MENSALIDADE 147,2044600412/2016 0,00 0]
+
+
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+
+
+
+
+
+ 🔍 EXTRAINDO RUBRICAS DA PÁGINA 11 (tipo: FUNCEF_DEMONSTRATIVO, referência: 2016-11) — Parser Regex
+
+ ════════════════════════════════════════════════════════════════════════════════
+
+
+ ════════════════════════════════════════════════════════════════════════════════
+
+
+
+
+
+
+
+
+
+ LINHA[ 52] - INSPEÇÃO: [UNIAO SEGUROS GERAIS 58,5146190412/2016 0,00 0]
+
+
+ 📄 TEXTO COMPLETO EXTRAÍDO DA PÁGINA (2204 caracteres):
+
+ ════════════════════════════════════════════════════════════════════════════════
+
+
+
+ FUNCEF
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   └─ Começa com dígitos: false
+
+
+   └─ Tem valor monetário: true
+
+
+ LINHA[ 53] - INSPEÇÃO: [ASSOC. APOSENT./MENSALIDADE - MG 44,1947761112/2016 0,00 0]
+
+
+   └─ Começa com dígitos: false
+
+
+
+
+
+
+ ════════════════════════════════════════════════════════════════════════════════
+
+ Processando página (tipo: FUNCEF_DEMONSTRATIVO, total de linhas: 69)
+
+ ════════════════════════════════════════════════════════════════════════════════
+
+
+ 📋 TODAS AS LINHAS DO TEXTO (69 linhas):
+
+ ════════════════════════════════════════════════════════════════════════════════
+
+
+
+   └─ Tem valor monetário: true
+
+
+
+
+
+ ════════════════════════════════════════════════════════════════════════════════
+
+
+ ════════════════════════════════════════════════════════════════════════════════
+ 🔍 PROCURANDO LINHAS QUE PARECEM RUBRICAS:
+
+
+
+
+
+
+
+
+ LINHA[ 56] - INSPEÇÃO: [BASE DEFICIT 6.342,16BDEFICIT12/2016 0,00 0]
+
+ ════════════════════════════════════════════════════════════════════════════════
+
+
+
+
+
+
+
+
+   └─ Começa com dígitos: false
+
+
+   └─ Tem valor monetário: true
+ LINHA[  2] - INSPEÇÃO: [70712900]
+
+   └─ Começa com dígitos: true
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ LINHA[ 57] - INSPEÇÃO: [MARGEM CONSIGNAVEL 518,07MGCONS12/2016 0,00 0]
+   └─ Tem valor monetário: false
+
+
+
+
+
+ LINHA[ 13] - INSPEÇÃO: [2563003]
+
+
+
+   └─ Começa com dígitos: true
+ ════════════════════════════════════════════════════════════════════════════════
+   └─ Tem valor monetário: false
+
+ ════════════════════════════════════════════════════════════════════════════════
+
+
+
+
+ LINHA[ 23] - INSPEÇÃO: [30310300]
+
+   └─ Começa com dígitos: true
+   └─ Começa com dígitos: false
+
+   └─ Tem valor monetário: false
+ ════════════════════════════════════════════════════════════════════════════════
+   └─ Tem valor monetário: true
+
+ LINHA[ 24] - INSPEÇÃO: [2563003]
+
+
+
+
+ ════════════════════════════════════════════════════════════════════════════════
+
+ 🔍 PROCURANDO LINHAS QUE PARECEM RUBRICAS:
+ ════════════════════════════════════════════════════════════════════════════════
+
+
+ ════════════════════════════════════════════════════════════════════════════════
+
+ LINHA[  2] - INSPEÇÃO: [70712900]
+
+ 🔍 EXTRAINDO RUBRICAS DA PÁGINA 9 (tipo: FUNCEF_DEMONSTRATIVO, referência: 2016-09) — Parser Regex
+
+ LINHA[ 58] - INSPEÇÃO: [RENDA BASE 8.190,13RBASE12/2016 0,00 0]
+ ════════════════════════════════════════════════════════════════════════════════
+
+ ════════════════════════════════════════════════════════════════════════════════
+   └─ Começa com dígitos: false
+   └─ Começa com dígitos: true
+
+ ════════════════════════════════════════════════════════════════════════════════
+
+ ════════════════════════════════════════════════════════════════════════════════
+ 🔍 PROCURANDO LINHAS QUE PARECEM RUBRICAS:
+
+ ════════════════════════════════════════════════════════════════════════════════
+   └─ Começa com dígitos: true
+ ════════════════════════════════════════════════════════════════════════════════
+ LINHA[  2] - INSPEÇÃO: [70712900]
+ 📄 TEXTO COMPLETO EXTRAÍDO DA PÁGINA (1830 caracteres):
+   └─ Tem valor monetário: false
+   └─ Começa com dígitos: true
+   └─ Tem valor monetário: true
+   └─ Tem valor monetário: false
+ LINHA[ 60] - INSPEÇÃO: [3.083,988.190,13]
+   └─ Tem valor monetário: false
+ LINHA[ 13] - INSPEÇÃO: [2563003]
+
+ 🔍 PROCURANDO LINHAS QUE PARECEM RUBRICAS:
+
+ LINHA[ 13] - INSPEÇÃO: [2563003]
+
+   └─ Começa com dígitos: true
+   └─ Começa com dígitos: true
+ ════════════════════════════════════════════════════════════════════════════════
+
+ ════════════════════════════════════════════════════════════════════════════════
+ ════════════════════════════════════════════════════════════════════════════════
+ LINHA[  2] - INSPEÇÃO: [70712900]
+
+ FUNCEF
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   └─ Tem valor monetário: false
+ 🔍 PROCURANDO LINHAS QUE PARECEM RUBRICAS:
+   └─ Tem valor monetário: false
+ ════════════════════════════════════════════════════════════════════════════════
+   └─ Começa com dígitos: false
+ LINHA[ 25] - INSPEÇÃO: [2016/07]
+ ════════════════════════════════════════════════════════════════════════════════
+
+
+   └─ Começa com dígitos: true
+ Processando página (tipo: FUNCEF_DEMONSTRATIVO, total de linhas: 65)
+   └─ Começa com dígitos: true
+ LINHA[ 23] - INSPEÇÃO: [30310300]
+
+   └─ Tem valor monetário: false
+
+   └─ Tem valor monetário: false
+ ════════════════════════════════════════════════════════════════════════════════
+   └─ Tem valor monetário: true
+ 🔍 PROCURANDO LINHAS QUE PARECEM RUBRICAS:
+ LINHA[ 23] - INSPEÇÃO: [30310300]
+ ════════════════════════════════════════════════════════════════════════════════
+ ════════════════════════════════════════════════════════════════════════════════
+ LINHA[ 62] - INSPEÇÃO: [0,005.106,15]
+ 📋 TODAS AS LINHAS DO TEXTO (65 linhas):
+ LINHA[ 13] - INSPEÇÃO: [2563003]
+   └─ Começa com dígitos: true
+
+ LINHA[ 30] - INSPEÇÃO: [0420253823]
+
+
+
+ ════════════════════════════════════════════════════════════════════════════════
+   └─ Começa com dígitos: true
+   └─ Começa com dígitos: false
+ LINHA[  2] - INSPEÇÃO: [70712900]
+   └─ Tem valor monetário: false
+   └─ Tem valor monetário: true
+ ════════════════════════════════════════════════════════════════════════════════
+   └─ Começa com dígitos: true
+   └─ Tem valor monetário: false
+
+   └─ Começa com dígitos: true
+ LINHA[ 24] - INSPEÇÃO: [2563003]
+   └─ Tem valor monetário: false
+
+
+
+ LINHA[  2] - INSPEÇÃO: [70712900]
+
+   └─ Começa com dígitos: true
+   └─ Começa com dígitos: true
+   └─ Tem valor monetário: false
+ LINHA[ 24] - INSPEÇÃO: [2563003]
+   └─ Tem valor monetário: false
+   └─ Começa com dígitos: true
+ ════════════════════════════════════════════════════════════════════════════════
+ LINHA[ 13] - INSPEÇÃO: [2563003]
+ 📊 Total de linhas que parecem rubricas: 0
+
+   └─ Tem valor monetário: false
+ ════════════════════════════════════════════════════════════════════════════════
+   └─ Começa com dígitos: true
+   └─ Tem valor monetário: false
+
+
+ LINHA[ 39] - INSPEÇÃO: [SUPL. APOS. TEMPO CONTRIB. BENEF. SALD. 6.342,1620330407/2016 0,00 0]
+ LINHA[ 25] - INSPEÇÃO: [2016/05]
+ LINHA[ 23] - INSPEÇÃO: [30310300]
+
+ LINHA[ 13] - INSPEÇÃO: [2563003]
+   └─ Começa com dígitos: true
+   └─ Começa com dígitos: false
+   └─ Começa com dígitos: true
+   └─ Tem valor monetário: false
+
+   └─ Começa com dígitos: true
+
+
+ ════════════════════════════════════════════════════════════════════════════════
+
+ ════════════════════════════════════════════════════════════════════════════════
+ ════════════════════════════════════════════════════════════════════════════════
+
+   └─ Tem valor monetário: false
+   └─ Começa com dígitos: true
+   └─ Tem valor monetário: true
+   └─ Tem valor monetário: false
+ LINHA[ 24] - INSPEÇÃO: [2563003]
+   └─ Tem valor monetário: false
+   └─ Começa com dígitos: true
+ LINHA[ 30] - INSPEÇÃO: [0420253823]
+   └─ Tem valor monetário: false
+ LINHA[ 25] - INSPEÇÃO: [2016/02]
+   └─ Começa com dígitos: true
+   └─ Começa com dígitos: true
+   └─ Tem valor monetário: false
+   └─ Tem valor monetário: false
+
+ 🔧 CONFIGURAÇÃO DO PARSER:
+ LINHA[ 23] - INSPEÇÃO: [30310300]
+ ════════════════════════════════════════════════════════════════════════════════
+
+ Tipo do documento: FUNCEF_DEMONSTRATIVO
+
+
+
+ 🔍 EXTRAINDO RUBRICAS DA PÁGINA 10 (tipo: FUNCEF_DEMONSTRATIVO, referência: 2016-10) — Parser Regex
+
+ 🔍 EXTRAINDO RUBRICAS DA PÁGINA 6 (tipo: FUNCEF_DEMONSTRATIVO, referência: 2016-06) — Parser Regex
+ ════════════════════════════════════════════════════════════════════════════════
+
+ ════════════════════════════════════════════════════════════════════════════════
+ LINHA[ 40] - INSPEÇÃO: [PROVENTOS INSS 1.847,9721870407/2016 0,00 0]
+ 📄 TEXTO COMPLETO EXTRAÍDO DA PÁGINA (1882 caracteres):
+
+   └─ Tem valor monetário: false
+ LINHA[ 23] - INSPEÇÃO: [30310300]
+ LINHA[ 25] - INSPEÇÃO: [2016/04]
+   └─ Começa com dígitos: true
+ LINHA[ 39] - INSPEÇÃO: [SUPL. APOS. TEMPO CONTRIB. BENEF. SALD. 6.342,1620330405/2016 0,00 0]
+   └─ Começa com dígitos: true
+ Padrões regex a tentar: 1
+   └─ Começa com dígitos: false
+ LINHA[ 30] - INSPEÇÃO: [0420253823]
+   └─ Tem valor monetário: true
+   └─ Tem valor monetário: false
+
+
+ ════════════════════════════════════════════════════════════════════════════════
+ LINHA[ 30] - INSPEÇÃO: [0420253823]
+ ════════════════════════════════════════════════════════════════════════════════
+
+   └─ Começa com dígitos: false
+ ════════════════════════════════════════════════════════════════════════════════
+   └─ Tem valor monetário: true
+
+
+   └─ Começa com dígitos: true
+
+   └─ Tem valor monetário: false
+   └─ Tem valor monetário: false
+
+ LINHA[ 24] - INSPEÇÃO: [2563003]
+
+   Padrão[1]: ^(\d{1,2}/\d{4})\s+(?:\d{2}/\d{2}/\d{4}\s+)?(\d{6})\s+(.+?)\s+(\d{1,3}(?:\.\d{3})*,\d{2})\s+\d{1,3}(?:\.\d{3})*,\d{2}\s+\d+\s*$
+ ════════════════════════════════════════════════════════════════════════════════
+ LINHA[ 24] - INSPEÇÃO: [2563003]
+ ════════════════════════════════════════════════════════════════════════════════
+   └─ Começa com dígitos: true
+ 🔍 PROCURANDO LINHAS QUE PARECEM RUBRICAS:
+   └─ Tem valor monetário: false
+   └─ Começa com dígitos: true
+   └─ Tem valor monetário: false
+ LINHA[ 25] - INSPEÇÃO: [2016/01]
+ LINHA[ 40] - INSPEÇÃO: [PROVENTOS INSS 1.847,9721870405/2016 0,00 0]
+
+   └─ Começa com dígitos: true
+ 📄 TEXTO COMPLETO EXTRAÍDO DA PÁGINA (1883 caracteres):
+   └─ Começa com dígitos: true
+
+   └─ Tem valor monetário: false
+   └─ Tem valor monetário: false
+ LINHA[ 30] - INSPEÇÃO: [0420253823]
+
+ FUNCEF
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ LINHA[ 39] - INSPEÇÃO: [SUPL. APOS. TEMPO CONTRIB. BENEF. SALD. 6.342,1620330404/2016 0,00 0]
+ ════════════════════════════════════════════════════════════════════════════════
+   └─ Começa com dígitos: true
+   └─ Começa com dígitos: true
+ LINHA[ 43] - INSPEÇÃO: [IMPOSTO RENDA FONTE (FUNCEF) 309,9543270407/2016 0,00 0]
+   └─ Tem valor monetário: false
+ ════════════════════════════════════════════════════════════════════════════════
+ ════════════════════════════════════════════════════════════════════════════════
+ LINHA[  2] - INSPEÇÃO: [70712900]
+   └─ Começa com dígitos: false
+   └─ Começa com dígitos: true
+ ════════════════════════════════════════════════════════════════════════════════
+ LINHA[ 39] - INSPEÇÃO: [SUPL. APOS. TEMPO CONTRIB. BENEF. SALD. 6.342,1620330402/2016 0,00 0]
+ FUNCEF
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   └─ Começa com dígitos: false
+ ════════════════════════════════════════════════════════════════════════════════
+   └─ Tem valor monetário: true
+ Processando página (tipo: FUNCEF_DEMONSTRATIVO, total de linhas: 66)
+ Processando página (tipo: FUNCEF_DEMONSTRATIVO, total de linhas: 66)
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: false
+ ════════════════════════════════════════════════════════════════════════════════
+ ════════════════════════════════════════════════════════════════════════════════
+ LINHA[ 39] - INSPEÇÃO: [SUPL. APOS. TEMPO CONTRIB. BENEF. SALD. 6.342,1620330401/2016 0,00 0]
+   └─ Tem valor monetário: false
+   └─ Tem valor monetário: true
+   └─ Começa com dígitos: false
+ 🎯 PROCESSANDO LINHA POR LINHA E EXTRAINDO RUBRICAS:
+   └─ Tem valor monetário: true
+
+
+ LINHA[ 13] - INSPEÇÃO: [2563003]
+ ════════════════════════════════════════════════════════════════════════════════
+
+ LINHA[ 40] - INSPEÇÃO: [PROVENTOS INSS 1.847,9721870404/2016 0,00 0]
+   └─ Começa com dígitos: true
+ ════════════════════════════════════════════════════════════════════════════════
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: false
+   └─ Tem valor monetário: true
+ LINHA[ 25] - INSPEÇÃO: [2016/08]
+ 📋 TODAS AS LINHAS DO TEXTO (66 linhas):
+ ════════════════════════════════════════════════════════════════════════════════
+   └─ Começa com dígitos: false
+ LINHA[ 44] - INSPEÇÃO: [CAIXA - CONSIGNACAO 70,5343358007/2016 0,00 0]
+ LINHA[ 23] - INSPEÇÃO: [30310300]
+
+ LINHA[ 43] - INSPEÇÃO: [IMPOSTO RENDA FONTE (FUNCEF) 309,9543270405/2016 0,00 0]
+ LINHA[ 40] - INSPEÇÃO: [PROVENTOS INSS 1.847,9721870402/2016 0,00 0]
+
+   └─ Começa com dígitos: false
+ ════════════════════════════════════════════════════════════════════════════════
+
+ 📋 TODAS AS LINHAS DO TEXTO (66 linhas):
+
+   └─ Tem valor monetário: true
+
+   └─ Começa com dígitos: true
+
+   └─ Tem valor monetário: true
+   └─ Começa com dígitos: false
+   └─ Começa com dígitos: true
+   └─ Tem valor monetário: true
+ LINHA[ 40] - INSPEÇÃO: [PROVENTOS INSS 1.847,9721870401/2016 0,00 0]
+
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+   └─ Começa com dígitos: false
+ 📊 Total de rubricas extraídas linha por linha: 0
+ LINHA[ 41] - INSPEÇÃO: [ADIANTAMENTO AB. ANU. FUNCEF 3.171,0821730413/2016 0,00 0]
+   └─ Tem valor monetário: true
+ ════════════════════════════════════════════════════════════════════════════════
+ ════════════════════════════════════════════════════════════════════════════════
+   └─ Começa com dígitos: false
+
+
+   └─ Tem valor monetário: true
+ LINHA[ 43] - INSPEÇÃO: [IMPOSTO RENDA FONTE (FUNCEF) 349,6243270404/2016 0,00 0]
+
+   └─ Começa com dígitos: false
+
+ LINHA[ 44] - INSPEÇÃO: [IMPOSTO RENDA FONTE (FUNCEF) 349,6243270402/2016 0,00 0]
+   └─ Tem valor monetário: false
+
+
+   └─ Tem valor monetário: false
+ LINHA[ 45] - INSPEÇÃO: [CAIXA - CONSIGNACAO 419,9943358007/2016 0,00 0]
+ LINHA[ 24] - INSPEÇÃO: [2563003]
+   └─ Começa com dígitos: false
+
+   └─ Começa com dígitos: true
+   └─ Tem valor monetário: true
+   └─ Tem valor monetário: true
+   └─ Tem valor monetário: false
+ LINHA[ 46] - INSPEÇÃO: [CAIXA - CONSIGNACAO 494,1443358007/2016 0,00 0]
+ LINHA[ 44] - INSPEÇÃO: [CAIXA - CONSIGNACAO 419,9943358005/2016 0,00 0]
+ Total de rubricas extraídas: 0 (tipo: FUNCEF_DEMONSTRATIVO)
+   └─ Começa com dígitos: false
+   └─ Começa com dígitos: false
+
+   └─ Tem valor monetário: true
+
+   └─ Começa com dígitos: false
+ LINHA[ 30] - INSPEÇÃO: [0420253823]
+
+   └─ Começa com dígitos: true
+
+   └─ Tem valor monetário: false
+
+
+
+ LINHA[ 43] - INSPEÇÃO: [IMPOSTO RENDA FONTE (FUNCEF) 349,6243270401/2016 0,00 0]
+ ════════════════════════════════════════════════════════════════════════════════
+ LINHA[ 25] - INSPEÇÃO: [2016/03]
+   └─ Começa com dígitos: false
+ 📊 Total de linhas parseadas: 0
+   └─ Tem valor monetário: true
+   └─ Tem valor monetário: true
+ LINHA[ 44] - INSPEÇÃO: [CAIXA - CONSIGNACAO 419,9943358004/2016 0,00 0]
+ LINHA[ 45] - INSPEÇÃO: [CAIXA - CONSIGNACAO 70,5343358005/2016 0,00 0]
+
+   └─ Tem valor monetário: true
+
+ LINHA[ 45] - INSPEÇÃO: [CAIXA - CONSIGNACAO 70,5343358002/2016 0,00 0]
+
+ LINHA[ 39] - INSPEÇÃO: [SUPL. APOS. TEMPO CONTRIB. BENEF. SALD. 6.342,1620330408/2016 0,00 0]
+
+   └─ Começa com dígitos: false
+
+   └─ Começa com dígitos: true
+   └─ Tem valor monetário: true
+ LINHA[ 44] - INSPEÇÃO: [CAIXA - CONSIGNACAO 494,1443358001/2016 0,00 0]
+ 📊 Página 12 - 0 rubricas extraídas (parser), 0 entries criadas
+   └─ Começa com dígitos: false
+ LINHA[ 47] - INSPEÇÃO: [TAXA ADMINISTRATIVA - SALDADO 57,0843620407/2016 0,00 0]
+   └─ Começa com dígitos: false
+
+   └─ Tem valor monetário: true
+   └─ Começa com dígitos: false
+
+
+
+   └─ Tem valor monetário: true
+
+   └─ Tem valor monetário: false
+
+
+
+
+
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+   └─ Tem valor monetário: true
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+
+   └─ Tem valor monetário: true
+ LINHA[ 46] - INSPEÇÃO: [CAIXA - CONSIGNACAO 494,1443358005/2016 0,00 0]
+   └─ Começa com dígitos: false
+
+   └─ Tem valor monetário: true
+
+
+ LINHA[ 47] - INSPEÇÃO: [TAXA ADMINISTRATIVA - SALDADO 57,0843620405/2016 0,00 0]
+
+ LINHA[ 30] - INSPEÇÃO: [0420253823]
+
+   └─ Começa com dígitos: false
+ LINHA[ 40] - INSPEÇÃO: [PROVENTOS INSS 1.847,9721870408/2016 0,00 0]
+
+
+   └─ Tem valor monetário: true
+   └─ Começa com dígitos: false
+ LINHA[ 45] - INSPEÇÃO: [CAIXA - CONSIGNACAO 70,5343358004/2016 0,00 0]
+ LINHA[ 45] - INSPEÇÃO: [CAIXA - CONSIGNACAO 70,5343358001/2016 0,00 0]
+   └─ Começa com dígitos: false
+ LINHA[ 48] - INSPEÇÃO: [CONTRIBUIÇÃO EXTRAORDINARIA 2014 176,3144300407/2016 0,00 0]
+   └─ Tem valor monetário: true
+
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+ LINHA[ 46] - INSPEÇÃO: [CAIXA - CONSIGNACAO 494,1443358002/2016 0,00 0]
+ LINHA[ 49] - INSPEÇÃO: [EMPREST. NOVO CREDINAMICO FIXO - FGQC 90,8444320407/2016 0,00 0]
+   └─ Começa com dígitos: false
+
+   └─ Começa com dígitos: true
+
+   └─ Começa com dígitos: false
+
+ LINHA[ 48] - INSPEÇÃO: [CONTRIBUIÇÃO EXTRAORDINARIA 2014 176,3144300405/2016 0,00 0]
+   └─ Tem valor monetário: false
+   └─ Tem valor monetário: true
+   └─ Tem valor monetário: true
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+ LINHA[ 46] - INSPEÇÃO: [CAIXA - CONSIGNACAO 494,1443358004/2016 0,00 0]
+
+   └─ Começa com dígitos: false
+ LINHA[ 46] - INSPEÇÃO: [CAIXA - CONSIGNACAO 419,9943358001/2016 0,00 0]
+   └─ Tem valor monetário: true
+   └─ Tem valor monetário: true
+   └─ Começa com dígitos: false
+ LINHA[ 47] - INSPEÇÃO: [CAIXA - CONSIGNACAO 419,9943358002/2016 0,00 0]
+
+   └─ Tem valor monetário: true
+ LINHA[ 47] - INSPEÇÃO: [TAXA ADMINISTRATIVA - SALDADO 57,0843620401/2016 0,00 0]
+
+
+   └─ Começa com dígitos: false
+
+
+
+ LINHA[ 39] - INSPEÇÃO: [SUPL. APOS. TEMPO CONTRIB. BENEF. SALD. 6.342,1620330403/2016 0,00 0]
+
+   └─ Começa com dígitos: false
+ LINHA[ 41] - INSPEÇÃO: [ADIANT. ABONO ANUAL INSS 923,9822150413/2016 0,00 0]
+ LINHA[ 50] - INSPEÇÃO: [EMPREST. NOVO CREDINAMICO FIXO 1.219,8344370407/2016 0,00 0]
+
+   └─ Começa com dígitos: false
+   └─ Começa com dígitos: false
+   └─ Começa com dígitos: false
+
+ LINHA[ 47] - INSPEÇÃO: [TAXA ADMINISTRATIVA - SALDADO 57,0843620404/2016 0,00 0]
+   └─ Começa com dígitos: false
+
+   └─ Tem valor monetário: true
+   └─ Começa com dígitos: false
+
+
+   └─ Tem valor monetário: true
+
+
+   └─ Tem valor monetário: true
+
+ LINHA[ 51] - INSPEÇÃO: [SAUDE CAIXA MENSALIDADE 147,2044600407/2016 0,00 0]
+
+   └─ Tem valor monetário: true
+   └─ Tem valor monetário: true
+
+   └─ Tem valor monetário: true
+ LINHA[ 48] - INSPEÇÃO: [TAXA ADMINISTRATIVA - SALDADO 57,0843620402/2016 0,00 0]
+ LINHA[ 49] - INSPEÇÃO: [EMPREST. NOVO CREDINAMICO FIXO - FGQC 92,6244320405/2016 0,00 0]
+
+   └─ Começa com dígitos: false
+
+   └─ Tem valor monetário: true
+   └─ Tem valor monetário: true
+ LINHA[ 40] - INSPEÇÃO: [PROVENTOS INSS 1.847,9721870403/2016 0,00 0]
+
+   └─ Começa com dígitos: false
+
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+ LINHA[ 44] - INSPEÇÃO: [IMPOSTO RENDA FONTE (FUNCEF) 309,9543270408/2016 0,00 0]
+   └─ Começa com dígitos: false
+
+   └─ Começa com dígitos: false
+
+ LINHA[ 48] - INSPEÇÃO: [EMPREST. NOVO CREDINAMICO FIXO - FGQC 96,0644320401/2016 0,00 0]
+   └─ Tem valor monetário: true
+
+
+   └─ Começa com dígitos: false
+
+ LINHA[ 50] - INSPEÇÃO: [EMPREST. NOVO CREDINAMICO FIXO 1.219,8344370405/2016 0,00 0]
+
+   └─ Começa com dígitos: false
+
+ LINHA[ 48] - INSPEÇÃO: [EMPREST. NOVO CREDINAMICO FIXO - FGQC 93,4944320404/2016 0,00 0]
+   └─ Tem valor monetário: true
+
+ LINHA[ 43] - INSPEÇÃO: [IMPOSTO RENDA FONTE (FUNCEF) 349,6243270403/2016 0,00 0]
+ LINHA[ 52] - INSPEÇÃO: [SAUDE CAIXA PARTICIPAÇÃO 86,6444610407/2016 0,00 0]
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+   └─ Tem valor monetário: true
+ LINHA[ 49] - INSPEÇÃO: [EMPREST. NOVO CREDINAMICO FIXO - FGQC 95,2244320402/2016 0,00 0]
+
+   └─ Tem valor monetário: true
+   └─ Tem valor monetário: true
+
+ LINHA[ 51] - INSPEÇÃO: [SAUDE CAIXA MENSALIDADE 147,2044600405/2016 0,00 0]
+   └─ Começa com dígitos: false
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+
+
+ LINHA[ 49] - INSPEÇÃO: [EMPREST. NOVO CREDINAMICO FIXO 1.219,8344370404/2016 0,00 0]
+
+   └─ Começa com dígitos: false
+ LINHA[ 44] - INSPEÇÃO: [CAIXA - CONSIGNACAO 70,5343358003/2016 0,00 0]
+ LINHA[ 45] - INSPEÇÃO: [CAIXA - CONSIGNACAO 70,5343358008/2016 0,00 0]
+   └─ Começa com dígitos: false
+
+   └─ Tem valor monetário: true
+ LINHA[ 49] - INSPEÇÃO: [EMPREST. NOVO CREDINAMICO FIXO 1.219,8344370401/2016 0,00 0]
+ LINHA[ 50] - INSPEÇÃO: [EMPREST. NOVO CREDINAMICO FIXO 1.219,8344370402/2016 0,00 0]
+   └─ Começa com dígitos: false
+   └─ Começa com dígitos: false
+
+   └─ Tem valor monetário: true
+
+   └─ Começa com dígitos: false
+
+ LINHA[ 52] - INSPEÇÃO: [SAUDE CAIXA PARTICIPAÇÃO 1,3244610405/2016 0,00 0]
+   └─ Tem valor monetário: true
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+ LINHA[ 50] - INSPEÇÃO: [SAUDE CAIXA MENSALIDADE 147,2044600404/2016 0,00 0]
+
+ LINHA[ 53] - INSPEÇÃO: [UNIAO SEGUROS GERAIS 58,5146190405/2016 0,00 0]
+
+   └─ Tem valor monetário: true
+
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+ LINHA[ 53] - INSPEÇÃO: [UNIAO SEGUROS GERAIS 58,5146190407/2016 0,00 0]
+   └─ Começa com dígitos: false
+ LINHA[ 54] - INSPEÇÃO: [ASSOC. APOSENT./MENSALIDADE - MG 40,8947761105/2016 0,00 0]
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+
+   └─ Tem valor monetário: true
+   └─ Tem valor monetário: true
+ LINHA[ 45] - INSPEÇÃO: [CAIXA - CONSIGNACAO 419,9943358003/2016 0,00 0]
+
+ LINHA[ 50] - INSPEÇÃO: [UNIAO SEGUROS GERAIS 58,5146190401/2016 0,00 0]
+ LINHA[ 51] - INSPEÇÃO: [UNIAO SEGUROS GERAIS 58,5146190402/2016 0,00 0]
+
+   └─ Começa com dígitos: false
+
+   └─ Começa com dígitos: false
+
+   └─ Começa com dígitos: false
+
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+ LINHA[ 51] - INSPEÇÃO: [UNIAO SEGUROS GERAIS 58,5146190404/2016 0,00 0]
+   └─ Tem valor monetário: true
+
+ LINHA[ 46] - INSPEÇÃO: [CAIXA - CONSIGNACAO 494,1443358008/2016 0,00 0]
+   └─ Começa com dígitos: false
+
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+
+   └─ Tem valor monetário: true
+
+   └─ Tem valor monetário: true
+ LINHA[ 46] - INSPEÇÃO: [CAIXA - CONSIGNACAO 494,1443358003/2016 0,00 0]
+ LINHA[ 51] - INSPEÇÃO: [APCEF MENSALIDADE - MG 81,9047711101/2016 0,00 0]
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+
+   └─ Tem valor monetário: true
+
+
+ LINHA[ 54] - INSPEÇÃO: [ASSOC. APOSENT./MENSALIDADE - MG 40,8947761107/2016 0,00 0]
+
+ LINHA[ 57] - INSPEÇÃO: [BASE DEFICIT 6.342,16BDEFICIT05/2016 0,00 0]
+   └─ Tem valor monetário: true
+   └─ Começa com dígitos: false
+
+   └─ Tem valor monetário: true
+
+ LINHA[ 47] - INSPEÇÃO: [CAIXA - CONSIGNACAO 419,9943358008/2016 0,00 0]
+ LINHA[ 52] - INSPEÇÃO: [APCEF MENSALIDADE - MG 81,9047711104/2016 0,00 0]
+   └─ Começa com dígitos: false
+   └─ Começa com dígitos: false
+ LINHA[ 52] - INSPEÇÃO: [ASSOC. APOSENT./MENSALIDADE - MG 40,8947761101/2016 0,00 0]
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+   └─ Começa com dígitos: false
+
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+
+
+ LINHA[ 52] - INSPEÇÃO: [FENACEF - SIMPOSIO 6,0047610402/2016 0,00 0]
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+
+
+
+ LINHA[ 58] - INSPEÇÃO: [MARGEM CONSIGNAVEL 513,68MGCONS05/2016 0,00 0]
+
+   └─ Tem valor monetário: true
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+   └─ Tem valor monetário: true
+ LINHA[ 47] - INSPEÇÃO: [TAXA ADMINISTRATIVA - SALDADO 57,0843620403/2016 0,00 0]
+
+ LINHA[ 48] - INSPEÇÃO: [TAXA ADMINISTRATIVA - SALDADO 57,0843620408/2016 0,00 0]
+ ⚠️ Parser regex extraiu 0 rubricas na página 12. Acionando fallback para Gemini AI...
+   └─ Começa com dígitos: false
+ LINHA[ 59] - INSPEÇÃO: [RENDA BASE 8.190,13RBASE05/2016 0,00 0]
+   └─ Tem valor monetário: true
+   └─ Tem valor monetário: true
+   └─ Começa com dígitos: false
+ LINHA[ 55] - INSPEÇÃO: [MARGEM CONSIGNAVEL 0,00MGCONS01/2016 0,00 0]
+ LINHA[ 57] - INSPEÇÃO: [BASE DEFICIT 6.342,16BDEFICIT07/2016 0,00 0]
+
+   └─ Começa com dígitos: false
+   └─ Começa com dígitos: false
+   └─ Começa com dígitos: false
+
+
+
+
+ LINHA[ 53] - INSPEÇÃO: [ASSOC. APOSENT./MENSALIDADE - MG 40,8947761104/2016 0,00 0]
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+
+
+ LINHA[ 49] - INSPEÇÃO: [CONTRIBUIÇÃO EXTRAORDINARIA 2014 176,3144300408/2016 0,00 0]
+
+   └─ Tem valor monetário: true
+   └─ Tem valor monetário: true
+   └─ Tem valor monetário: true
+ LINHA[ 61] - INSPEÇÃO: [3.088,378.190,13]
+ LINHA[ 56] - INSPEÇÃO: [RENDA BASE 8.190,13RBASE01/2016 0,00 0]
+   └─ Começa com dígitos: false
+ LINHA[ 58] - INSPEÇÃO: [MARGEM CONSIGNAVEL 430,14MGCONS07/2016 0,00 0]
+   └─ Tem valor monetário: true
+   └─ Tem valor monetário: true
+ LINHA[ 63] - INSPEÇÃO: [0,005.101,76]
+   └─ Começa com dígitos: false
+
+ LINHA[ 53] - INSPEÇÃO: [APCEF MENSALIDADE - MG 81,9047711102/2016 0,00 0]
+   └─ Começa com dígitos: false
+
+
+
+   └─ Começa com dígitos: false
+
+   └─ Tem valor monetário: true
+ LINHA[ 48] - INSPEÇÃO: [EMPREST. NOVO CREDINAMICO FIXO - FGQC 94,3644320403/2016 0,00 0]
+   └─ Começa com dígitos: false
+
+   └─ Começa com dígitos: false
+ LINHA[ 56] - INSPEÇÃO: [MARGEM CONSIGNAVEL 486,89MGCONS04/2016 0,00 0]
+
+
+   └─ Tem valor monetário: true
+   └─ Começa com dígitos: false
+
+
+   └─ Começa com dígitos: false
+
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+   └─ Tem valor monetário: true
+   └─ Tem valor monetário: true
+
+ ════════════════════════════════════════════════════════════════════════════════
+ 📊 Total de linhas que parecem rubricas: 0
+ ════════════════════════════════════════════════════════════════════════════════
+
+   └─ Tem valor monetário: true
+   └─ Tem valor monetário: true
+ LINHA[ 49] - INSPEÇÃO: [EMPREST. NOVO CREDINAMICO FIXO 1.219,8344370403/2016 0,00 0]
+
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+ LINHA[ 59] - INSPEÇÃO: [RENDA BASE 8.190,13RBASE07/2016 0,00 0]
+ LINHA[ 58] - INSPEÇÃO: [2.888,558.190,13]
+
+ LINHA[ 54] - INSPEÇÃO: [ASSOC. APOSENT./MENSALIDADE - MG 40,8947761102/2016 0,00 0]
+
+
+ ════════════════════════════════════════════════════════════════════════════════
+ LINHA[ 57] - INSPEÇÃO: [RENDA BASE 8.190,13RBASE04/2016 0,00 0]
+
+
+ LINHA[ 50] - INSPEÇÃO: [EMPREST. NOVO CREDINAMICO FIXO - FGQC 89,9444320408/2016 0,00 0]
+ 🔧 CONFIGURAÇÃO DO PARSER:
+   └─ Começa com dígitos: false
+
+   └─ Tem valor monetário: true
+   └─ Tem valor monetário: true
+
+   └─ Começa com dígitos: false
+
+   └─ Tem valor monetário: true
+
+   └─ Começa com dígitos: false
+   └─ Começa com dígitos: false
+ LINHA[ 61] - INSPEÇÃO: [3.171,918.190,13]
+   └─ Começa com dígitos: false
+
+   └─ Tem valor monetário: true
+
+
+
+
+   └─ Começa com dígitos: false
+
+ LINHA[ 63] - INSPEÇÃO: [0,005.018,22]
+ ════════════════════════════════════════════════════════════════════════════════
+   └─ Começa com dígitos: false
+ ════════════════════════════════════════════════════════════════════════════════
+ Tipo do documento: FUNCEF_DEMONSTRATIVO
+ ════════════════════════════════════════════════════════════════════════════════
+ 🔍 PROCURANDO LINHAS QUE PARECEM RUBRICAS:
+ LINHA[ 59] - INSPEÇÃO: [3.033,188.190,13]
+
+ LINHA[ 50] - INSPEÇÃO: [SAUDE CAIXA MENSALIDADE 147,2044600403/2016 0,00 0]
+   └─ Começa com dígitos: false
+ ════════════════════════════════════════════════════════════════════════════════
+   └─ Tem valor monetário: true
+   └─ Tem valor monetário: true
+   └─ Tem valor monetário: true
+ LINHA[  2] - INSPEÇÃO: [70712900]
+ LINHA[ 61] - INSPEÇÃO: [0,005.156,95]
+
+   └─ Tem valor monetário: true
+
+   └─ Começa com dígitos: false
+
+   └─ Tem valor monetário: true
+ Padrões regex a tentar: 1
+   Padrão[1]: ^(\d{1,2}/\d{4})\s+(?:\d{2}/\d{2}/\d{4}\s+)?(\d{6})\s+(.+?)\s+(\d{1,3}(?:\.\d{3})*,\d{2})\s+\d{1,3}(?:\.\d{3})*,\d{2}\s+\d+\s*$
+ ════════════════════════════════════════════════════════════════════════════════
+
+   └─ Começa com dígitos: false
+
+   └─ Tem valor monetário: true
+ LINHA[ 60] - INSPEÇÃO: [0,005.301,58]
+ LINHA[ 51] - INSPEÇÃO: [UNIAO SEGUROS GERAIS 58,5146190403/2016 0,00 0]
+ LINHA[ 55] - INSPEÇÃO: [TAXA ADM. AB. ANUAL FUNCEF - SALDADO 28,5443640413/2016 0,00 0]
+   └─ Começa com dígitos: true
+ LINHA[ 51] - INSPEÇÃO: [EMPREST. NOVO CREDINAMICO FIXO 1.219,8344370408/2016 0,00 0]
+   └─ Tem valor monetário: false
+
+   └─ Tem valor monetário: true
+
+ LINHA[ 13] - INSPEÇÃO: [2563003]
+ ════════════════════════════════════════════════════════════════════════════════
+ ════════════════════════════════════════════════════════════════════════════════
+ 📊 Total de linhas que parecem rubricas: 0
+ 📊 Total de linhas que parecem rubricas: 0
+
+   └─ Começa com dígitos: false
+
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+   └─ Tem valor monetário: true
+ LINHA[ 52] - INSPEÇÃO: [APCEF MENSALIDADE - MG 81,9047711103/2016 0,00 0]
+ LINHA[ 58] - INSPEÇÃO: [MARGEM CONSIGNAVEL 626,36MGCONS02/2016 0,00 0]
+   └─ Começa com dígitos: false
+
+
+
+   └─ Tem valor monetário: true
+   └─ Começa com dígitos: true
+ ════════════════════════════════════════════════════════════════════════════════
+   └─ Tem valor monetário: false
+ 🎯 PROCESSANDO LINHA POR LINHA E EXTRAINDO RUBRICAS:
+ LINHA[ 52] - INSPEÇÃO: [SAUDE CAIXA MENSALIDADE 147,2044600408/2016 0,00 0]
+ ════════════════════════════════════════════════════════════════════════════════
+
+ ════════════════════════════════════════════════════════════════════════════════
+ LINHA[ 23] - INSPEÇÃO: [30310300]
+   └─ Começa com dígitos: false
+   └─ Começa com dígitos: true
+   └─ Começa com dígitos: false
+ ════════════════════════════════════════════════════════════════════════════════
+   └─ Tem valor monetário: true
+ ════════════════════════════════════════════════════════════════════════════════
+ 📊 Total de linhas que parecem rubricas: 0
+   └─ Tem valor monetário: true
+ LINHA[ 53] - INSPEÇÃO: [SAUDE CAIXA PARTICIPAÇÃO 140,2944610408/2016 0,00 0]
+   └─ Começa com dígitos: false
+   └─ Começa com dígitos: false
+ LINHA[ 53] - INSPEÇÃO: [ASSOC. APOSENT./MENSALIDADE - MG 40,8947761103/2016 0,00 0]
+   └─ Tem valor monetário: true
+   └─ Começa com dígitos: false
+ 🤖 Usando Gemini AI [gemini-2.5-flash] para extração ESTRUTURADA (JSON) da página 12...
+   └─ Tem valor monetário: true
+
+
+ ════════════════════════════════════════════════════════════════════════════════
+   └─ Tem valor monetário: true
+
+ ════════════════════════════════════════════════════════════════════════════════
+
+ LINHA[ 56] - INSPEÇÃO: [MARGEM CONSIGNAVEL 486,02MGCONS03/2016 0,00 0]
+ ════════════════════════════════════════════════════════════════════════════════
+
+   └─ Tem valor monetário: false
+ 🔧 CONFIGURAÇÃO DO PARSER:
+ ════════════════════════════════════════════════════════════════════════════════
+ ════════════════════════════════════════════════════════════════════════════════
+ 🔧 CONFIGURAÇÃO DO PARSER:
+ ════════════════════════════════════════════════════════════════════════════════
+ Tipo do documento: FUNCEF_DEMONSTRATIVO
+ Padrões regex a tentar: 1
+   Padrão[1]: ^(\d{1,2}/\d{4})\s+(?:\d{2}/\d{2}/\d{4}\s+)?(\d{6})\s+(.+?)\s+(\d{1,3}(?:\.\d{3})*,\d{2})\s+\d{1,3}(?:\.\d{3})*,\d{2}\s+\d+\s*$
+ LINHA[ 54] - INSPEÇÃO: [UNIAO SEGUROS GERAIS 58,5146190408/2016 0,00 0]
+ LINHA[ 59] - INSPEÇÃO: [RENDA BASE 8.190,13RBASE02/2016 0,00 0]
+
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+ 📊 Total de rubricas extraídas linha por linha: 0
+ ════════════════════════════════════════════════════════════════════════════════
+ LINHA[ 55] - INSPEÇÃO: [ASSOC. APOSENT./MENSALIDADE - MG 40,8947761108/2016 0,00 0]
+
+   └─ Começa com dígitos: false
+
+ ════════════════════════════════════════════════════════════════════════════════
+ LINHA[ 24] - INSPEÇÃO: [2563003]
+ Tipo do documento: FUNCEF_DEMONSTRATIVO
+ 🔧 CONFIGURAÇÃO DO PARSER:
+   └─ Começa com dígitos: true
+ ════════════════════════════════════════════════════════════════════════════════
+ ════════════════════════════════════════════════════════════════════════════════
+ ════════════════════════════════════════════════════════════════════════════════
+   └─ Tem valor monetário: false
+ 🎯 PROCESSANDO LINHA POR LINHA E EXTRAINDO RUBRICAS:
+   └─ Começa com dígitos: false
+ ════════════════════════════════════════════════════════════════════════════════
+
+ Total de rubricas extraídas: 0 (tipo: FUNCEF_DEMONSTRATIVO)
+
+   └─ Começa com dígitos: false
+ ════════════════════════════════════════════════════════════════════════════════
+ 📊 Total de linhas parseadas: 0
+   └─ Tem valor monetário: true
+
+
+
+
+
+ Padrões regex a tentar: 1
+ Tipo do documento: FUNCEF_DEMONSTRATIVO
+ LINHA[ 25] - INSPEÇÃO: [2016/11]
+ ════════════════════════════════════════════════════════════════════════════════
+   └─ Tem valor monetário: true
+ 📊 Total de rubricas extraídas linha por linha: 0
+
+   └─ Tem valor monetário: true
+ ════════════════════════════════════════════════════════════════════════════════
+ 📊 Página 5 - 0 rubricas extraídas (parser), 0 entries criadas
+ LINHA[ 58] - INSPEÇÃO: [BASE DEFICIT 6.342,16BDEFICIT08/2016 0,00 0]
+ LINHA[ 57] - INSPEÇÃO: [RENDA BASE 8.190,13RBASE03/2016 0,00 0]
+   └─ Começa com dígitos: false
+
+
+
+   Padrão[1]: ^(\d{1,2}/\d{4})\s+(?:\d{2}/\d{2}/\d{4}\s+)?(\d{6})\s+(.+?)\s+(\d{1,3}(?:\.\d{3})*,\d{2})\s+\d{1,3}(?:\.\d{3})*,\d{2}\s+\d+\s*$
+ Padrões regex a tentar: 1
+   └─ Começa com dígitos: true
+   Padrão[1]: ^(\d{1,2}/\d{4})\s+(?:\d{2}/\d{2}/\d{4}\s+)?(\d{6})\s+(.+?)\s+(\d{1,3}(?:\.\d{3})*,\d{2})\s+\d{1,3}(?:\.\d{3})*,\d{2}\s+\d+\s*$
+ ════════════════════════════════════════════════════════════════════════════════
+   └─ Tem valor monetário: false
+ ════════════════════════════════════════════════════════════════════════════════
+ LINHA[ 61] - INSPEÇÃO: [2.922,2511.361,21]
+ LINHA[ 30] - INSPEÇÃO: [0420253823]
+
+   └─ Começa com dígitos: false
+ Total de rubricas extraídas: 0 (tipo: FUNCEF_DEMONSTRATIVO)
+ ════════════════════════════════════════════════════════════════════════════════
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+ 📊 Total de linhas parseadas: 0
+   └─ Tem valor monetário: true
+
+
+ ════════════════════════════════════════════════════════════════════════════════
+ 🎯 PROCESSANDO LINHA POR LINHA E EXTRAINDO RUBRICAS:
+ ════════════════════════════════════════════════════════════════════════════════
+ ════════════════════════════════════════════════════════════════════════════════
+
+ 🎯 PROCESSANDO LINHA POR LINHA E EXTRAINDO RUBRICAS:
+ ════════════════════════════════════════════════════════════════════════════════
+ ════════════════════════════════════════════════════════════════════════════════
+   └─ Começa com dígitos: true
+   └─ Tem valor monetário: true
+ ════════════════════════════════════════════════════════════════════════════════
+   └─ Tem valor monetário: false
+
+ LINHA[ 63] - INSPEÇÃO: [0,008.438,96]
+
+   └─ Começa com dígitos: false
+
+ LINHA[ 59] - INSPEÇÃO: [MARGEM CONSIGNAVEL 377,39MGCONS08/2016 0,00 0]
+   └─ Tem valor monetário: true
+ LINHA[ 39] - INSPEÇÃO: [SUPL. APOS. TEMPO CONTRIB. BENEF. SALD. 6.342,1620330411/2016 0,00 0]
+ 📊 Página 4 - 0 rubricas extraídas (parser), 0 entries criadas
+ ════════════════════════════════════════════════════════════════════════════════
+ LINHA[ 59] - INSPEÇÃO: [3.034,058.190,13]
+ ════════════════════════════════════════════════════════════════════════════════
+
+ 📊 Total de rubricas extraídas linha por linha: 0
+ 📊 Total de rubricas extraídas linha por linha: 0
+ ════════════════════════════════════════════════════════════════════════════════
+ ════════════════════════════════════════════════════════════════════════════════
+ Total de rubricas extraídas: 0 (tipo: FUNCEF_DEMONSTRATIVO)
+ Total de rubricas extraídas: 0 (tipo: FUNCEF_DEMONSTRATIVO)
+
+ ════════════════════════════════════════════════════════════════════════════════
+
+ ════════════════════════════════════════════════════════════════════════════════
+   └─ Começa com dígitos: false
+ 📊 Total de linhas parseadas: 0
+   └─ Tem valor monetário: true
+   └─ Começa com dígitos: false
+ 📊 Página 7 - 0 rubricas extraídas (parser), 0 entries criadas
+ ════════════════════════════════════════════════════════════════════════════════
+   └─ Tem valor monetário: true
+ LINHA[ 60] - INSPEÇÃO: [RENDA BASE 8.190,13RBASE08/2016 0,00 0]
+   └─ Começa com dígitos: false
+ 🔍 PROCURANDO LINHAS QUE PARECEM RUBRICAS:
+
+
+ 📊 Total de linhas parseadas: 0
+ ════════════════════════════════════════════════════════════════════════════════
+
+ 📊 Página 1 - 0 rubricas extraídas (parser), 0 entries criadas
+ 📊 Total de linhas que parecem rubricas: 0
+ ════════════════════════════════════════════════════════════════════════════════
+ LINHA[ 40] - INSPEÇÃO: [PROVENTOS INSS 1.847,9721870411/2016 0,00 0]
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+   └─ Tem valor monetário: true
+
+
+ LINHA[  2] - INSPEÇÃO: [70712900]
+   └─ Começa com dígitos: true
+
+   └─ Tem valor monetário: false
+ ════════════════════════════════════════════════════════════════════════════════
+   └─ Começa com dígitos: false
+ LINHA[ 62] - INSPEÇÃO: [3.224,669.114,11]
+   └─ Tem valor monetário: true
+ LINHA[ 61] - INSPEÇÃO: [0,005.156,08]
+
+ LINHA[ 41] - INSPEÇÃO: [AC.  TX ADM.ADT.AB.AN.FUNCEF 28,5413060413/2016 0,00 0]
+
+
+
+
+ 🔧 CONFIGURAÇÃO DO PARSER:
+ ════════════════════════════════════════════════════════════════════════════════
+   └─ Começa com dígitos: false
+ LINHA[ 13] - INSPEÇÃO: [2563003]
+   └─ Tem valor monetário: true
+ Tipo do documento: FUNCEF_DEMONSTRATIVO
+   └─ Começa com dígitos: false
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+   └─ Começa com dígitos: true
+ LINHA[ 64] - INSPEÇÃO: [0,005.889,45]
+
+
+ Padrões regex a tentar: 1
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: false
+   └─ Tem valor monetário: true
+ LINHA[ 42] - INSPEÇÃO: [ABONO ANUAL FUNCEF 6.342,1621100413/2016 0,00 0]
+   └─ Tem valor monetário: true
+ LINHA[ 23] - INSPEÇÃO: [30310300]
+
+   └─ Começa com dígitos: true
+
+   └─ Tem valor monetário: false
+
+   Padrão[1]: ^(\d{1,2}/\d{4})\s+(?:\d{2}/\d{2}/\d{4}\s+)?(\d{6})\s+(.+?)\s+(\d{1,3}(?:\.\d{3})*,\d{2})\s+\d{1,3}(?:\.\d{3})*,\d{2}\s+\d+\s*$
+
+
+   └─ Começa com dígitos: false
+ ⚠️ Parser regex extraiu 0 rubricas na página 5. Acionando fallback para Gemini AI...
+   └─ Tem valor monetário: true
+ ════════════════════════════════════════════════════════════════════════════════
+ LINHA[ 43] - INSPEÇÃO: [ABONO ANUAL INSS 1.847,9722220413/2016 0,00 0]
+ ════════════════════════════════════════════════════════════════════════════════
+   └─ Começa com dígitos: false
+
+   └─ Tem valor monetário: true
+ LINHA[ 24] - INSPEÇÃO: [2563003]
+ ════════════════════════════════════════════════════════════════════════════════
+
+ ════════════════════════════════════════════════════════════════════════════════
+ 🎯 PROCESSANDO LINHA POR LINHA E EXTRAINDO RUBRICAS:
+
+ 📊 Total de linhas que parecem rubricas: 0
+ 📊 Total de linhas que parecem rubricas: 0
+
+   └─ Começa com dígitos: true
+ LINHA[ 46] - INSPEÇÃO: [IMPOSTO RENDA FONTE (FUNCEF) 309,9543270411/2016 0,00 0]
+   └─ Tem valor monetário: false
+ ════════════════════════════════════════════════════════════════════════════════
+ ⚠️ Falha ao salvar progresso intermediário: null
+   └─ Começa com dígitos: false
+
+ ════════════════════════════════════════════════════════════════════════════════
+ ════════════════════════════════════════════════════════════════════════════════
+ ════════════════════════════════════════════════════════════════════════════════
+
+ LINHA[ 25] - INSPEÇÃO: [2016/09]
+ ════════════════════════════════════════════════════════════════════════════════
+
+   └─ Começa com dígitos: true
+   └─ Tem valor monetário: false
+
+   └─ Tem valor monetário: true
+
+ LINHA[ 30] - INSPEÇÃO: [0420253823]
+
+ 🔧 CONFIGURAÇÃO DO PARSER:
+ ════════════════════════════════════════════════════════════════════════════════
+
+ 📊 Total de rubricas extraídas linha por linha: 0
+ ════════════════════════════════════════════════════════════════════════════════
+ LINHA[ 47] - INSPEÇÃO: [CAIXA - CONSIGNACAO 419,9943358011/2016 0,00 0]
+   └─ Começa com dígitos: true
+   └─ Começa com dígitos: false
+ ════════════════════════════════════════════════════════════════════════════════
+ Tipo do documento: FUNCEF_DEMONSTRATIVO
+ Padrões regex a tentar: 1
+ 🔧 CONFIGURAÇÃO DO PARSER:
+ ════════════════════════════════════════════════════════════════════════════════
+ ════════════════════════════════════════════════════════════════════════════════
+ ════════════════════════════════════════════════════════════════════════════════
+ ════════════════════════════════════════════════════════════════════════════════
+ 🔍 PROCURANDO LINHAS QUE PARECEM RUBRICAS:
+ Total de rubricas extraídas: 0 (tipo: FUNCEF_DEMONSTRATIVO)
+ ════════════════════════════════════════════════════════════════════════════════
+ Tipo do documento: FUNCEF_DEMONSTRATIVO
+   └─ Tem valor monetário: false
+ ════════════════════════════════════════════════════════════════════════════════
+ 🔍 PROCURANDO LINHAS QUE PARECEM RUBRICAS:
+   └─ Tem valor monetário: true
+   Padrão[1]: ^(\d{1,2}/\d{4})\s+(?:\d{2}/\d{2}/\d{4}\s+)?(\d{6})\s+(.+?)\s+(\d{1,3}(?:\.\d{3})*,\d{2})\s+\d{1,3}(?:\.\d{3})*,\d{2}\s+\d+\s*$
+ LINHA[ 48] - INSPEÇÃO: [CAIXA - CONSIGNACAO 70,5343358011/2016 0,00 0]
+ ════════════════════════════════════════════════════════════════════════════════
+ ════════════════════════════════════════════════════════════════════════════════
+ LINHA[ 39] - INSPEÇÃO: [SUPL. APOS. TEMPO CONTRIB. BENEF. SALD. 6.342,1620330409/2016 0,00 0]
+ Padrões regex a tentar: 1
+ ════════════════════════════════════════════════════════════════════════════════
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+   Padrão[1]: ^(\d{1,2}/\d{4})\s+(?:\d{2}/\d{2}/\d{4}\s+)?(\d{6})\s+(.+?)\s+(\d{1,3}(?:\.\d{3})*,\d{2})\s+\d{1,3}(?:\.\d{3})*,\d{2}\s+\d+\s*$
+ 📊 Total de linhas parseadas: 0
+ LINHA[ 40] - INSPEÇÃO: [PROVENTOS INSS 1.847,9721870409/2016 0,00 0]
+ ════════════════════════════════════════════════════════════════════════════════
+ 📊 Página 2 - 0 rubricas extraídas (parser), 0 entries criadas
+   └─ Começa com dígitos: false
+ 🎯 PROCESSANDO LINHA POR LINHA E EXTRAINDO RUBRICAS:
+ LINHA[  2] - INSPEÇÃO: [70712900]
+ ════════════════════════════════════════════════════════════════════════════════
+   └─ Tem valor monetário: true
+   └─ Começa com dígitos: true
+ ════════════════════════════════════════════════════════════════════════════════
+ ⚠️ Parser regex extraiu 0 rubricas na página 4. Acionando fallback para Gemini AI...
+ ⚠️ Parser regex extraiu 0 rubricas na página 1. Acionando fallback para Gemini AI...
+ ⚠️ Parser regex extraiu 0 rubricas na página 7. Acionando fallback para Gemini AI...
+   └─ Começa com dígitos: false
+ ════════════════════════════════════════════════════════════════════════════════
+ LINHA[  2] - INSPEÇÃO: [70712900]
+   └─ Começa com dígitos: true
+   └─ Tem valor monetário: false
+ LINHA[ 49] - INSPEÇÃO: [CAIXA - CONSIGNACAO 494,1443358011/2016 0,00 0]
+ 📊 Total de rubricas extraídas linha por linha: 0
+ ════════════════════════════════════════════════════════════════════════════════
+ LINHA[ 13] - INSPEÇÃO: [2563003]
+   └─ Tem valor monetário: true
+   └─ Começa com dígitos: true
+ ════════════════════════════════════════════════════════════════════════════════
+ 🎯 PROCESSANDO LINHA POR LINHA E EXTRAINDO RUBRICAS:
+ ════════════════════════════════════════════════════════════════════════════════
+   └─ Tem valor monetário: false
+   └─ Começa com dígitos: false
+ Total de rubricas extraídas: 0 (tipo: FUNCEF_DEMONSTRATIVO)
+   └─ Tem valor monetário: true
+ LINHA[ 50] - INSPEÇÃO: [TAXA ADMINISTRATIVA - SALDADO 57,0843620411/2016 0,00 0]
+ LINHA[ 43] - INSPEÇÃO: [IMPOSTO RENDA FONTE (FUNCEF) 309,9543270409/2016 0,00 0]
+ LINHA[ 13] - INSPEÇÃO: [2563003]
+   └─ Tem valor monetário: false
+   └─ Começa com dígitos: true
+ ════════════════════════════════════════════════════════════════════════════════
+   └─ Começa com dígitos: false
+ ════════════════════════════════════════════════════════════════════════════════
+   └─ Tem valor monetário: true
+   └─ Começa com dígitos: false
+ LINHA[ 23] - INSPEÇÃO: [30310300]
+   └─ Tem valor monetário: false
+ 📊 Total de linhas parseadas: 0
+   └─ Começa com dígitos: true
+   └─ Tem valor monetário: true
+ 📊 Página 8 - 0 rubricas extraídas (parser), 0 entries criadas
+ LINHA[ 51] - INSPEÇÃO: [CONTRIBUIÇÃO EXTRAORDINARIA 2014 176,3144300411/2016 0,00 0]
+ 🤖 Usando Gemini AI [gemini-2.5-flash] para extração ESTRUTURADA (JSON) da página 5...
+ 📊 Total de rubricas extraídas linha por linha: 0
+ LINHA[ 44] - INSPEÇÃO: [CAIXA - CONSIGNACAO 70,5343358009/2016 0,00 0]
+ LINHA[ 23] - INSPEÇÃO: [30310300]
+ ════════════════════════════════════════════════════════════════════════════════
+   └─ Tem valor monetário: false
+   └─ Começa com dígitos: false
+   └─ Começa com dígitos: true
+   └─ Começa com dígitos: false
+ Total de rubricas extraídas: 0 (tipo: FUNCEF_DEMONSTRATIVO)
+   └─ Tem valor monetário: true
+   └─ Tem valor monetário: false
+ ════════════════════════════════════════════════════════════════════════════════
+ LINHA[ 45] - INSPEÇÃO: [CAIXA - CONSIGNACAO 494,1443358009/2016 0,00 0]
+ LINHA[ 24] - INSPEÇÃO: [2563003]
+ 📊 Total de linhas parseadas: 0
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+   └─ Começa com dígitos: true
+ LINHA[ 24] - INSPEÇÃO: [2563003]
+   └─ Tem valor monetário: false
+ 📊 Página 3 - 0 rubricas extraídas (parser), 0 entries criadas
+ LINHA[ 52] - INSPEÇÃO: [EMPREST. NOVO CREDINAMICO FIXO - FGQC 87,1944320411/2016 0,00 0]
+   └─ Começa com dígitos: true
+ LINHA[ 25] - INSPEÇÃO: [2016/10]
+   └─ Tem valor monetário: true
+   └─ Tem valor monetário: false
+ LINHA[ 46] - INSPEÇÃO: [CAIXA - CONSIGNACAO 419,9943358009/2016 0,00 0]
+   └─ Começa com dígitos: false
+   └─ Começa com dígitos: true
+   └─ Tem valor monetário: false
+ LINHA[ 25] - INSPEÇÃO: [2016/06]
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+   └─ Tem valor monetário: true
+ LINHA[ 53] - INSPEÇÃO: [EMPREST. NOVO CREDINAMICO FIXO 1.219,8344370411/2016 0,00 0]
+   └─ Começa com dígitos: true
+   └─ Começa com dígitos: false
+ LINHA[ 47] - INSPEÇÃO: [TAXA ADMINISTRATIVA - SALDADO 57,0843620409/2016 0,00 0]
+   └─ Tem valor monetário: false
+ LINHA[ 30] - INSPEÇÃO: [0420253823]
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+   └─ Começa com dígitos: true
+   └─ Tem valor monetário: false
+ LINHA[ 54] - INSPEÇÃO: [SAUDE CAIXA MENSALIDADE 147,2044600411/2016 0,00 0]
+   └─ Tem valor monetário: true
+   └─ Começa com dígitos: false
+ LINHA[ 30] - INSPEÇÃO: [0420253823]
+ LINHA[ 48] - INSPEÇÃO: [CONTRIBUIÇÃO EXTRAORDINARIA 2014 176,3144300409/2016 0,00 0]
+   └─ Tem valor monetário: true
+ LINHA[ 39] - INSPEÇÃO: [SUPL. APOS. TEMPO CONTRIB. BENEF. SALD. 6.342,1620330410/2016 0,00 0]
+   └─ Começa com dígitos: true
+ LINHA[ 55] - INSPEÇÃO: [SAUDE CAIXA PARTICIPAÇÃO 1,3244610411/2016 0,00 0]
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: false
+   └─ Começa com dígitos: false
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+   └─ Tem valor monetário: true
+ LINHA[ 49] - INSPEÇÃO: [EMPREST. NOVO CREDINAMICO FIXO - FGQC 89,0344320409/2016 0,00 0]
+   └─ Tem valor monetário: true
+ LINHA[ 40] - INSPEÇÃO: [PROVENTOS INSS 1.847,9721870410/2016 0,00 0]
+ LINHA[ 39] - INSPEÇÃO: [SUPL. APOS. TEMPO CONTRIB. BENEF. SALD. 6.342,1620330406/2016 0,00 0]
+   └─ Começa com dígitos: false
+   └─ Começa com dígitos: false
+ LINHA[ 56] - INSPEÇÃO: [UNIAO SEGUROS GERAIS 58,5146190411/2016 0,00 0]
+   └─ Tem valor monetário: true
+   └─ Tem valor monetário: true
+   └─ Começa com dígitos: false
+ LINHA[ 43] - INSPEÇÃO: [IMPOSTO RENDA FONTE (FUNCEF) 309,9543270410/2016 0,00 0]
+   └─ Tem valor monetário: true
+   └─ Começa com dígitos: false
+ LINHA[ 50] - INSPEÇÃO: [EMPREST. NOVO CREDINAMICO FIXO 1.219,8344370409/2016 0,00 0]
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+   └─ Tem valor monetário: true
+   └─ Começa com dígitos: false
+ LINHA[ 40] - INSPEÇÃO: [PROVENTOS INSS 1.847,9721870406/2016 0,00 0]
+   └─ Tem valor monetário: true
+ LINHA[ 57] - INSPEÇÃO: [FENACEF - SIMPOSIO 6,0047610411/2016 0,00 0]
+ LINHA[ 44] - INSPEÇÃO: [CAIXA - CONSIGNACAO 70,5343358010/2016 0,00 0]
+   └─ Começa com dígitos: false
+ LINHA[ 51] - INSPEÇÃO: [SAUDE CAIXA MENSALIDADE 147,2044600409/2016 0,00 0]
+   └─ Começa com dígitos: false
+ 🤖 Usando Gemini AI [gemini-2.5-flash] para extração ESTRUTURADA (JSON) da página 4...
+ ⚠️ Parser regex extraiu 0 rubricas na página 2. Acionando fallback para Gemini AI...
+   └─ Tem valor monetário: true
+   └─ Começa com dígitos: false
+ 🤖 Usando Gemini AI [gemini-2.5-flash] para extração ESTRUTURADA (JSON) da página 1...
+   └─ Tem valor monetário: true
+   └─ Tem valor monetário: true
+   └─ Começa com dígitos: false
+ LINHA[ 45] - INSPEÇÃO: [CAIXA - CONSIGNACAO 419,9943358010/2016 0,00 0]
+ 💾 Progresso intermediário salvo — 24 eventos no processingLog
+ LINHA[ 58] - INSPEÇÃO: [ASSOC. APOSENT./MENSALIDADE - MG 44,1947761111/2016 0,00 0]
+   └─ Tem valor monetário: true
+   └─ Começa com dígitos: false
+ LINHA[ 43] - INSPEÇÃO: [IMPOSTO RENDA FONTE (FUNCEF) 309,9543270406/2016 0,00 0]
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+   └─ Tem valor monetário: true
+   └─ Começa com dígitos: false
+ LINHA[ 52] - INSPEÇÃO: [UNIAO SEGUROS GERAIS 58,5146190409/2016 0,00 0]
+ Processando página 12 com Gemini [gemini-2.5-flash]...
+ LINHA[ 59] - INSPEÇÃO: [REP. ADTO ABONO AN. FUNCEF 3.171,0831730413/2016 0,00 0]
+   └─ Tem valor monetário: true
+   └─ Começa com dígitos: false
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+ LINHA[ 46] - INSPEÇÃO: [CAIXA - CONSIGNACAO 494,1443358010/2016 0,00 0]
+ LINHA[ 60] - INSPEÇÃO: [REP. ADIANT.ABONO ANUAL INSS 923,9832150413/2016 0,00 0]
+   └─ Tem valor monetário: true
+ LINHA[ 44] - INSPEÇÃO: [CAIXA - CONSIGNACAO 70,5343358006/2016 0,00 0]
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+ LINHA[ 53] - INSPEÇÃO: [ASSOC. APOSENT./MENSALIDADE - MG 40,8947761109/2016 0,00 0]
+   └─ Começa com dígitos: false
+   └─ Começa com dígitos: false
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+   └─ Tem valor monetário: true
+ LINHA[ 47] - INSPEÇÃO: [TAXA ADMINISTRATIVA - SALDADO 57,0843620410/2016 0,00 0]
+ LINHA[ 61] - INSPEÇÃO: [TAXA ADM. AB. ANUAL FUNCEF - SALDADO 57,0843640413/2016 0,00 0]
+   └─ Começa com dígitos: false
+ LINHA[ 45] - INSPEÇÃO: [CAIXA - CONSIGNACAO 494,1443358006/2016 0,00 0]
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+   └─ Tem valor monetário: true
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+ LINHA[ 62] - INSPEÇÃO: [IR ABONO ANUAL FUNCEF 309,9544270413/2016 0,00 0]
+   └─ Começa com dígitos: false
+ LINHA[ 56] - INSPEÇÃO: [BASE DEFICIT 6.342,16BDEFICIT09/2016 0,00 0]
+   └─ Tem valor monetário: true
+ LINHA[ 48] - INSPEÇÃO: [CONTRIBUIÇÃO EXTRAORDINARIA 2014 176,3144300410/2016 0,00 0]
+   └─ Tem valor monetário: true
+   └─ Começa com dígitos: false
+   └─ Começa com dígitos: false
+ LINHA[ 63] - INSPEÇÃO: [CONT. EXTRAORDINARIA ABONO ANUAL - 2014 176,3144590413/2016 0,00 0]
+   └─ Tem valor monetário: true
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+ LINHA[ 57] - INSPEÇÃO: [MARGEM CONSIGNAVEL 518,59MGCONS09/2016 0,00 0]
+ LINHA[ 46] - INSPEÇÃO: [CAIXA - CONSIGNACAO 419,9943358006/2016 0,00 0]
+   └─ Tem valor monetário: true
+   └─ Começa com dígitos: false
+ LINHA[ 49] - INSPEÇÃO: [EMPREST. NOVO CREDINAMICO FIXO - FGQC 88,1244320410/2016 0,00 0]
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+   └─ Começa com dígitos: false
+ LINHA[ 66] - INSPEÇÃO: [BASE DEFICIT 6.342,16BDEFICIT11/2016 0,00 0]
+   └─ Tem valor monetário: true
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+ LINHA[ 58] - INSPEÇÃO: [RENDA BASE 8.190,13RBASE09/2016 0,00 0]
+   └─ Começa com dígitos: false
+ LINHA[ 47] - INSPEÇÃO: [TAXA ADMINISTRATIVA - SALDADO 57,0843620406/2016 0,00 0]
+   └─ Tem valor monetário: true
+ LINHA[ 50] - INSPEÇÃO: [EMPREST. NOVO CREDINAMICO FIXO 1.219,8344370410/2016 0,00 0]
+   └─ Começa com dígitos: false
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+ LINHA[ 60] - INSPEÇÃO: [3.083,468.190,13]
+   └─ Tem valor monetário: true
+   └─ Começa com dígitos: false
+ LINHA[ 67] - INSPEÇÃO: [MARGEM CONSIGNAVEL 509,81MGCONS11/2016 0,00 0]
+ LINHA[ 48] - INSPEÇÃO: [CONTRIBUIÇÃO EXTRAORDINARIA 2014 176,3144300406/2016 0,00 0]
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+   └─ Tem valor monetário: true
+   └─ Tem valor monetário: true
+ LINHA[ 68] - INSPEÇÃO: [RENDA BASE 8.190,13RBASE11/2016 0,00 0]
+   └─ Começa com dígitos: false
+   └─ Começa com dígitos: false
+ LINHA[ 62] - INSPEÇÃO: [0,005.106,67]
+ LINHA[ 51] - INSPEÇÃO: [SAUDE CAIXA MENSALIDADE 237,4244600410/2016 0,00 0]
+   └─ Tem valor monetário: true
+   └─ Começa com dígitos: false
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+   └─ Tem valor monetário: true
+ ════════════════════════════════════════════════════════════════════════════════
+ LINHA[ 52] - INSPEÇÃO: [SAUDE CAIXA PARTICIPAÇÃO 85,2144610410/2016 0,00 0]
+   └─ Tem valor monetário: true
+   └─ Começa com dígitos: false
+ LINHA[ 49] - INSPEÇÃO: [EMPREST. NOVO CREDINAMICO FIXO - FGQC 91,7444320406/2016 0,00 0]
+   └─ Tem valor monetário: true
+ 📊 Total de linhas que parecem rubricas: 0
+ ════════════════════════════════════════════════════════════════════════════════
+ ════════════════════════════════════════════════════════════════════════════════
+ LINHA[ 53] - INSPEÇÃO: [UNIAO SEGUROS GERAIS 58,5146190410/2016 0,00 0]
+   └─ Começa com dígitos: false
+   └─ Começa com dígitos: false
+ ════════════════════════════════════════════════════════════════════════════════
+ 📊 Total de linhas que parecem rubricas: 0
+   └─ Tem valor monetário: true
+ 🔧 CONFIGURAÇÃO DO PARSER:
+ ════════════════════════════════════════════════════════════════════════════════
+ ════════════════════════════════════════════════════════════════════════════════
+   └─ Tem valor monetário: true
+ ════════════════════════════════════════════════════════════════════════════════
+ Tipo do documento: FUNCEF_DEMONSTRATIVO
+ LINHA[ 54] - INSPEÇÃO: [ASSOC. APOSENT./MENSALIDADE - MG 40,8947761110/2016 0,00 0]
+ 🔧 CONFIGURAÇÃO DO PARSER:
+   └─ Começa com dígitos: false
+ LINHA[ 50] - INSPEÇÃO: [EMPREST. NOVO CREDINAMICO FIXO 1.219,8344370406/2016 0,00 0]
+ ════════════════════════════════════════════════════════════════════════════════
+ Padrões regex a tentar: 1
+   └─ Tem valor monetário: true
+   Padrão[1]: ^(\d{1,2}/\d{4})\s+(?:\d{2}/\d{2}/\d{4}\s+)?(\d{6})\s+(.+?)\s+(\d{1,3}(?:\.\d{3})*,\d{2})\s+\d{1,3}(?:\.\d{3})*,\d{2}\s+\d+\s*$
+ ⚠️ Parser regex extraiu 0 rubricas na página 8. Acionando fallback para Gemini AI...
+ ════════════════════════════════════════════════════════════════════════════════
+ ⚠️ Parser regex extraiu 0 rubricas na página 3. Acionando fallback para Gemini AI...
+   └─ Começa com dígitos: false
+ LINHA[ 57] - INSPEÇÃO: [BASE DEFICIT 6.342,16BDEFICIT10/2016 0,00 0]
+ Tipo do documento: FUNCEF_DEMONSTRATIVO
+ Padrões regex a tentar: 1
+ ════════════════════════════════════════════════════════════════════════════════
+   └─ Tem valor monetário: true
+   └─ Começa com dígitos: false
+ 🎯 PROCESSANDO LINHA POR LINHA E EXTRAINDO RUBRICAS:
+   └─ Tem valor monetário: true
+ ════════════════════════════════════════════════════════════════════════════════
+   Padrão[1]: ^(\d{1,2}/\d{4})\s+(?:\d{2}/\d{2}/\d{4}\s+)?(\d{6})\s+(.+?)\s+(\d{1,3}(?:\.\d{3})*,\d{2})\s+\d{1,3}(?:\.\d{3})*,\d{2}\s+\d+\s*$
+ LINHA[ 51] - INSPEÇÃO: [SAUDE CAIXA MENSALIDADE 147,2044600406/2016 0,00 0]
+ LINHA[ 58] - INSPEÇÃO: [MARGEM CONSIGNAVEL 344,07MGCONS10/2016 0,00 0]
+ ════════════════════════════════════════════════════════════════════════════════
+ ════════════════════════════════════════════════════════════════════════════════
+ ════════════════════════════════════════════════════════════════════════════════
+   └─ Começa com dígitos: false
+ 🎯 PROCESSANDO LINHA POR LINHA E EXTRAINDO RUBRICAS:
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+ 📊 Total de rubricas extraídas linha por linha: 0
+ LINHA[ 52] - INSPEÇÃO: [SAUDE CAIXA PARTICIPAÇÃO 18,0044610406/2016 0,00 0]
+   └─ Começa com dígitos: false
+ ════════════════════════════════════════════════════════════════════════════════
+   └─ Tem valor monetário: true
+ ════════════════════════════════════════════════════════════════════════════════
+   └─ Tem valor monetário: true
+ ════════════════════════════════════════════════════════════════════════════════
+ LINHA[ 53] - INSPEÇÃO: [UNIAO SEGUROS GERAIS 58,5146190406/2016 0,00 0]
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+ 📊 Total de rubricas extraídas linha por linha: 0
+ ════════════════════════════════════════════════════════════════════════════════
+ LINHA[ 59] - INSPEÇÃO: [RENDA BASE 8.190,13RBASE10/2016 0,00 0]
+ Total de rubricas extraídas: 0 (tipo: FUNCEF_DEMONSTRATIVO)
+ ════════════════════════════════════════════════════════════════════════════════
+ LINHA[ 54] - INSPEÇÃO: [ASSOC. APOSENT./MENSALIDADE - MG 40,8947761106/2016 0,00 0]
+ Total de rubricas extraídas: 0 (tipo: FUNCEF_DEMONSTRATIVO)
+   └─ Começa com dígitos: false
+ 📊 Total de linhas parseadas: 0
+   └─ Começa com dígitos: false
+ ════════════════════════════════════════════════════════════════════════════════
+   └─ Tem valor monetário: true
+   └─ Tem valor monetário: true
+ 📊 Página 9 - 0 rubricas extraídas (parser), 0 entries criadas
+ 📊 Total de linhas parseadas: 0
+ 📊 Página 11 - 0 rubricas extraídas (parser), 0 entries criadas
+ LINHA[ 61] - INSPEÇÃO: [3.257,988.190,13]
+ LINHA[ 57] - INSPEÇÃO: [BASE DEFICIT 6.342,16BDEFICIT06/2016 0,00 0]
+   └─ Começa com dígitos: false
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+ LINHA[ 63] - INSPEÇÃO: [0,004.932,15]
+   └─ Começa com dígitos: false
+   └─ Tem valor monetário: true
+   └─ Tem valor monetário: true
+ ════════════════════════════════════════════════════════════════════════════════
+ LINHA[ 58] - INSPEÇÃO: [MARGEM CONSIGNAVEL 497,88MGCONS06/2016 0,00 0]
+ 📊 Total de linhas que parecem rubricas: 0
+   └─ Começa com dígitos: false
+ ════════════════════════════════════════════════════════════════════════════════
+   └─ Tem valor monetário: true
+ ════════════════════════════════════════════════════════════════════════════════
+ 🔧 CONFIGURAÇÃO DO PARSER:
+ ════════════════════════════════════════════════════════════════════════════════
+ Tipo do documento: FUNCEF_DEMONSTRATIVO
+ LINHA[ 59] - INSPEÇÃO: [RENDA BASE 8.190,13RBASE06/2016 0,00 0]
+ Padrões regex a tentar: 1
+   └─ Começa com dígitos: false
+   Padrão[1]: ^(\d{1,2}/\d{4})\s+(?:\d{2}/\d{2}/\d{4}\s+)?(\d{6})\s+(.+?)\s+(\d{1,3}(?:\.\d{3})*,\d{2})\s+\d{1,3}(?:\.\d{3})*,\d{2}\s+\d+\s*$
+   └─ Tem valor monetário: true
+ ════════════════════════════════════════════════════════════════════════════════
+ LINHA[ 61] - INSPEÇÃO: [3.104,178.190,13]
+ ════════════════════════════════════════════════════════════════════════════════
+ 🎯 PROCESSANDO LINHA POR LINHA E EXTRAINDO RUBRICAS:
+   └─ Começa com dígitos: false
+ ════════════════════════════════════════════════════════════════════════════════
+   └─ Tem valor monetário: true
+ ════════════════════════════════════════════════════════════════════════════════
+ LINHA[ 63] - INSPEÇÃO: [0,005.085,96]
+ 📊 Total de rubricas extraídas linha por linha: 0
+   └─ Começa com dígitos: false
+ ════════════════════════════════════════════════════════════════════════════════
+   └─ Tem valor monetário: true
+ Total de rubricas extraídas: 0 (tipo: FUNCEF_DEMONSTRATIVO)
+ ════════════════════════════════════════════════════════════════════════════════
+ 📊 Total de linhas parseadas: 0
+ ════════════════════════════════════════════════════════════════════════════════
+ 📊 Página 10 - 0 rubricas extraídas (parser), 0 entries criadas
+ 📊 Total de linhas que parecem rubricas: 0
+ ════════════════════════════════════════════════════════════════════════════════
+ ════════════════════════════════════════════════════════════════════════════════
+ 🤖 Usando Gemini AI [gemini-2.5-flash] para extração ESTRUTURADA (JSON) da página 2...
+ 🤖 Usando Gemini AI [gemini-2.5-flash] para extração ESTRUTURADA (JSON) da página 8...
+ 🔧 CONFIGURAÇÃO DO PARSER:
+ ════════════════════════════════════════════════════════════════════════════════
+ Tipo do documento: FUNCEF_DEMONSTRATIVO
+ Padrões regex a tentar: 1
+   Padrão[1]: ^(\d{1,2}/\d{4})\s+(?:\d{2}/\d{2}/\d{4}\s+)?(\d{6})\s+(.+?)\s+(\d{1,3}(?:\.\d{3})*,\d{2})\s+\d{1,3}(?:\.\d{3})*,\d{2}\s+\d+\s*$
+ ════════════════════════════════════════════════════════════════════════════════
+ ════════════════════════════════════════════════════════════════════════════════
+ 🎯 PROCESSANDO LINHA POR LINHA E EXTRAINDO RUBRICAS:
+ ════════════════════════════════════════════════════════════════════════════════
+ ════════════════════════════════════════════════════════════════════════════════
+ 📊 Total de rubricas extraídas linha por linha: 0
+ ════════════════════════════════════════════════════════════════════════════════
+ Total de rubricas extraídas: 0 (tipo: FUNCEF_DEMONSTRATIVO)
+ ════════════════════════════════════════════════════════════════════════════════
+ 📊 Total de linhas parseadas: 0
+ 📊 Página 6 - 0 rubricas extraídas (parser), 0 entries criadas
+ 🤖 Usando Gemini AI [gemini-2.5-flash] para extração ESTRUTURADA (JSON) da página 3...
+ 💾 Progresso intermediário salvo — 29 eventos no processingLog
+ ⚠️ Parser regex extraiu 0 rubricas na página 9. Acionando fallback para Gemini AI...
+ ⚠️ Parser regex extraiu 0 rubricas na página 11. Acionando fallback para Gemini AI...
+ 💾 Progresso intermediário salvo — 31 eventos no processingLog
+ ⚠️ Parser regex extraiu 0 rubricas na página 10. Acionando fallback para Gemini AI...
+ ⚠️ Parser regex extraiu 0 rubricas na página 6. Acionando fallback para Gemini AI...
+ ⚠️ Falha ao salvar progresso intermediário: null
+ 💾 Progresso intermediário salvo — 33 eventos no processingLog
+ 🤖 Usando Gemini AI [gemini-2.5-flash] para extração ESTRUTURADA (JSON) da página 11...
+ ⚠️ Falha ao salvar progresso intermediário: null
+ ⚠️ Falha ao salvar progresso intermediário: null
+ ⚠️ Falha ao salvar progresso intermediário: null
+ Processando página 8 com Gemini [gemini-2.5-flash]...
+ Processando página 1 com Gemini [gemini-2.5-flash]...
+ 🤖 Usando Gemini AI [gemini-2.5-flash] para extração ESTRUTURADA (JSON) da página 9...
+ ⚠️ Falha ao salvar progresso intermediário: null
+ Processando página 3 com Gemini [gemini-2.5-flash]...
+ 💾 Progresso intermediário salvo — 35 eventos no processingLog
+ Processando página 4 com Gemini [gemini-2.5-flash]...
+ 💾 Progresso intermediário salvo — 35 eventos no processingLog
+ 🤖 Usando Gemini AI [gemini-2.5-flash] para extração ESTRUTURADA (JSON) da página 10...
+ Processando página 5 com Gemini [gemini-2.5-flash]...
+ 💾 Progresso intermediário salvo — 36 eventos no processingLog
+ 🤖 Usando Gemini AI [gemini-2.5-flash] para extração ESTRUTURADA (JSON) da página 6...
+ 💾 Progresso intermediário salvo — 37 eventos no processingLog
+ 💾 Progresso intermediário salvo — 37 eventos no processingLog
+ 💾 Progresso intermediário salvo — 37 eventos no processingLog
+ Processando página 2 com Gemini [gemini-2.5-flash]...
+ 💾 Progresso intermediário salvo — 37 eventos no processingLog
+ 💾 Progresso intermediário salvo — 37 eventos no processingLog
+ 💾 Progresso intermediário salvo — 37 eventos no processingLog
+ Processando página 11 com Gemini [gemini-2.5-flash]...
+ 💾 Progresso intermediário salvo — 37 eventos no processingLog
+ Processando página 9 com Gemini [gemini-2.5-flash]...
+ 💾 Progresso intermediário salvo — 37 eventos no processingLog
+ Processando página 10 com Gemini [gemini-2.5-flash]...
+ 💾 Progresso intermediário salvo — 37 eventos no processingLog
+ Processando página 6 com Gemini [gemini-2.5-flash]...
+ 🤖 Usando Gemini AI [gemini-2.5-flash] para extração ESTRUTURADA (JSON) da página 7...
+ 💾 Progresso intermediário salvo — 38 eventos no processingLog
+ 💾 Progresso intermediário salvo — 38 eventos no processingLog
+ Processando página 7 com Gemini [gemini-2.5-flash]...
+ ❌ Response already committed. Ignoring error: null
+ ❌ Response already committed. Ignoring error: null
+ ❌ Response already committed. Ignoring error: null
+ ❌ Response already committed. Ignoring error: null
+ Gemini [gemini-2.5-flash] processou página 1 em 17556ms (2961 chars na resposta)
+ ✅ Gemini retornou 2949 chars de JSON estruturado da página 1
+ Gemini JSON - Página 1: nome=DISRAELE SILVEIRA SANTOS, cpf=null, competencia=01/2016, bruto=8190.13, descontos=2888.55, líquido=5301.58
+ Gemini JSON - Página 1: 14 rubricas extraídas do JSON
+ Validando extração de contracheque: 14 entries, bruto=8190.13, descontos=2888.55, líquido=5301.58
+ Validação contracheque concluída: score=0,53, valid=false, recommendation=REJECT, issues=2
+ 📊 Página 1 (Gemini JSON) - 14 rubricas extraídas, score=0,53, recommendation=REJECT
+   ⚠️ Validação: [SOMA_PROVENTOS_INCORRETA] Soma dos proventos (11078.68) difere do salário bruto informado (8190.13) — esperado=8190.13, encontrado=11078.68
+   ⚠️ Validação: [SOMA_DESCONTOS_INCORRETA] Soma dos descontos (0) difere do total informado (2888.55) — esperado=2888.55, encontrado=0
+ 🔄 Score 0,53 < 0.85 — Acionando CROSS-VALIDATION (Fase 3) na página 1...
+ ════════════════════════════════════════════════════════════════════════════════
+ 🔄 CROSS-VALIDATION — Página 1 — Iniciando 2ª extração com prompt alternativo
+ ════════════════════════════════════════════════════════════════════════════════
+ 💾 Progresso intermediário salvo — 41 eventos no processingLog
+ Processando página 1 com Gemini [gemini-2.5-flash]...
+ ❌ Response already committed. Ignoring error: null
+ ❌ Response already committed. Ignoring error: null
+ Gemini [gemini-2.5-flash] processou página 3 em 24048ms (2979 chars na resposta)
+ ✅ Gemini retornou 2967 chars de JSON estruturado da página 3
+ Gemini JSON - Página 3: nome=DISRAELE SILVEIRA SANTOS, cpf=null, competencia=03/2016, bruto=8190.13, descontos=3034.05, líquido=5156.08
+ Gemini JSON - Página 3: 14 rubricas extraídas do JSON
+ Validando extração de contracheque: 14 entries, bruto=8190.13, descontos=3034.05, líquido=5156.08
+ Validação contracheque concluída: score=0,53, valid=false, recommendation=REJECT, issues=2
+ 📊 Página 3 (Gemini JSON) - 14 rubricas extraídas, score=0,53, recommendation=REJECT
+   ⚠️ Validação: [SOMA_PROVENTOS_INCORRETA] Soma dos proventos (11224.18) difere do salário bruto informado (8190.13) — esperado=8190.13, encontrado=11224.18
+   ⚠️ Validação: [SOMA_DESCONTOS_INCORRETA] Soma dos descontos (0) difere do total informado (3034.05) — esperado=3034.05, encontrado=0
+ 🔄 Score 0,53 < 0.85 — Acionando CROSS-VALIDATION (Fase 3) na página 3...
+ ════════════════════════════════════════════════════════════════════════════════
+ 🔄 CROSS-VALIDATION — Página 3 — Iniciando 2ª extração com prompt alternativo
+ ════════════════════════════════════════════════════════════════════════════════
+ 💾 Progresso intermediário salvo — 44 eventos no processingLog
+ Processando página 3 com Gemini [gemini-2.5-flash]...
+ Gemini [gemini-2.5-flash] processou página 8 em 24390ms (3189 chars na resposta)
+ ✅ Gemini retornou 3177 chars de JSON estruturado da página 8
+ Gemini JSON - Página 8: nome=DISRAELE SILVEIRA SANTOS, cpf=null, competencia=08/2016, bruto=9114.11, descontos=3224.66, líquido=5889.45
+ Gemini JSON - Página 8: 15 rubricas extraídas do JSON
+ Validando extração de contracheque: 15 entries, bruto=9114.11, descontos=3224.66, líquido=5889.45
+ Validação contracheque concluída: score=0,53, valid=false, recommendation=REJECT, issues=2
+ 📊 Página 8 (Gemini JSON) - 15 rubricas extraídas, score=0,53, recommendation=REJECT
+   ⚠️ Validação: [SOMA_PROVENTOS_INCORRETA] Soma dos proventos (12338.77) difere do salário bruto informado (9114.11) — esperado=9114.11, encontrado=12338.77
+   ⚠️ Validação: [SOMA_DESCONTOS_INCORRETA] Soma dos descontos (0) difere do total informado (3224.66) — esperado=3224.66, encontrado=0
+ 🔄 Score 0,53 < 0.85 — Acionando CROSS-VALIDATION (Fase 3) na página 8...
+ ════════════════════════════════════════════════════════════════════════════════
+ 🔄 CROSS-VALIDATION — Página 8 — Iniciando 2ª extração com prompt alternativo
+ ════════════════════════════════════════════════════════════════════════════════
+ 💾 Progresso intermediário salvo — 47 eventos no processingLog
+ Processando página 8 com Gemini [gemini-2.5-flash]...
+ Gemini [gemini-2.5-flash] processou página 9 em 26384ms (3353 chars na resposta)
+ ✅ Gemini retornou 3341 chars de JSON estruturado da página 9
+ Gemini JSON - Página 9: nome=DISRAELE SILVEIRA SANTOS, cpf=null, competencia=09/2016, bruto=8190.13, descontos=3083.46, líquido=5106.67
+ Gemini JSON - Página 9: 16 rubricas extraídas do JSON
+ Validando extração de contracheque: 16 entries, bruto=8190.13, descontos=3083.46, líquido=5106.67
+ Validação contracheque concluída: score=0,53, valid=false, recommendation=REJECT, issues=2
+ 📊 Página 9 (Gemini JSON) - 16 rubricas extraídas, score=0,53, recommendation=REJECT
+   ⚠️ Validação: [SOMA_PROVENTOS_INCORRETA] Soma dos proventos (11273.59) difere do salário bruto informado (8190.13) — esperado=8190.13, encontrado=11273.59
+   ⚠️ Validação: [SOMA_DESCONTOS_INCORRETA] Soma dos descontos (0) difere do total informado (3083.46) — esperado=3083.46, encontrado=0
+ 🔄 Score 0,53 < 0.85 — Acionando CROSS-VALIDATION (Fase 3) na página 9...
+ ════════════════════════════════════════════════════════════════════════════════
+ 🔄 CROSS-VALIDATION — Página 9 — Iniciando 2ª extração com prompt alternativo
+ ════════════════════════════════════════════════════════════════════════════════
+ 💾 Progresso intermediário salvo — 50 eventos no processingLog
+ Processando página 9 com Gemini [gemini-2.5-flash]...
+ Gemini [gemini-2.5-flash] processou página 4 em 26541ms (3153 chars na resposta)
+ ✅ Gemini retornou 3141 chars de JSON estruturado da página 4
+ Gemini JSON - Página 4: nome=DISRAELE SILVEIRA SANTOS, cpf=null, competencia=04/2016, bruto=8190.13, descontos=3033.18, líquido=5156.95
+ Gemini JSON - Página 4: 15 rubricas extraídas do JSON
+ Validando extração de contracheque: 15 entries, bruto=8190.13, descontos=3033.18, líquido=5156.95
+ Validação contracheque concluída: score=0,53, valid=false, recommendation=REJECT, issues=2
+ 📊 Página 4 (Gemini JSON) - 15 rubricas extraídas, score=0,53, recommendation=REJECT
+   ⚠️ Validação: [SOMA_PROVENTOS_INCORRETA] Soma dos proventos (11223.31) difere do salário bruto informado (8190.13) — esperado=8190.13, encontrado=11223.31
+   ⚠️ Validação: [SOMA_DESCONTOS_INCORRETA] Soma dos descontos (0) difere do total informado (3033.18) — esperado=3033.18, encontrado=0
+ 🔄 Score 0,53 < 0.85 — Acionando CROSS-VALIDATION (Fase 3) na página 4...
+ ════════════════════════════════════════════════════════════════════════════════
+ 🔄 CROSS-VALIDATION — Página 4 — Iniciando 2ª extração com prompt alternativo
+ ════════════════════════════════════════════════════════════════════════════════
+ 💾 Progresso intermediário salvo — 53 eventos no processingLog
+ Processando página 4 com Gemini [gemini-2.5-flash]...
+ Gemini [gemini-2.5-flash] processou página 7 em 26630ms (3545 chars na resposta)
+ ✅ Gemini retornou 3533 chars de JSON estruturado da página 7
+ Gemini JSON - Página 7: nome=DISRAELE SILVEIRA SANTOS, cpf=null, competencia=07/2016, bruto=8190.13, descontos=3171.91, líquido=5018.22
+ Gemini JSON - Página 7: 17 rubricas extraídas do JSON
+ Validando extração de contracheque: 17 entries, bruto=8190.13, descontos=3171.91, líquido=5018.22
+ Validação contracheque concluída: score=0,53, valid=false, recommendation=REJECT, issues=2
+ 📊 Página 7 (Gemini JSON) - 17 rubricas extraídas, score=0,53, recommendation=REJECT
+   ⚠️ Validação: [SOMA_PROVENTOS_INCORRETA] Soma dos proventos (11362.04) difere do salário bruto informado (8190.13) — esperado=8190.13, encontrado=11362.04
+   ⚠️ Validação: [SOMA_DESCONTOS_INCORRETA] Soma dos descontos (0) difere do total informado (3171.91) — esperado=3171.91, encontrado=0
+ 🔄 Score 0,53 < 0.85 — Acionando CROSS-VALIDATION (Fase 3) na página 7...
+ ════════════════════════════════════════════════════════════════════════════════
+ 🔄 CROSS-VALIDATION — Página 7 — Iniciando 2ª extração com prompt alternativo
+ ════════════════════════════════════════════════════════════════════════════════
+ 💾 Progresso intermediário salvo — 56 eventos no processingLog
+ Processando página 7 com Gemini [gemini-2.5-flash]...
+ Gemini [gemini-2.5-flash] processou página 10 em 27856ms (3545 chars na resposta)
+ ✅ Gemini retornou 3533 chars de JSON estruturado da página 10
+ Gemini JSON - Página 10: nome=DISRAELE SILVEIRA SANTOS, cpf=null, competencia=10/2016, bruto=8190.13, descontos=3257.98, líquido=4932.15
+ Gemini JSON - Página 10: 17 rubricas extraídas do JSON
+ Validando extração de contracheque: 17 entries, bruto=8190.13, descontos=3257.98, líquido=4932.15
+ Validação contracheque concluída: score=0,53, valid=false, recommendation=REJECT, issues=2
+ 📊 Página 10 (Gemini JSON) - 17 rubricas extraídas, score=0,53, recommendation=REJECT
+   ⚠️ Validação: [SOMA_PROVENTOS_INCORRETA] Soma dos proventos (11448.11) difere do salário bruto informado (8190.13) — esperado=8190.13, encontrado=11448.11
+   ⚠️ Validação: [SOMA_DESCONTOS_INCORRETA] Soma dos descontos (0) difere do total informado (3257.98) — esperado=3257.98, encontrado=0
+ 🔄 Score 0,53 < 0.85 — Acionando CROSS-VALIDATION (Fase 3) na página 10...
+ ════════════════════════════════════════════════════════════════════════════════
+ 🔄 CROSS-VALIDATION — Página 10 — Iniciando 2ª extração com prompt alternativo
+ ════════════════════════════════════════════════════════════════════════════════
+ 💾 Progresso intermediário salvo — 59 eventos no processingLog
+ Processando página 10 com Gemini [gemini-2.5-flash]...
+ ❌ Response already committed. Ignoring error: null
+ Gemini [gemini-2.5-flash] processou página 5 em 31644ms (3544 chars na resposta)
+ ✅ Gemini retornou 3532 chars de JSON estruturado da página 5
+ Gemini JSON - Página 5: nome=DISRAELE SILVEIRA SANTOS, cpf=null, competencia=05/2016, bruto=8190.13, descontos=3088.37, líquido=5101.76
+ Gemini JSON - Página 5: 17 rubricas extraídas do JSON
+ Validando extração de contracheque: 17 entries, bruto=8190.13, descontos=3088.37, líquido=5101.76
+ Validação contracheque concluída: score=0,53, valid=false, recommendation=REJECT, issues=2
+ 📊 Página 5 (Gemini JSON) - 17 rubricas extraídas, score=0,53, recommendation=REJECT
+   ⚠️ Validação: [SOMA_PROVENTOS_INCORRETA] Soma dos proventos (11278.50) difere do salário bruto informado (8190.13) — esperado=8190.13, encontrado=11278.50
+   ⚠️ Validação: [SOMA_DESCONTOS_INCORRETA] Soma dos descontos (0) difere do total informado (3088.37) — esperado=3088.37, encontrado=0
+ 🔄 Score 0,53 < 0.85 — Acionando CROSS-VALIDATION (Fase 3) na página 5...
+ ════════════════════════════════════════════════════════════════════════════════
+ 🔄 CROSS-VALIDATION — Página 5 — Iniciando 2ª extração com prompt alternativo
+ ════════════════════════════════════════════════════════════════════════════════
+ 💾 Progresso intermediário salvo — 62 eventos no processingLog
+ Processando página 5 com Gemini [gemini-2.5-flash]...
+ ❌ Response already committed. Ignoring error: null
+ Gemini [gemini-2.5-flash] processou página 12 em 32918ms (3351 chars na resposta)
+ ✅ Gemini retornou 3339 chars de JSON estruturado da página 12
+ Gemini JSON - Página 12: nome=DISRAELE SILVEIRA SANTOS, cpf=null, competencia=12/2016, bruto=8190.13, descontos=3083.98, líquido=5106.15
+ Gemini JSON - Página 12: 16 rubricas extraídas do JSON
+ Validando extração de contracheque: 16 entries, bruto=8190.13, descontos=3083.98, líquido=5106.15
+ Validação contracheque concluída: score=0,53, valid=false, recommendation=REJECT, issues=2
+ 📊 Página 12 (Gemini JSON) - 16 rubricas extraídas, score=0,53, recommendation=REJECT
+   ⚠️ Validação: [SOMA_PROVENTOS_INCORRETA] Soma dos proventos (11274.11) difere do salário bruto informado (8190.13) — esperado=8190.13, encontrado=11274.11
+   ⚠️ Validação: [SOMA_DESCONTOS_INCORRETA] Soma dos descontos (0) difere do total informado (3083.98) — esperado=3083.98, encontrado=0
+ 🔄 Score 0,53 < 0.85 — Acionando CROSS-VALIDATION (Fase 3) na página 12...
+ ════════════════════════════════════════════════════════════════════════════════
+ 🔄 CROSS-VALIDATION — Página 12 — Iniciando 2ª extração com prompt alternativo
+ ════════════════════════════════════════════════════════════════════════════════
+ 💾 Progresso intermediário salvo — 65 eventos no processingLog
+ Processando página 12 com Gemini [gemini-2.5-flash]...
+ ❌ Response already committed. Ignoring error: null
+ Gemini [gemini-2.5-flash] processou página 1 em 19371ms (2961 chars na resposta)
+ ✅ 2ª extração concluída: 2949 chars de JSON
+ Gemini JSON - Página 1: nome=DISRAELE SILVEIRA SANTOS, cpf=null, competencia=01/2016, bruto=8190.13, descontos=2888.55, líquido=5301.58
+ Gemini JSON - Página 1: 14 rubricas extraídas do JSON
+ Gemini JSON - Página 1: nome=DISRAELE SILVEIRA SANTOS, cpf=null, competencia=01/2016, bruto=8190.13, descontos=2888.55, líquido=5301.58
+ Gemini JSON - Página 1: 14 rubricas extraídas do JSON
+ ════════════════════════════════════════════════════════════════════════════════
+ 📊 CROSS-VALIDATION CONCLUÍDA:
+    Total de campos comparados: 19
+    Campos que coincidem: 19 (100%)
+    Campos que divergem: 0
+    Revisão manual necessária: false
+    Entries consolidadas: 12
+ ════════════════════════════════════════════════════════════════════════════════
+ 📊 Cross-validation página 1: score=1,00, matched=19/19, revisão=false
+ 💾 Progresso intermediário salvo — 66 eventos no processingLog
+ Gemini [gemini-2.5-flash] processou página 11 em 39770ms (5294 chars na resposta)
+ ✅ Gemini retornou 5282 chars de JSON estruturado da página 11
+ Gemini JSON - Página 11: nome=DISRAELE SILVEIRA SANTOS, cpf=null, competencia=11/2016, bruto=16408.8, descontos=7730.64, líquido=8678.16
+ Gemini JSON - Página 11: 26 rubricas extraídas do JSON
+ Validando extração de contracheque: 26 entries, bruto=16408.8, descontos=7730.64, líquido=8678.16
+ Validação contracheque concluída: score=0,53, valid=false, recommendation=REJECT, issues=2
+ 📊 Página 11 (Gemini JSON) - 26 rubricas extraídas, score=0,53, recommendation=REJECT
+   ⚠️ Validação: [SOMA_PROVENTOS_INCORRETA] Soma dos proventos (24139.44) difere do salário bruto informado (16408.8) — esperado=16408.8, encontrado=24139.44
+   ⚠️ Validação: [SOMA_DESCONTOS_INCORRETA] Soma dos descontos (0) difere do total informado (7730.64) — esperado=7730.64, encontrado=0
+ 🔄 Score 0,53 < 0.85 — Acionando CROSS-VALIDATION (Fase 3) na página 11...
+ ════════════════════════════════════════════════════════════════════════════════
+ 🔄 CROSS-VALIDATION — Página 11 — Iniciando 2ª extração com prompt alternativo
+ ════════════════════════════════════════════════════════════════════════════════
+ 💾 Progresso intermediário salvo — 69 eventos no processingLog
+ Processando página 11 com Gemini [gemini-2.5-flash]...
+ ❌ Response already committed. Ignoring error: null
+ Gemini [gemini-2.5-flash] processou página 2 em 40831ms (3549 chars na resposta)
+ ✅ Gemini retornou 3537 chars de JSON estruturado da página 2
+ Gemini JSON - Página 2: nome=DISRAELE SILVEIRA SANTOS, cpf=null, competencia=02/2016, bruto=11361.21, descontos=2922.25, líquido=8438.96
+ Gemini JSON - Página 2: 17 rubricas extraídas do JSON
+ Validando extração de contracheque: 17 entries, bruto=11361.21, descontos=2922.25, líquido=8438.96
+ Validação contracheque concluída: score=0,53, valid=false, recommendation=REJECT, issues=2
+ 📊 Página 2 (Gemini JSON) - 17 rubricas extraídas, score=0,53, recommendation=REJECT
+   ⚠️ Validação: [SOMA_PROVENTOS_INCORRETA] Soma dos proventos (14283.46) difere do salário bruto informado (11361.21) — esperado=11361.21, encontrado=14283.46
+   ⚠️ Validação: [SOMA_DESCONTOS_INCORRETA] Soma dos descontos (0) difere do total informado (2922.25) — esperado=2922.25, encontrado=0
+ 🔄 Score 0,53 < 0.85 — Acionando CROSS-VALIDATION (Fase 3) na página 2...
+ ════════════════════════════════════════════════════════════════════════════════
+ 🔄 CROSS-VALIDATION — Página 2 — Iniciando 2ª extração com prompt alternativo
+ ════════════════════════════════════════════════════════════════════════════════
+ 💾 Progresso intermediário salvo — 72 eventos no processingLog
+ Processando página 2 com Gemini [gemini-2.5-flash]...
+ Gemini [gemini-2.5-flash] processou página 6 em 41396ms (3554 chars na resposta)
+ ✅ Gemini retornou 3542 chars de JSON estruturado da página 6
+ Gemini JSON - Página 6: nome=DISRAELE SILVEIRA SANTOS, cpf=null, competencia=06/2016, bruto=8190.13, descontos=3104.17, líquido=5085.96
+ Gemini JSON - Página 6: 14 rubricas extraídas do JSON
+ Validando extração de contracheque: 14 entries, bruto=8190.13, descontos=3104.17, líquido=5085.96
+ Validação contracheque concluída: score=0,53, valid=false, recommendation=REJECT, issues=2
+ 📊 Página 6 (Gemini JSON) - 14 rubricas extraídas, score=0,53, recommendation=REJECT
+   ⚠️ Validação: [SOMA_PROVENTOS_INCORRETA] Soma dos proventos (11294.30) difere do salário bruto informado (8190.13) — esperado=8190.13, encontrado=11294.30
+   ⚠️ Validação: [SOMA_DESCONTOS_INCORRETA] Soma dos descontos (0) difere do total informado (3104.17) — esperado=3104.17, encontrado=0
+ 🔄 Score 0,53 < 0.85 — Acionando CROSS-VALIDATION (Fase 3) na página 6...
+ ════════════════════════════════════════════════════════════════════════════════
+ 🔄 CROSS-VALIDATION — Página 6 — Iniciando 2ª extração com prompt alternativo
+ ════════════════════════════════════════════════════════════════════════════════
+ 💾 Progresso intermediário salvo — 75 eventos no processingLog
+ Processando página 6 com Gemini [gemini-2.5-flash]...
+ ❌ Response already committed. Ignoring error: null
+ Gemini [gemini-2.5-flash] processou página 3 em 20853ms (3153 chars na resposta)
+ ✅ 2ª extração concluída: 3141 chars de JSON
+ Gemini JSON - Página 3: nome=DISRAELE SILVEIRA SANTOS, cpf=null, competencia=03/2016, bruto=8190.13, descontos=3034.05, líquido=5156.08
+ Gemini JSON - Página 3: 15 rubricas extraídas do JSON
+ Gemini JSON - Página 3: nome=DISRAELE SILVEIRA SANTOS, cpf=null, competencia=03/2016, bruto=8190.13, descontos=3034.05, líquido=5156.08
+ Gemini JSON - Página 3: 14 rubricas extraídas do JSON
+ ════════════════════════════════════════════════════════════════════════════════
+ 📊 CROSS-VALIDATION CONCLUÍDA:
+    Total de campos comparados: 20
+    Campos que coincidem: 19 (95%)
+    Campos que divergem: 1
+    Revisão manual necessária: false
+    Entries consolidadas: 13
+ ════════════════════════════════════════════════════════════════════════════════
+ 📊 Cross-validation página 3: score=0,95, matched=19/20, revisão=false
+ 💾 Progresso intermediário salvo — 76 eventos no processingLog
+ Gemini [gemini-2.5-flash] processou página 4 em 19349ms (3153 chars na resposta)
+ ✅ 2ª extração concluída: 3141 chars de JSON
+ Gemini JSON - Página 4: nome=DISRAELE SILVEIRA SANTOS, cpf=null, competencia=04/2016, bruto=8190.13, descontos=3033.18, líquido=5156.95
+ Gemini JSON - Página 4: 15 rubricas extraídas do JSON
+ Gemini JSON - Página 4: nome=DISRAELE SILVEIRA SANTOS, cpf=null, competencia=04/2016, bruto=8190.13, descontos=3033.18, líquido=5156.95
+ Gemini JSON - Página 4: 15 rubricas extraídas do JSON
+ ════════════════════════════════════════════════════════════════════════════════
+ 📊 CROSS-VALIDATION CONCLUÍDA:
+    Total de campos comparados: 20
+    Campos que coincidem: 20 (100%)
+    Campos que divergem: 0
+    Revisão manual necessária: false
+    Entries consolidadas: 13
+ ════════════════════════════════════════════════════════════════════════════════
+ 📊 Cross-validation página 4: score=1,00, matched=20/20, revisão=false
+ 💾 Progresso intermediário salvo — 77 eventos no processingLog
+ Gemini [gemini-2.5-flash] processou página 10 em 19245ms (3545 chars na resposta)
+ ✅ 2ª extração concluída: 3533 chars de JSON
+ Gemini JSON - Página 10: nome=DISRAELE SILVEIRA SANTOS, cpf=null, competencia=10/2016, bruto=8190.13, descontos=3257.98, líquido=4932.15
+ Gemini JSON - Página 10: 17 rubricas extraídas do JSON
+ Gemini JSON - Página 10: nome=DISRAELE SILVEIRA SANTOS, cpf=null, competencia=10/2016, bruto=8190.13, descontos=3257.98, líquido=4932.15
+ Gemini JSON - Página 10: 17 rubricas extraídas do JSON
+ ════════════════════════════════════════════════════════════════════════════════
+ 📊 CROSS-VALIDATION CONCLUÍDA:
+    Total de campos comparados: 22
+    Campos que coincidem: 22 (100%)
+    Campos que divergem: 0
+    Revisão manual necessária: false
+    Entries consolidadas: 15
+ ════════════════════════════════════════════════════════════════════════════════
+ 📊 Cross-validation página 10: score=1,00, matched=22/22, revisão=false
+ 💾 Progresso intermediário salvo — 78 eventos no processingLog
+ ❌ Response already committed. Ignoring error: null
+ Gemini [gemini-2.5-flash] processou página 9 em 24015ms (3345 chars na resposta)
+ ✅ 2ª extração concluída: 3333 chars de JSON
+ Gemini JSON - Página 9: nome=DISRAELE SILVEIRA SANTOS, cpf=null, competencia=09/2016, bruto=8190.13, descontos=3083.46, líquido=5106.67
+ Gemini JSON - Página 9: 16 rubricas extraídas do JSON
+ Gemini JSON - Página 9: nome=DISRAELE SILVEIRA SANTOS, cpf=null, competencia=09/2016, bruto=8190.13, descontos=3083.46, líquido=5106.67
+ Gemini JSON - Página 9: 16 rubricas extraídas do JSON
+ ════════════════════════════════════════════════════════════════════════════════
+ 📊 CROSS-VALIDATION CONCLUÍDA:
+    Total de campos comparados: 21
+    Campos que coincidem: 21 (100%)
+    Campos que divergem: 0
+    Revisão manual necessária: false
+    Entries consolidadas: 14
+ ════════════════════════════════════════════════════════════════════════════════
+ 📊 Cross-validation página 9: score=1,00, matched=21/21, revisão=false
+ 💾 Progresso intermediário salvo — 79 eventos no processingLog
+ ❌ Response already committed. Ignoring error: null
+ Gemini [gemini-2.5-flash] processou página 8 em 28324ms (3739 chars na resposta)
+ ✅ 2ª extração concluída: 3727 chars de JSON
+ Gemini JSON - Página 8: nome=DISRAELE SILVEIRA SANTOS, cpf=null, competencia=08/2016, bruto=9114.11, descontos=3224.66, líquido=5889.45
+ Gemini JSON - Página 8: 18 rubricas extraídas do JSON
+ Gemini JSON - Página 8: nome=DISRAELE SILVEIRA SANTOS, cpf=null, competencia=08/2016, bruto=9114.11, descontos=3224.66, líquido=5889.45
+ Gemini JSON - Página 8: 15 rubricas extraídas do JSON
+ ════════════════════════════════════════════════════════════════════════════════
+ 📊 CROSS-VALIDATION CONCLUÍDA:
+    Total de campos comparados: 23
+    Campos que coincidem: 20 (87%)
+    Campos que divergem: 3
+    Revisão manual necessária: false
+    Entries consolidadas: 16
+ ════════════════════════════════════════════════════════════════════════════════
+ 📊 Cross-validation página 8: score=0,87, matched=20/23, revisão=false
+ 💾 Progresso intermediário salvo — 80 eventos no processingLog
+ Gemini [gemini-2.5-flash] processou página 5 em 23709ms (3536 chars na resposta)
+ ✅ 2ª extração concluída: 3524 chars de JSON
+ Gemini JSON - Página 5: nome=DISRAELE SILVEIRA SANTOS, cpf=null, competencia=05/2016, bruto=8190.13, descontos=3088.37, líquido=5101.76
+ Gemini JSON - Página 5: 17 rubricas extraídas do JSON
+ Gemini JSON - Página 5: nome=DISRAELE SILVEIRA SANTOS, cpf=null, competencia=05/2016, bruto=8190.13, descontos=3088.37, líquido=5101.76
+ Gemini JSON - Página 5: 17 rubricas extraídas do JSON
+ ════════════════════════════════════════════════════════════════════════════════
+ 📊 CROSS-VALIDATION CONCLUÍDA:
+    Total de campos comparados: 22
+    Campos que coincidem: 22 (100%)
+    Campos que divergem: 0
+    Revisão manual necessária: false
+    Entries consolidadas: 15
+ ════════════════════════════════════════════════════════════════════════════════
+ 📊 Cross-validation página 5: score=1,00, matched=22/22, revisão=false
+ 💾 Progresso intermediário salvo — 81 eventos no processingLog
+ Gemini [gemini-2.5-flash] processou página 12 em 23112ms (3345 chars na resposta)
+ ✅ 2ª extração concluída: 3333 chars de JSON
+ Gemini JSON - Página 12: nome=DISRAELE SILVEIRA SANTOS, cpf=null, competencia=12/2016, bruto=8190.13, descontos=3083.98, líquido=5106.15
+ Gemini JSON - Página 12: 16 rubricas extraídas do JSON
+ Gemini JSON - Página 12: nome=DISRAELE SILVEIRA SANTOS, cpf=null, competencia=12/2016, bruto=8190.13, descontos=3083.98, líquido=5106.15
+ Gemini JSON - Página 12: 16 rubricas extraídas do JSON
+ ════════════════════════════════════════════════════════════════════════════════
+ 📊 CROSS-VALIDATION CONCLUÍDA:
+    Total de campos comparados: 21
+    Campos que coincidem: 21 (100%)
+    Campos que divergem: 0
+    Revisão manual necessária: false
+    Entries consolidadas: 14
+ ════════════════════════════════════════════════════════════════════════════════
+ 📊 Cross-validation página 12: score=1,00, matched=21/21, revisão=false
+ 💾 Progresso intermediário salvo — 82 eventos no processingLog
+ ❌ Response already committed. Ignoring error: null
+ Gemini [gemini-2.5-flash] processou página 11 em 19903ms (5286 chars na resposta)
+ ✅ 2ª extração concluída: 5274 chars de JSON
+ Gemini JSON - Página 11: nome=DISRAELE SILVEIRA SANTOS, cpf=null, competencia=11/2016, bruto=16408.8, descontos=7730.64, líquido=8678.16
+ Gemini JSON - Página 11: 26 rubricas extraídas do JSON
+ Gemini JSON - Página 11: nome=DISRAELE SILVEIRA SANTOS, cpf=null, competencia=11/2016, bruto=16408.8, descontos=7730.64, líquido=8678.16
+ Gemini JSON - Página 11: 26 rubricas extraídas do JSON
+ ════════════════════════════════════════════════════════════════════════════════
+ 📊 CROSS-VALIDATION CONCLUÍDA:
+    Total de campos comparados: 31
+    Campos que coincidem: 31 (100%)
+    Campos que divergem: 0
+    Revisão manual necessária: false
+    Entries consolidadas: 24
+ ════════════════════════════════════════════════════════════════════════════════
+ 📊 Cross-validation página 11: score=1,00, matched=31/31, revisão=false
+ 💾 Progresso intermediário salvo — 83 eventos no processingLog
+ Gemini [gemini-2.5-flash] processou página 6 em 18735ms (2995 chars na resposta)
+ ✅ 2ª extração concluída: 2983 chars de JSON
+ Gemini JSON - Página 6: nome=DISRAELE SILVEIRA SANTOS, cpf=null, competencia=06/2016, bruto=8190.13, descontos=3104.17, líquido=5085.96
+ Gemini JSON - Página 6: 14 rubricas extraídas do JSON
+ Gemini JSON - Página 6: nome=DISRAELE SILVEIRA SANTOS, cpf=null, competencia=06/2016, bruto=8190.13, descontos=3104.17, líquido=5085.96
+ Gemini JSON - Página 6: 14 rubricas extraídas do JSON
+ ════════════════════════════════════════════════════════════════════════════════
+ 📊 CROSS-VALIDATION CONCLUÍDA:
+    Total de campos comparados: 19
+    Campos que coincidem: 19 (100%)
+    Campos que divergem: 0
+    Revisão manual necessária: false
+    Entries consolidadas: 12
+ ════════════════════════════════════════════════════════════════════════════════
+ 📊 Cross-validation página 6: score=1,00, matched=19/19, revisão=false
+ 💾 Progresso intermediário salvo — 84 eventos no processingLog
+ ❌ Response already committed. Ignoring error: null
+ Gemini [gemini-2.5-flash] processou página 2 em 19882ms (3554 chars na resposta)
+ ✅ 2ª extração concluída: 3542 chars de JSON
+ Gemini JSON - Página 2: nome=DISRAELE SILVEIRA SANTOS, cpf=null, competencia=02/2016, bruto=11361.21, descontos=2922.25, líquido=8438.96
+ Gemini JSON - Página 2: 17 rubricas extraídas do JSON
+ Gemini JSON - Página 2: nome=DISRAELE SILVEIRA SANTOS, cpf=null, competencia=02/2016, bruto=11361.21, descontos=2922.25, líquido=8438.96
+ Gemini JSON - Página 2: 17 rubricas extraídas do JSON
+ ════════════════════════════════════════════════════════════════════════════════
+ 📊 CROSS-VALIDATION CONCLUÍDA:
+    Total de campos comparados: 22
+    Campos que coincidem: 22 (100%)
+    Campos que divergem: 0
+    Revisão manual necessária: false
+    Entries consolidadas: 15
+ ════════════════════════════════════════════════════════════════════════════════
+ 📊 Cross-validation página 2: score=1,00, matched=22/22, revisão=false
+ 💾 Progresso intermediário salvo — 85 eventos no processingLog
+ ❌ Response already committed. Ignoring error: null
+ Gemini [gemini-2.5-flash] processou página 7 em 38521ms (3537 chars na resposta)
+ ✅ 2ª extração concluída: 3525 chars de JSON
+ Gemini JSON - Página 7: nome=DISRAELE SILVEIRA SANTOS, cpf=null, competencia=07/2016, bruto=8190.13, descontos=3171.91, líquido=5018.22
+ Gemini JSON - Página 7: 17 rubricas extraídas do JSON
+ Gemini JSON - Página 7: nome=DISRAELE SILVEIRA SANTOS, cpf=null, competencia=07/2016, bruto=8190.13, descontos=3171.91, líquido=5018.22
+ Gemini JSON - Página 7: 17 rubricas extraídas do JSON
+ ════════════════════════════════════════════════════════════════════════════════
+ 📊 CROSS-VALIDATION CONCLUÍDA:
+    Total de campos comparados: 22
+    Campos que coincidem: 22 (100%)
+    Campos que divergem: 0
+    Revisão manual necessária: false
+    Entries consolidadas: 15
+ ════════════════════════════════════════════════════════════════════════════════
+ 📊 Cross-validation página 7: score=1,00, matched=22/22, revisão=false
+ 💾 Progresso intermediário salvo — 86 eventos no processingLog
+ ════════════════════════════════════════════════════════════════════════════════
+ 📊 PASS 1 — CONSOLIDANDO ENTRIES DE TODAS AS PÁGINAS:
+ ════════════════════════════════════════════════════════════════════════════════
+ Página 1 contribuiu com 12 entries
+ Página 2 contribuiu com 13 entries
+ Página 3 contribuiu com 13 entries
+ Página 4 contribuiu com 15 entries
+ Página 5 contribuiu com 14 entries
+ Página 6 contribuiu com 16 entries
+ Página 7 contribuiu com 15 entries
+ Página 8 contribuiu com 14 entries
+ Página 9 contribuiu com 24 entries
+ Página 10 contribuiu com 12 entries
+ Página 11 contribuiu com 15 entries
+ Página 12 contribuiu com 15 entries
+ 📊 Pass 1: 178 entries extraídas. Páginas com 0 entries: []
+ ════════════════════════════════════════════════════════════════════════════════
+ 📊 TOTAL DE ENTRIES EXTRAÍDAS DE TODAS AS PÁGINAS: 178
+ ════════════════════════════════════════════════════════════════════════════════
+ === VALIDAÇÃO DE RUBRICAS ===
+ Total de entries extraídas: 178
+ Códigos de rubricas extraídas: RBASE, 477111, 461904, 443204, MGCONS, 443704, 432704, 433580, 436204, 203304, 218704, 477611, 446004, 446104, 443004, BDEFICIT, 221504, 436404, 317304, 222204, 130604, 445904, 442704, 321504, 211004, 476104, 217304
+ 💾 Progresso intermediário salvo — 87 eventos no processingLog
+ ⚠️ Rubrica RBASE não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica RBASE não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 443204 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 443204 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica MGCONS não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica MGCONS não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 443704 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 443704 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 432704 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 432704 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 433580 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 433580 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 436204 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 436204 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 203304 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 203304 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 218704 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 218704 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 477611 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 477611 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 477111 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 477111 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 461904 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 461904 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 443204 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 443204 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica MGCONS não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica MGCONS não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 443704 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 443704 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 432704 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 432704 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 433580 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 433580 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 446004 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 461904 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 446004 não encontrada ou inativa. Entry ignorada.
+ Rubrica 461904 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 203304 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 477111 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 203304 não encontrada ou inativa. Entry ignorada.
+ Rubrica 477111 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica RBASE não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 477611 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 218704 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica RBASE não encontrada ou inativa. Entry ignorada.
+ Rubrica 477611 não encontrada ou inativa. Entry ignorada.
+ Rubrica 218704 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 461904 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 477111 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 443204 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 461904 não encontrada ou inativa. Entry ignorada.
+ Rubrica 477111 não encontrada ou inativa. Entry ignorada.
+ Rubrica 443204 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica MGCONS não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 432704 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 443704 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 432704 não encontrada ou inativa. Entry ignorada.
+ Rubrica MGCONS não encontrada ou inativa. Entry ignorada.
+ Rubrica 443704 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 433580 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 436204 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 446004 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 436204 não encontrada ou inativa. Entry ignorada.
+ Rubrica 433580 não encontrada ou inativa. Entry ignorada.
+ Rubrica 446004 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 477611 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 218704 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 203304 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 477611 não encontrada ou inativa. Entry ignorada.
+ Rubrica 218704 não encontrada ou inativa. Entry ignorada.
+ Rubrica 203304 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica MGCONS não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica MGCONS não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 461904 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 461904 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica RBASE não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica RBASE não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 446004 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 432704 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 203304 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 446004 não encontrada ou inativa. Entry ignorada.
+ Rubrica 432704 não encontrada ou inativa. Entry ignorada.
+ Rubrica 203304 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 443204 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 443204 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 446104 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 443004 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 446104 não encontrada ou inativa. Entry ignorada.
+ Rubrica 443004 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 443704 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica BDEFICIT não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 433580 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 443704 não encontrada ou inativa. Entry ignorada.
+ Rubrica BDEFICIT não encontrada ou inativa. Entry ignorada.
+ Rubrica 433580 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 477611 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 436204 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 477611 não encontrada ou inativa. Entry ignorada.
+ Rubrica 436204 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 218704 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 218704 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 461904 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica RBASE não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica MGCONS não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 461904 não encontrada ou inativa. Entry ignorada.
+ Rubrica RBASE não encontrada ou inativa. Entry ignorada.
+ Rubrica MGCONS não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 203304 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 432704 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 446004 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 203304 não encontrada ou inativa. Entry ignorada.
+ Rubrica 432704 não encontrada ou inativa. Entry ignorada.
+ Rubrica 446004 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 443204 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica BDEFICIT não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 443004 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 443204 não encontrada ou inativa. Entry ignorada.
+ Rubrica BDEFICIT não encontrada ou inativa. Entry ignorada.
+ Rubrica 443004 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 436204 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 443704 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 433580 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 436204 não encontrada ou inativa. Entry ignorada.
+ Rubrica 443704 não encontrada ou inativa. Entry ignorada.
+ Rubrica 433580 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 443004 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 477611 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 218704 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 443004 não encontrada ou inativa. Entry ignorada.
+ Rubrica 477611 não encontrada ou inativa. Entry ignorada.
+ Rubrica 218704 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 443204 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 461904 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 221504 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 443204 não encontrada ou inativa. Entry ignorada.
+ Rubrica 461904 não encontrada ou inativa. Entry ignorada.
+ Rubrica 221504 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 433580 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 432704 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 443704 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 433580 não encontrada ou inativa. Entry ignorada.
+ Rubrica 432704 não encontrada ou inativa. Entry ignorada.
+ Rubrica 443704 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 203304 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 436204 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 436204 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 446004 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 203304 não encontrada ou inativa. Entry ignorada.
+ Rubrica 436204 não encontrada ou inativa. Entry ignorada.
+ Rubrica 436204 não encontrada ou inativa. Entry ignorada.
+ Rubrica 446004 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 477611 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 446104 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica RBASE não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 477611 não encontrada ou inativa. Entry ignorada.
+ Rubrica 446104 não encontrada ou inativa. Entry ignorada.
+ Rubrica RBASE não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 218704 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 218704 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica MGCONS não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica BDEFICIT não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica MGCONS não encontrada ou inativa. Entry ignorada.
+ Rubrica BDEFICIT não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 461904 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 461904 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica RBASE não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica RBASE não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 446004 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica MGCONS não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 432704 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 203304 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica RBASE não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 432704 não encontrada ou inativa. Entry ignorada.
+ Rubrica 446004 não encontrada ou inativa. Entry ignorada.
+ Rubrica RBASE não encontrada ou inativa. Entry ignorada.
+ Rubrica MGCONS não encontrada ou inativa. Entry ignorada.
+ Rubrica 203304 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 443004 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 446104 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 443204 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica BDEFICIT não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 443704 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 443004 não encontrada ou inativa. Entry ignorada.
+ Rubrica 446104 não encontrada ou inativa. Entry ignorada.
+ Rubrica 443204 não encontrada ou inativa. Entry ignorada.
+ Rubrica 443704 não encontrada ou inativa. Entry ignorada.
+ Rubrica BDEFICIT não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 477611 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 218704 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 436204 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica RBASE não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 433580 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 218704 não encontrada ou inativa. Entry ignorada.
+ Rubrica 477611 não encontrada ou inativa. Entry ignorada.
+ Rubrica 436204 não encontrada ou inativa. Entry ignorada.
+ Rubrica RBASE não encontrada ou inativa. Entry ignorada.
+ Rubrica 433580 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 461904 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 203304 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 432704 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica MGCONS não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 446004 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 203304 não encontrada ou inativa. Entry ignorada.
+ Rubrica 461904 não encontrada ou inativa. Entry ignorada.
+ Rubrica 446004 não encontrada ou inativa. Entry ignorada.
+ Rubrica 432704 não encontrada ou inativa. Entry ignorada.
+ Rubrica MGCONS não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 443204 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica BDEFICIT não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 443204 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 433580 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica BDEFICIT não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 443004 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 443704 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 433580 não encontrada ou inativa. Entry ignorada.
+ Rubrica 443004 não encontrada ou inativa. Entry ignorada.
+ Rubrica 443704 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 477611 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 218704 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 436204 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 461904 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica RBASE não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 477611 não encontrada ou inativa. Entry ignorada.
+ Rubrica 436204 não encontrada ou inativa. Entry ignorada.
+ Rubrica 218704 não encontrada ou inativa. Entry ignorada.
+ Rubrica RBASE não encontrada ou inativa. Entry ignorada.
+ Rubrica 461904 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica MGCONS não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 203304 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica MGCONS não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 432704 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 446004 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 436404 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 432704 não encontrada ou inativa. Entry ignorada.
+ Rubrica 203304 não encontrada ou inativa. Entry ignorada.
+ Rubrica 446004 não encontrada ou inativa. Entry ignorada.
+ Rubrica 436404 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 317304 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 222204 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 130604 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 443004 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 446104 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 317304 não encontrada ou inativa. Entry ignorada.
+ Rubrica 222204 não encontrada ou inativa. Entry ignorada.
+ Rubrica 443004 não encontrada ou inativa. Entry ignorada.
+ Rubrica 130604 não encontrada ou inativa. Entry ignorada.
+ Rubrica 446104 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica BDEFICIT não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 442704 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 445904 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 443204 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica BDEFICIT não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 443704 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 442704 não encontrada ou inativa. Entry ignorada.
+ Rubrica 445904 não encontrada ou inativa. Entry ignorada.
+ Rubrica 443704 não encontrada ou inativa. Entry ignorada.
+ Rubrica 443204 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 321504 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 211004 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 436204 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 218704 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 433580 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 436204 não encontrada ou inativa. Entry ignorada.
+ Rubrica 218704 não encontrada ou inativa. Entry ignorada.
+ Rubrica 321504 não encontrada ou inativa. Entry ignorada.
+ Rubrica 211004 não encontrada ou inativa. Entry ignorada.
+ Rubrica 433580 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 443204 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 476104 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 443204 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 477611 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 461904 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 443004 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 461904 não encontrada ou inativa. Entry ignorada.
+ Rubrica 476104 não encontrada ou inativa. Entry ignorada.
+ Rubrica 477611 não encontrada ou inativa. Entry ignorada.
+ Rubrica 443004 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 443704 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 446004 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 433580 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 432704 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 436204 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 433580 não encontrada ou inativa. Entry ignorada.
+ Rubrica 443704 não encontrada ou inativa. Entry ignorada.
+ Rubrica 432704 não encontrada ou inativa. Entry ignorada.
+ Rubrica 446004 não encontrada ou inativa. Entry ignorada.
+ Rubrica 436204 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 446104 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 477611 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica RBASE não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 446104 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 218704 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 477611 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 203304 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica RBASE não encontrada ou inativa. Entry ignorada.
+ Rubrica 218704 não encontrada ou inativa. Entry ignorada.
+ Rubrica 203304 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 436404 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 461904 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 217304 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 477111 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica MGCONS não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 436404 não encontrada ou inativa. Entry ignorada.
+ Rubrica 461904 não encontrada ou inativa. Entry ignorada.
+ Rubrica 217304 não encontrada ou inativa. Entry ignorada.
+ Rubrica 477111 não encontrada ou inativa. Entry ignorada.
+ Rubrica MGCONS não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 203304 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 432704 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 203304 não encontrada ou inativa. Entry ignorada.
+ Rubrica 432704 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 433580 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 433580 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 443204 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 443204 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 443704 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 443704 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 436204 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 436204 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 477611 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 477611 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 476104 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 476104 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 218704 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 218704 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica RBASE não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica RBASE não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 432704 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 446004 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 203304 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 461904 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica MGCONS não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 446004 não encontrada ou inativa. Entry ignorada.
+ Rubrica 461904 não encontrada ou inativa. Entry ignorada.
+ Rubrica 432704 não encontrada ou inativa. Entry ignorada.
+ Rubrica 203304 não encontrada ou inativa. Entry ignorada.
+ Rubrica MGCONS não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 446104 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica BDEFICIT não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 443204 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 443004 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 443704 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 443204 não encontrada ou inativa. Entry ignorada.
+ Rubrica 446104 não encontrada ou inativa. Entry ignorada.
+ Rubrica 443704 não encontrada ou inativa. Entry ignorada.
+ Rubrica BDEFICIT não encontrada ou inativa. Entry ignorada.
+ Rubrica 443004 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 477611 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 433580 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 477611 não encontrada ou inativa. Entry ignorada.
+ ⚠️ Rubrica 218704 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ ⚠️ Rubrica 436204 não encontrada no banco. Cadastre via POST /api/v1/rubricas.
+ Rubrica 218704 não encontrada ou inativa. Entry ignorada.
+ Rubrica 433580 não encontrada ou inativa. Entry ignorada.
+ Rubrica 436204 não encontrada ou inativa. Entry ignorada.
+ === RESULTADO DA VALIDAÇÃO ===
+ Entries extraídas: 178
+ Entries válidas (rubrica encontrada no banco): 0
+ Entries ignoradas (rubrica não encontrada): 178
+ ⚠️ Nenhuma entry válida após validação de rubricas. Verifique se as rubricas estão cadastradas na API 1 (Rubricas).
+ Processamento concluído. Total de entries: 0
+ Processamento concluído com sucesso. Entries: 0
+ ❌ Response already committed. Ignoring error: null
+ ❌ Response already committed. Ignoring error: null
+ ❌ Response already committed. Ignoring error: null
+ ❌ Response already committed. Ignoring error: null
+ ❌ Response already committed. Ignoring error: null
+ ❌ Response already committed. Ignoring error: null
+ ❌ Response already committed. Ignoring error: null
+ ❌ Response already committed. Ignoring error: null
+ ❌ Response already committed. Ignoring error: null
+ ❌ Response already committed. Ignoring error: null
+ ❌ Response already committed. Ignoring error: null
+ ❌ Response already committed. Ignoring error: null
+ ❌ Response already committed. Ignoring error: null
+ ❌ Response already committed. Ignoring error: null
+ ❌ Response already committed. Ignoring error: null
+ ❌ Response already committed. Ignoring error: null
+ ❌ Response already committed. Ignoring error: null
+ ❌ Response already committed. Ignoring error: null
+ ❌ Response already committed. Ignoring error: null
+ ❌ Response already committed. Ignoring error: null
+ ❌ Response already committed. Ignoring error: null
+ ❌ Response already committed. Ignoring error: null
+ === DocumentQueryUseCase.findByPersonId() INICIADO ===
+ PersonId: 6a1bae890c74d37e68ee0676
+ ✓ Pessoa encontrada: DISRAELE SILVEIRA SANTOS (05738717600)
+ ✓ 1 documentos encontrados para personId: 6a1bae890c74d37e68ee0676 (SUPER_ADMIN)
+ === DocumentQueryUseCase.findByPersonId() INICIADO ===
+ PersonId: 6a1bae890c74d37e68ee0676
+ ✓ Pessoa encontrada: DISRAELE SILVEIRA SANTOS (05738717600)
+ ✓ 1 documentos encontrados para personId: 6a1bae890c74d37e68ee0676 (SUPER_ADMIN)
+ ❌ Response already committed. Ignoring error: null

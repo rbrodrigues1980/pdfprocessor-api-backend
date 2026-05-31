@@ -34,7 +34,7 @@ public class BulkDocumentUploadUseCase {
      * @param files Lista de arquivos PDF
      * @param cpf CPF da pessoa (obrigatório)
      * @param nome Nome da pessoa (obrigatório)
-     * @param matricula Matrícula da pessoa (obrigatório)
+     * @param matricula Matrícula da pessoa (opcional)
      * @return Resposta com resultado de cada upload
      */
     public Mono<BulkUploadResponse> uploadBulk(
@@ -65,11 +65,6 @@ public class BulkDocumentUploadUseCase {
         if (nome == null || nome.trim().isEmpty()) {
             log.error("Nome não informado");
             return Mono.error(new IllegalArgumentException("Nome é obrigatório"));
-        }
-
-        if (matricula == null || matricula.trim().isEmpty()) {
-            log.error("Matrícula não informada");
-            return Mono.error(new IllegalArgumentException("Matrícula é obrigatória"));
         }
 
         if (files == null || files.isEmpty()) {
