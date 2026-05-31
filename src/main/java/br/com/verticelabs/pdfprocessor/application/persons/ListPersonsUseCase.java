@@ -12,7 +12,12 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
+import br.com.verticelabs.pdfprocessor.domain.model.PayrollDocument;
+
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -46,15 +51,16 @@ public class ListPersonsUseCase {
         Mono<List<Person>> personsMono = mongoTemplate.find(findQuery, Person.class).collectList();
         
         return Mono.zip(personsMono, countMono)
-                .map(tuple -> {
+                .flatMap(tuple -> {
                     List<Person> persons = tuple.getT1();
                     Long total = tuple.getT2();
                     int totalPages = (int) Math.ceil((double) total / size);
-                    
-                    return new ListPersonsResult(persons, total, totalPages, page, size);
+
+                    return reconcileDocumentos(persons, null)
+                            .map(reconciled -> new ListPersonsResult(reconciled, total, totalPages, page, size));
                 });
     }
-    
+
     private Mono<ListPersonsResult> listPersonsByTenant(String tenantId, String nomeFilter, String cpfFilter, String matriculaFilter, int page, int size) {
         Query countQuery = buildQuery(tenantId, nomeFilter, cpfFilter, matriculaFilter);
         Query findQuery = buildQuery(tenantId, nomeFilter, cpfFilter, matriculaFilter);
@@ -66,15 +72,64 @@ public class ListPersonsUseCase {
         Mono<List<Person>> personsMono = mongoTemplate.find(findQuery, Person.class).collectList();
         
         return Mono.zip(personsMono, countMono)
-                .map(tuple -> {
+                .flatMap(tuple -> {
                     List<Person> persons = tuple.getT1();
                     Long total = tuple.getT2();
                     int totalPages = (int) Math.ceil((double) total / size);
-                    
-                    return new ListPersonsResult(persons, total, totalPages, page, size);
+
+                    return reconcileDocumentos(persons, tenantId)
+                            .map(reconciled -> new ListPersonsResult(reconciled, total, totalPages, page, size));
                 });
     }
-    
+
+    /**
+     * Reconcilia a lista de IDs de documentos de cada pessoa com a coleção real
+     * de payroll_documents.
+     *
+     * Motivo: o array Person.documentos é denormalizado e atualizado no upload via
+     * read-modify-write não atômico. Em uploads concorrentes (bulk), o "last write
+     * wins" pode perder IDs, deixando a contagem defasada (ex.: mostrar 9 quando há
+     * 10 documentos). Aqui recalculamos a partir da fonte de verdade (a coleção de
+     * documentos), corrigindo a exibição e auto-curando dados antigos.
+     *
+     * @param tenantId quando não-nulo, restringe a busca ao tenant; null para SUPER_ADMIN.
+     */
+    private Mono<List<Person>> reconcileDocumentos(List<Person> persons, String tenantId) {
+        if (persons.isEmpty()) {
+            return Mono.just(persons);
+        }
+
+        List<String> cpfs = persons.stream()
+                .map(Person::getCpf)
+                .filter(c -> c != null && !c.isEmpty())
+                .distinct()
+                .collect(Collectors.toList());
+
+        if (cpfs.isEmpty()) {
+            return Mono.just(persons);
+        }
+
+        Query docQuery = new Query(Criteria.where("cpf").in(cpfs));
+        if (tenantId != null) {
+            docQuery.addCriteria(Criteria.where("tenantId").is(tenantId));
+        }
+
+        return mongoTemplate.find(docQuery, PayrollDocument.class)
+                .collectList()
+                .map(docs -> {
+                    Map<String, List<String>> docIdsByCpf = docs.stream()
+                            .collect(Collectors.groupingBy(
+                                    PayrollDocument::getCpf,
+                                    Collectors.mapping(PayrollDocument::getId, Collectors.toList())));
+
+                    for (Person person : persons) {
+                        List<String> realIds = docIdsByCpf.getOrDefault(person.getCpf(), new ArrayList<>());
+                        person.setDocumentos(new ArrayList<>(realIds));
+                    }
+                    return persons;
+                });
+    }
+
     private Query buildQuery(String tenantId, String nomeFilter, String cpfFilter, String matriculaFilter) {
         Query query = new Query();
         

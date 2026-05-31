@@ -927,6 +927,8 @@ public class DocumentProcessUseCase {
             return DocumentType.CAIXA;
         } else if ("FUNCEF".equals(origem)) {
             return DocumentType.FUNCEF;
+        } else if ("FUNCEF_DEMONSTRATIVO".equals(origem)) {
+            return DocumentType.FUNCEF_DEMONSTRATIVO;
         } else {
             return document.getTipo();
         }
