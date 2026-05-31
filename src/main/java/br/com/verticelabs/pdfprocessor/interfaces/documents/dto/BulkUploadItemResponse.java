@@ -14,5 +14,7 @@ public class BulkUploadItemResponse {
     private DocumentType tipoDetectado;
     private Boolean sucesso;
     private String erro; // Mensagem de erro se falhou
+    /** Código estruturado (ex.: DOCUMENTO_DUPLICADO) */
+    private String codigoErro;
 }
 

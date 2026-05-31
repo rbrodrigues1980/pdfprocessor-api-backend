@@ -53,8 +53,10 @@ public class DocumentTypeDetectionServiceImpl implements DocumentTypeDetectionSe
         
         // 2. Logo/Nome da FUNCEF
         boolean hasFuncefLogo = upperText.contains("FUNCEF") &&
-                               (upperText.contains("FUNDAÇÃO DOS ECONOMIÁRIOS FEDERais") ||
-                                upperText.contains("FUNDACAO DOS ECONOMIARIOS FEDERais"));
+                               (upperText.contains("FUNDAÇÃO DOS ECONOMIÁRIOS FEDERAIS") ||
+                                upperText.contains("FUNDACAO DOS ECONOMIARIOS FEDERAIS") ||
+                                upperText.contains("ECONOMIÁRIOS FEDERAIS") ||
+                                upperText.contains("ECONOMIARIOS FEDERAIS"));
         
         // 3. Campo "Ano Pagamento / Mês" (específico da FUNCEF)
         boolean hasFuncefDateField = upperText.contains("ANO PAGAMENTO / MÊS") ||

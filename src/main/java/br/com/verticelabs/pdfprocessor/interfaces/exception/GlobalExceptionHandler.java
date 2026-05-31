@@ -67,9 +67,30 @@ public class GlobalExceptionHandler {
         return Mono.just(createErrorResponse(HttpStatus.UNAUTHORIZED, ex.getMessage(), request));
     }
 
+    @ExceptionHandler(DocumentoDuplicadoException.class)
+    public Mono<ResponseEntity<ApiErrorResponse>> handleDocumentoDuplicado(DocumentoDuplicadoException ex,
+            ServerHttpRequest request,
+            ServerHttpResponse response) {
+        if (response.isCommitted()) {
+            return Mono.empty();
+        }
+        Map<String, Object> details = new HashMap<>();
+        details.put("existingDocumentId", ex.getExistingDocumentId());
+        details.put("code", "DOCUMENTO_DUPLICADO");
+
+        return Mono.just(ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiErrorResponse.builder()
+                        .timestamp(LocalDateTime.now())
+                        .status(HttpStatus.CONFLICT.value())
+                        .error(HttpStatus.CONFLICT.getReasonPhrase())
+                        .message(ex.getMessage())
+                        .path(request.getPath().value())
+                        .details(details)
+                        .build()));
+    }
+
     @ExceptionHandler({
             PersonDuplicadaException.class,
-            DocumentoDuplicadoException.class,
             RubricaDuplicadaException.class,
             InvalidStatusTransitionException.class
     })

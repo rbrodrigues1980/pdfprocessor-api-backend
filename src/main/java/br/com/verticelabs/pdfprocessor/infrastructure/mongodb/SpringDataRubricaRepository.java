@@ -8,25 +8,11 @@ import reactor.core.publisher.Mono;
 
 @Repository
 public interface SpringDataRubricaRepository extends ReactiveMongoRepository<Rubrica, String> {
-    Mono<Rubrica> findByCodigoAndTenantId(String codigo, String tenantId);
-    
-    Flux<Rubrica> findAllByTenantId(String tenantId);
-    
-    Flux<Rubrica> findAllByTenantIdAndAtivoTrue(String tenantId);
-    
-    Mono<Long> countByTenantIdAndAtivoTrue(String tenantId);
-    
-    Mono<Long> countByAtivoTrue();
-    
-    Mono<Boolean> existsByCodigoAndTenantId(String codigo, String tenantId);
-    
-    // Métodos legados
-    @Deprecated
     Mono<Rubrica> findByCodigo(String codigo);
 
-    @Deprecated
     Flux<Rubrica> findAllByAtivoTrue();
 
-    @Deprecated
+    Mono<Long> countByAtivoTrue();
+
     Mono<Boolean> existsByCodigo(String codigo);
 }

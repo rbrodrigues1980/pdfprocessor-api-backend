@@ -53,7 +53,7 @@ public class EntryMapper {
         String codigoNormalizado = entry.getRubricaCodigo().trim().replaceAll("\\s+", "");
         
         // Buscar rubrica (pode não existir para entries de IRPF)
-        return rubricaRepository.findByCodigo(codigoNormalizado, tenantId != null ? tenantId : "GLOBAL")
+        return rubricaRepository.findByCodigo(codigoNormalizado)
                 .map(rubrica -> {
                     return EntryResponse.builder()
                             .id(entry.getId())

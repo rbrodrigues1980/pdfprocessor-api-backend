@@ -16,20 +16,14 @@ import org.springframework.data.mongodb.core.mapping.Document;
 public class Rubrica {
     @Id
     private String id;
-    
-    private String tenantId; // "GLOBAL" para rubricas globais ou tenantId específico para customizadas
-    
-    @Indexed
-    private String codigo; // Código da rubrica (único por tenant ou global)
-    
-    private String descricao; // Nome da rubrica exatamente como aparecerá no PDF
-    
-    private String categoria; // Classificação opcional (ex.: Administrativa, Extraordinária)
-    
+
+    @Indexed(unique = true)
+    private String codigo;
+
+    private String descricao;
+
+    private String categoria;
+
     @Builder.Default
-    private Boolean ativo = true; // Indica se a rubrica está ativa no sistema
-    
-    public boolean isGlobal() {
-        return "GLOBAL".equals(tenantId);
-    }
+    private Boolean ativo = true;
 }

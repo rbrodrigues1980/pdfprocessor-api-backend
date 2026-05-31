@@ -1,4 +1,50 @@
-version: '3.8'
+# ============================================
+# COMANDOS ÚTEIS
+# ============================================
+#
+# --- Subir a infra (apenas API, usando MongoDB Atlas) ---
+# docker compose up -d
+#
+# --- Subir a infra COM MongoDB local ---
+# docker compose --profile with-mongodb up -d
+#
+# --- Build/rebuild da imagem da API ---
+# docker compose build
+# docker compose build --no-cache        (forçar rebuild completo)
+#
+# --- Ver logs em tempo real ---
+# docker compose logs -f
+# docker compose logs -f api             (só da API)
+#
+# --- Parar tudo (mantém volumes/dados) ---
+# docker compose down
+#
+# --- Parar e remover volumes (APAGA dados do MongoDB local) ---
+# docker compose down -v
+#
+# --- Reiniciar um serviço ---
+# docker compose restart api
+#
+# --- Reiniciar tudo ---
+# docker compose restart
+#
+# --- Ver status dos containers ---
+# docker compose ps
+#
+# --- Remover imagens do projeto ---
+# docker compose down --rmi local        (remove só imagens buildadas localmente)
+# docker compose down --rmi all          (remove todas as imagens usadas)
+#
+# --- Limpar tudo (containers + volumes + imagens) ---
+# docker compose down -v --rmi all
+#
+# --- Limpeza geral do Docker (imagens/containers/volumes sem uso) ---
+# docker system prune -af
+# docker volume prune -f
+#
+# ============================================
+
+name: infra-pdfprocessor
 
 services:
   # ============================================
@@ -15,8 +61,8 @@ services:
       # Spring Profiles
       - SPRING_PROFILES_ACTIVE=docker
 
-      # MongoDB Atlas (substitua pela sua URI)
-      - SPRING_DATA_MONGODB_URI=${MONGODB_URI:-mongodb://localhost:27017/pdfprocessor-hml}
+      # MongoDB Local (container pdfprocessor-mongodb)
+      - SPRING_DATA_MONGODB_URI=mongodb://admin:admin123@pdfprocessor-mongodb:27017/pdfprocessor?authSource=admin
 
       # JWT Configuration
       - JWT_SECRET=${JWT_SECRET:-your-super-secret-key-change-in-production}
@@ -34,6 +80,8 @@ services:
       - ./logs:/app/logs
       # Volume para arquivos temporários (opcional)
       - ./temp:/app/temp
+    depends_on:
+      - mongodb
     networks:
       - pdfprocessor-network
     restart: unless-stopped
@@ -62,8 +110,6 @@ services:
     networks:
       - pdfprocessor-network
     restart: unless-stopped
-    profiles:
-      - with-mongodb
 
 networks:
   pdfprocessor-network:

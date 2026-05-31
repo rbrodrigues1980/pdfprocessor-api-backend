@@ -62,8 +62,28 @@ public class RubricaController {
     }
 
     @DeleteMapping("/{codigo}")
+    public Mono<ResponseEntity<Object>> excluir(@PathVariable String codigo) {
+        return rubricaUseCase.excluir(codigo)
+                .then(Mono.just(ResponseEntity.noContent().<Object>build()))
+                .onErrorResume(RubricaNotFoundException.class, e ->
+                        Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND)
+                                .body((Object) new ErrorResponse(HttpStatus.NOT_FOUND.value(), e.getMessage())))
+                );
+    }
+
+    @PatchMapping("/{codigo}/deactivate")
     public Mono<ResponseEntity<Object>> desativar(@PathVariable String codigo) {
         return rubricaUseCase.desativar(codigo)
+                .then(Mono.just(ResponseEntity.ok().<Object>build()))
+                .onErrorResume(RubricaNotFoundException.class, e ->
+                        Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND)
+                                .body((Object) new ErrorResponse(HttpStatus.NOT_FOUND.value(), e.getMessage())))
+                );
+    }
+
+    @PatchMapping("/{codigo}/activate")
+    public Mono<ResponseEntity<Object>> ativar(@PathVariable String codigo) {
+        return rubricaUseCase.ativar(codigo)
                 .then(Mono.just(ResponseEntity.ok().<Object>build()))
                 .onErrorResume(RubricaNotFoundException.class, e ->
                         Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND)

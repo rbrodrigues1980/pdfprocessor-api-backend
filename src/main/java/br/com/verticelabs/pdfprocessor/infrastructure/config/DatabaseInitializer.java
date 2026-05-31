@@ -40,21 +40,28 @@ public class DatabaseInitializer implements CommandLineRunner {
     private void initializeRubricasCollection() {
         String collectionName = "rubricas";
         log.info("Criando índices para collection '{}'...", collectionName);
-        
+
         ReactiveIndexOperations indexOps = mongoTemplate.indexOps(collectionName);
-        Index codigoIndex = new Index().on("codigo", org.springframework.data.domain.Sort.Direction.ASC).unique();
-        
-        indexOps.ensureIndex(codigoIndex)
-                .doOnSuccess(indexName -> log.info("Collection '{}' inicializada. Índice único 'codigo' criado: {}", 
-                        collectionName, indexName))
-                .doOnError(error -> {
-                    if (error.getMessage() != null && error.getMessage().contains("duplicate")) {
-                        log.info("Índice 'codigo' já existe na collection '{}'", collectionName);
-                    } else {
-                        log.warn("Aviso ao criar índice na collection '{}': {}", collectionName, error.getMessage());
-                    }
+
+        // Remover índice composto legado (codigo, tenantId) se existir — rubricas agora são globais
+        indexOps.getIndexInfo()
+                .filter(index -> index.getName().equals("codigo_tenantId_unique"))
+                .next()
+                .flatMap(oldIndex -> {
+                    log.info("Removendo índice legado 'codigo_tenantId_unique' da collection '{}'...", collectionName);
+                    return indexOps.dropIndex("codigo_tenantId_unique")
+                            .doOnSuccess(v -> log.info("Índice legado 'codigo_tenantId_unique' removido."))
+                            .onErrorResume(e -> Mono.empty());
                 })
-                .onErrorResume(error -> Mono.empty())
+                .then(Mono.defer(() -> {
+                    Index codigoIndex = new Index()
+                            .on("codigo", org.springframework.data.domain.Sort.Direction.ASC)
+                            .unique();
+                    return indexOps.ensureIndex(codigoIndex)
+                            .doOnSuccess(name -> log.info("Collection '{}' inicializada. Índice único 'codigo' criado.", collectionName))
+                            .doOnError(error -> log.warn("Aviso ao criar índice na collection '{}': {}", collectionName, error.getMessage()))
+                            .onErrorResume(error -> Mono.empty());
+                }))
                 .subscribe();
     }
 
