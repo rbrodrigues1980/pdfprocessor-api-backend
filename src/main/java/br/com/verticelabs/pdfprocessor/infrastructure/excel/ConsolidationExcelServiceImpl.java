@@ -1245,6 +1245,7 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
         row = addSimDetalhe(sheet, row, "Imposto devido", data.getImpostoDevido(), subLabelStyle, valueStyle);
         row = addSimDetalhe(sheet, row, "Dedução de incentivo", data.getDeducaoIncentivo(), subLabelStyle, valueStyle);
         row = addSimDetalhe(sheet, row, "Imposto devido I", data.getImpostoDevidoI(), subLabelStyle, valueStyle);
+        row = addSimInssDomesticoEspelhoSePresente(sheet, row, data, subLabelStyle, valueStyle);
         if (deveExibirImpostoDevidoIIEspelho(data)) {
             row = addSimDetalhe(sheet, row, "Imposto devido II", data.getImpostoDevidoII(), subLabelStyle, valueStyle);
         }
@@ -1878,6 +1879,37 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
         return impostoI == null || data.getImpostoDevidoII().compareTo(impostoI) != 0;
     }
 
+    /** Entre Imposto devido I e II no espelho da declaração (bloco 1 e seção 8). */
+    private int addSimInssDomesticoEspelhoSePresente(Sheet sheet, int row, IrpfDeclaracaoData data,
+            CellStyle subLabelStyle, CellStyle valueStyle) {
+        BigDecimal inss = resolverInssDomesticoEspelho(data);
+        if (inss.compareTo(BigDecimal.ZERO) > 0) {
+            row = addSimDetalhe(sheet, row, "Contribuição Prev. Empregador Doméstico",
+                    inss, subLabelStyle, valueStyle);
+        }
+        return row;
+    }
+
+    /** Valor do RESUMO ou diferença Imposto devido I − II quando o crédito INSS doméstico existe. */
+    private BigDecimal resolverInssDomesticoEspelho(IrpfDeclaracaoData data) {
+        if (data == null) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal inss = nvl(data.getContribuicaoPatronalPrevidenciaSocial());
+        if (inss.compareTo(BigDecimal.ZERO) > 0) {
+            return inss;
+        }
+        if (!deveExibirImpostoDevidoIIEspelho(data)) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal impostoI = data.getImpostoDevidoI() != null ? data.getImpostoDevidoI() : data.getImpostoDevido();
+        BigDecimal impostoII = data.getImpostoDevidoII();
+        if (impostoI != null && impostoII != null && impostoI.compareTo(impostoII) > 0) {
+            return impostoI.subtract(impostoII);
+        }
+        return BigDecimal.ZERO;
+    }
+
     /** Seção DEDUÇÕES com rótulos do RESUMO IRPF (espelho entregue ou simulação planilha). */
     private int addSimSecaoDeducoesResumo(
             Sheet sheet, int row, ExcelIrpfDeducoesResumoDTO deducoes,
@@ -2478,6 +2510,7 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
         row = addSimDetalhe(sheet, row, "Imposto devido", data.getImpostoDevido(), subLabelStyle, valueStyle);
         row = addSimDetalhe(sheet, row, "Dedução de incentivo", data.getDeducaoIncentivo(), subLabelStyle, valueStyle);
         row = addSimDetalhe(sheet, row, "Imposto devido I", data.getImpostoDevidoI(), subLabelStyle, valueStyle);
+        row = addSimInssDomesticoEspelhoSePresente(sheet, row, data, subLabelStyle, valueStyle);
         if (data.getImpostoDevidoII() != null) {
             row = addSimDetalhe(sheet, row, "Imposto devido II", data.getImpostoDevidoII(), subLabelStyle, valueStyle);
         }
