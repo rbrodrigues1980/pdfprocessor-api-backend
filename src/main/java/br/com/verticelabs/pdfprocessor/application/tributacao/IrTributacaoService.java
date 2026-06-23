@@ -10,7 +10,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.List;
 
 /**
@@ -22,6 +21,7 @@ import java.util.List;
 public class IrTributacaoService {
 
     private final IrTributacaoRepository repository;
+    private final IrCalculoProgressivoService calculoProgressivoService;
 
     // ========== Consultas ==========
 
@@ -78,6 +78,13 @@ public class IrTributacaoService {
                 .then(repository.deleteParametros(ano, tipoIncidencia));
     }
 
+    /**
+     * Remove apenas as faixas de um ano e tipo (preserva parâmetros).
+     */
+    public Mono<Void> deleteFaixasOnly(Integer ano, String tipoIncidencia) {
+        return repository.deleteFaixas(ano, tipoIncidencia);
+    }
+
     // ========== Cálculo de Imposto ==========
 
     /**
@@ -97,59 +104,13 @@ public class IrTributacaoService {
 
         return buscarFaixas(ano, tipoIncidencia)
                 .collectList()
-                .map(faixas -> calcularImpostoProgressivo(baseCalculo, faixas))
+                .flatMap(faixas -> buscarParametros(ano, tipoIncidencia)
+                        .defaultIfEmpty(new IrParametrosAnuais())
+                        .map(params -> {
+                            var resultado = calculoProgressivoService.calcular(
+                                    faixas, baseCalculo, BigDecimal.ZERO, BigDecimal.ZERO, params);
+                            return resultado.getImpostoDevido();
+                        }))
                 .doOnSuccess(imposto -> log.debug("Imposto calculado: {}", imposto));
-    }
-
-    /**
-     * Calcula o imposto usando a tabela progressiva.
-     * Fórmula: Imposto = (Base × Alíquota) - Dedução
-     */
-    private BigDecimal calcularImpostoProgressivo(BigDecimal baseCalculo, List<IrTabelaTributacao> faixas) {
-        if (faixas == null || faixas.isEmpty()) {
-            log.warn("Nenhuma faixa de tributação encontrada, retornando zero");
-            return BigDecimal.ZERO;
-        }
-
-        // Encontrar a faixa correta
-        for (IrTabelaTributacao faixa : faixas) {
-            BigDecimal limiteInferior = faixa.getLimiteInferior();
-            BigDecimal limiteSuperior = faixa.getLimiteSuperior();
-
-            // Verificar se a base está nesta faixa
-            boolean acimaDeLimiteInferior = baseCalculo.compareTo(limiteInferior) >= 0;
-            boolean abaixoDeLimiteSuperior = limiteSuperior == null ||
-                    baseCalculo.compareTo(limiteSuperior) <= 0;
-
-            if (acimaDeLimiteInferior && abaixoDeLimiteSuperior) {
-                BigDecimal aliquota = faixa.getAliquota();
-                BigDecimal deducao = faixa.getDeducao();
-
-                if (aliquota == null || aliquota.compareTo(BigDecimal.ZERO) == 0) {
-                    // Faixa isenta
-                    return BigDecimal.ZERO;
-                }
-
-                // Imposto = (Base × Alíquota) - Dedução
-                BigDecimal imposto = baseCalculo.multiply(aliquota)
-                        .subtract(deducao != null ? deducao : BigDecimal.ZERO)
-                        .setScale(2, RoundingMode.HALF_UP);
-
-                log.debug("Faixa {}: aliquota={}, deducao={}, imposto={}",
-                        faixa.getFaixa(), aliquota, deducao, imposto);
-
-                return imposto.max(BigDecimal.ZERO); // Imposto nunca é negativo
-            }
-        }
-
-        // Se não encontrou faixa, usa a última (maior alíquota)
-        IrTabelaTributacao ultimaFaixa = faixas.get(faixas.size() - 1);
-        BigDecimal aliquota = ultimaFaixa.getAliquota();
-        BigDecimal deducao = ultimaFaixa.getDeducao();
-
-        return baseCalculo.multiply(aliquota != null ? aliquota : BigDecimal.ZERO)
-                .subtract(deducao != null ? deducao : BigDecimal.ZERO)
-                .setScale(2, RoundingMode.HALF_UP)
-                .max(BigDecimal.ZERO);
     }
 }

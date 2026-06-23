@@ -217,6 +217,19 @@ public class DocumentController {
         }
 
         /**
+         * GET /api/v1/documents/{id}/irpf-data
+         * Retorna os dados de IRPF armazenados em um documento.
+         */
+        @GetMapping("/{id}/irpf-data")
+        public Mono<ResponseEntity<Object>> getIrpfData(@PathVariable String id) {
+                log.debug("=== INÍCIO: GET /api/v1/documents/{}/irpf-data ===", id);
+                return documentQueryUseCase.findIrpfDataById(id)
+                                .<ResponseEntity<Object>>map(data -> ResponseEntity.ok((Object) data))
+                                .onErrorResume(IllegalStateException.class, e ->
+                                        Mono.just(ResponseEntity.notFound().build()));
+        }
+
+        /**
          * GET /api/v1/documents/{id}/summary
          * Retorna resumo das rubricas e estatísticas do documento.
          */

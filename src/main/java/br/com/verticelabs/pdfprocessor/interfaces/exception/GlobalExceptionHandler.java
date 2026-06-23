@@ -26,12 +26,15 @@ public class GlobalExceptionHandler {
             TenantNotFoundException.class,
             UserNotFoundException.class,
             RubricaNotFoundException.class,
-            NoEntriesFoundException.class
+            EmpresaNotFoundException.class,
+            NoEntriesFoundException.class,
+            RepasseNotFoundException.class
     })
     public Mono<ResponseEntity<ApiErrorResponse>> handleNotFoundException(RuntimeException ex,
             ServerHttpRequest request,
             ServerHttpResponse response) {
         if (response.isCommitted()) {
+            logCommittedResponseError(ex, request);
             return Mono.empty();
         }
         return Mono.just(createErrorResponse(HttpStatus.NOT_FOUND, ex.getMessage(), request));
@@ -43,12 +46,14 @@ public class GlobalExceptionHandler {
             InvalidYearException.class,
             InvalidOriginException.class,
             ExcelGenerationException.class,
+            PersonEmpresaVinculoInvalidoException.class,
             IllegalArgumentException.class
     })
     public Mono<ResponseEntity<ApiErrorResponse>> handleBadRequestException(RuntimeException ex,
             ServerHttpRequest request,
             ServerHttpResponse response) {
         if (response.isCommitted()) {
+            logCommittedResponseError(ex, request);
             return Mono.empty();
         }
         return Mono.just(createErrorResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), request));
@@ -62,9 +67,34 @@ public class GlobalExceptionHandler {
     public Mono<ResponseEntity<ApiErrorResponse>> handleUnauthorizedException(RuntimeException ex,
             ServerHttpRequest request, ServerHttpResponse response) {
         if (response.isCommitted()) {
+            logCommittedResponseError(ex, request);
             return Mono.empty();
         }
         return Mono.just(createErrorResponse(HttpStatus.UNAUTHORIZED, ex.getMessage(), request));
+    }
+
+    @ExceptionHandler(DeclaracaoCpfMismatchException.class)
+    public Mono<ResponseEntity<ApiErrorResponse>> handleDeclaracaoCpfMismatch(DeclaracaoCpfMismatchException ex,
+            ServerHttpRequest request,
+            ServerHttpResponse response) {
+        if (response.isCommitted()) {
+            logCommittedResponseError(ex, request);
+            return Mono.empty();
+        }
+        Map<String, Object> details = new HashMap<>();
+        details.put("cpfCadastrado", ex.getCpfPessoa());
+        details.put("cpfDeclaracao", ex.getCpfDeclaracao());
+        details.put("code", "CPF_MISMATCH");
+
+        return Mono.just(ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
+                .body(ApiErrorResponse.builder()
+                        .timestamp(LocalDateTime.now())
+                        .status(HttpStatus.UNPROCESSABLE_ENTITY.value())
+                        .error("CPF Divergente")
+                        .message(ex.getMessage())
+                        .path(request.getPath().value())
+                        .details(details)
+                        .build()));
     }
 
     @ExceptionHandler(DocumentoDuplicadoException.class)
@@ -72,6 +102,7 @@ public class GlobalExceptionHandler {
             ServerHttpRequest request,
             ServerHttpResponse response) {
         if (response.isCommitted()) {
+            logCommittedResponseError(ex, request);
             return Mono.empty();
         }
         Map<String, Object> details = new HashMap<>();
@@ -91,22 +122,39 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler({
             PersonDuplicadaException.class,
+            PersonAlreadyValidatedException.class,
+            RepasseAlreadyPaidException.class,
             RubricaDuplicadaException.class,
+            EmpresaDuplicadaException.class,
+            EmpresaEmUsoException.class,
             InvalidStatusTransitionException.class
     })
     public Mono<ResponseEntity<ApiErrorResponse>> handleConflictException(RuntimeException ex,
             ServerHttpRequest request,
             ServerHttpResponse response) {
         if (response.isCommitted()) {
+            logCommittedResponseError(ex, request);
             return Mono.empty();
         }
         return Mono.just(createErrorResponse(HttpStatus.CONFLICT, ex.getMessage(), request));
+    }
+
+    @ExceptionHandler(ForbiddenOperationException.class)
+    public Mono<ResponseEntity<ApiErrorResponse>> handleForbiddenException(ForbiddenOperationException ex,
+            ServerHttpRequest request,
+            ServerHttpResponse response) {
+        if (response.isCommitted()) {
+            logCommittedResponseError(ex, request);
+            return Mono.empty();
+        }
+        return Mono.just(createErrorResponse(HttpStatus.FORBIDDEN, ex.getMessage(), request));
     }
 
     @ExceptionHandler(WebExchangeBindException.class)
     public Mono<ResponseEntity<ApiErrorResponse>> handleValidationException(WebExchangeBindException ex,
             ServerHttpRequest request, ServerHttpResponse response) {
         if (response.isCommitted()) {
+            logCommittedResponseError(ex, request);
             return Mono.empty();
         }
         Map<String, String> errors = new HashMap<>();
@@ -131,13 +179,29 @@ public class GlobalExceptionHandler {
     public Mono<ResponseEntity<ApiErrorResponse>> handleGlobalException(Exception ex, ServerHttpRequest request,
             ServerHttpResponse response) {
         if (response.isCommitted()) {
-            log.warn("❌ Response already committed. Ignoring error: {}", ex.getMessage());
+            logCommittedResponseError(ex, request);
             return Mono.empty();
         }
-        log.error("❌ Unexpected error occurred", ex);
+        log.error("Unexpected error occurred", ex);
         return Mono.just(createErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR,
                 "An unexpected error occurred: " + ex.getMessage(),
                 request));
+    }
+
+    private void logCommittedResponseError(Throwable ex, ServerHttpRequest request) {
+        String message = ex.getMessage();
+        if (message == null || message.isBlank()) {
+            message = "(sem mensagem)";
+        }
+        log.warn(
+                "Response already committed — cannot write error body. method={} path={} exception={} message={}",
+                request.getMethod(),
+                request.getPath().value(),
+                ex.getClass().getSimpleName(),
+                message);
+        if (log.isDebugEnabled()) {
+            log.debug("Committed response error stack trace", ex);
+        }
     }
 
     private ResponseEntity<ApiErrorResponse> createErrorResponse(HttpStatus status, String message,

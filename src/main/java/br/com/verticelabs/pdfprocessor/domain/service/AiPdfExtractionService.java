@@ -46,6 +46,16 @@ public interface AiPdfExtractionService {
     Mono<String> extractIncomeTaxData(byte[] pdfBytes, int pageNumber);
 
     /**
+     * Extrai dados de IR com o modelo Gemini 2.5 Pro (maior precisão em PDFs digitalizados).
+     */
+    Mono<String> extractIncomeTaxDataWithPro(byte[] pdfBytes, int pageNumber);
+
+    /**
+     * Extrai dados de IR de páginas consecutivas com Gemini 2.5 Pro (PDFs digitalizados).
+     */
+    Mono<String> extractIncomeTaxDataMultiPageWithPro(byte[] pdfBytes, List<Integer> pages);
+
+    /**
      * Valida dados extraídos de um contracheque.
      * 
      * @param extractedDataJson JSON com dados extraídos

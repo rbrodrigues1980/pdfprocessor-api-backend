@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -20,6 +21,7 @@ import java.util.List;
 @Slf4j
 @Component
 @RequiredArgsConstructor
+@Order(1)
 public class IrTributacaoSeedInitializer {
 
     private static final String ANUAL = "ANUAL";
@@ -44,6 +46,8 @@ public class IrTributacaoSeedInitializer {
     }
 
     private void populateAllYears() {
+        saveTributacao2015();
+
         // Anos 2016-2022 (mesma tabela)
         for (int ano = 2016; ano <= 2022; ano++) {
             saveTributacao2016a2022(ano);
@@ -58,7 +62,90 @@ public class IrTributacaoSeedInitializer {
         // Ano 2025
         saveTributacao2025();
 
+        // Ano 2026 (Lei nº 15.270/2025 - desconto simplificado sobe para R$ 17.640,00)
+        saveTributacao2026();
+
         log.info("Dados de tributação IRPF inicializados com sucesso!");
+    }
+
+    /**
+     * Tabela 2015 (Incidência Anual) — Exercício 2016.
+     * Fonte: https://www.gov.br/receitafederal/pt-br/assuntos/meu-imposto-de-renda/tabelas/2015
+     */
+    private void saveTributacao2015() {
+        int ano = 2015;
+        List<IrTabelaTributacao> faixas = new ArrayList<>();
+
+        faixas.add(IrTabelaTributacao.builder()
+                .anoCalendario(ano)
+                .tipoIncidencia(ANUAL)
+                .faixa(1)
+                .limiteInferior(BigDecimal.ZERO)
+                .limiteSuperior(new BigDecimal("22499.13"))
+                .aliquota(BigDecimal.ZERO)
+                .deducao(BigDecimal.ZERO)
+                .descricao("Isento")
+                .build());
+
+        faixas.add(IrTabelaTributacao.builder()
+                .anoCalendario(ano)
+                .tipoIncidencia(ANUAL)
+                .faixa(2)
+                .limiteInferior(new BigDecimal("22499.14"))
+                .limiteSuperior(new BigDecimal("33477.72"))
+                .aliquota(new BigDecimal("0.075"))
+                .deducao(new BigDecimal("1687.43"))
+                .descricao("7,5%")
+                .build());
+
+        faixas.add(IrTabelaTributacao.builder()
+                .anoCalendario(ano)
+                .tipoIncidencia(ANUAL)
+                .faixa(3)
+                .limiteInferior(new BigDecimal("33477.73"))
+                .limiteSuperior(new BigDecimal("44476.74"))
+                .aliquota(new BigDecimal("0.15"))
+                .deducao(new BigDecimal("4198.26"))
+                .descricao("15%")
+                .build());
+
+        faixas.add(IrTabelaTributacao.builder()
+                .anoCalendario(ano)
+                .tipoIncidencia(ANUAL)
+                .faixa(4)
+                .limiteInferior(new BigDecimal("44476.75"))
+                .limiteSuperior(new BigDecimal("55373.55"))
+                .aliquota(new BigDecimal("0.225"))
+                .deducao(new BigDecimal("7534.02"))
+                .descricao("22,5%")
+                .build());
+
+        faixas.add(IrTabelaTributacao.builder()
+                .anoCalendario(ano)
+                .tipoIncidencia(ANUAL)
+                .faixa(5)
+                .limiteInferior(new BigDecimal("55373.56"))
+                .limiteSuperior(null)
+                .aliquota(new BigDecimal("0.275"))
+                .deducao(new BigDecimal("10302.70"))
+                .descricao("27,5%")
+                .build());
+
+        tributacaoService.salvarFaixas(faixas).subscribe();
+
+        IrParametrosAnuais params = IrParametrosAnuais.builder()
+                .anoCalendario(ano)
+                .tipoIncidencia(ANUAL)
+                .deducaoDependente(new BigDecimal("2275.08"))
+                .limiteInstrucao(new BigDecimal("3561.50"))
+                .limiteInssDomestico(IrTributacaoParametrosUtil.limiteInssDomestico(2015))
+                .limiteDescontoSimplificado(new BigDecimal("16754.34"))
+                .isencao65Anos(new BigDecimal("22499.13"))
+                .build();
+
+        tributacaoService.salvarParametros(params).subscribe();
+
+        log.debug("Tributação 2015 (ANUAL) salva");
     }
 
     /**
@@ -138,6 +225,7 @@ public class IrTributacaoSeedInitializer {
                 .tipoIncidencia(ANUAL)
                 .deducaoDependente(new BigDecimal("2275.08"))
                 .limiteInstrucao(new BigDecimal("3561.50"))
+                .limiteInssDomestico(IrTributacaoParametrosUtil.limiteInssDomestico(ano))
                 .limiteDescontoSimplificado(new BigDecimal("16754.34"))
                 .isencao65Anos(new BigDecimal("22847.76"))
                 .build();
@@ -221,6 +309,7 @@ public class IrTributacaoSeedInitializer {
                 .tipoIncidencia(ANUAL)
                 .deducaoDependente(new BigDecimal("2275.08"))
                 .limiteInstrucao(new BigDecimal("3561.50"))
+                .limiteInssDomestico(IrTributacaoParametrosUtil.limiteInssDomestico(ano))
                 .limiteDescontoSimplificado(new BigDecimal("16754.34"))
                 .isencao65Anos(new BigDecimal("24511.92"))
                 .build();
@@ -304,6 +393,7 @@ public class IrTributacaoSeedInitializer {
                 .tipoIncidencia(ANUAL)
                 .deducaoDependente(new BigDecimal("2275.08"))
                 .limiteInstrucao(new BigDecimal("3561.50"))
+                .limiteInssDomestico(IrTributacaoParametrosUtil.limiteInssDomestico(ano))
                 .limiteDescontoSimplificado(new BigDecimal("16754.34"))
                 .isencao65Anos(new BigDecimal("26963.20"))
                 .build();
@@ -387,6 +477,7 @@ public class IrTributacaoSeedInitializer {
                 .tipoIncidencia(ANUAL)
                 .deducaoDependente(new BigDecimal("2275.08"))
                 .limiteInstrucao(new BigDecimal("3561.50"))
+                .limiteInssDomestico(IrTributacaoParametrosUtil.limiteInssDomestico(ano))
                 .limiteDescontoSimplificado(new BigDecimal("16754.34"))
                 .isencao65Anos(new BigDecimal("28467.20"))
                 .build();
@@ -394,5 +485,91 @@ public class IrTributacaoSeedInitializer {
         tributacaoService.salvarParametros(params).subscribe();
 
         log.debug("Tributação 2025 (ANUAL) salva");
+    }
+
+    /**
+     * Tabela 2026 (Incidência Anual) — Exercício 2027.
+     * Fonte: https://www.gov.br/receitafederal/pt-br/assuntos/meu-imposto-de-renda/tabelas/2026
+     */
+    private void saveTributacao2026() {
+        int ano = 2026;
+        List<IrTabelaTributacao> faixas = new ArrayList<>();
+
+        faixas.add(IrTabelaTributacao.builder()
+                .anoCalendario(ano)
+                .tipoIncidencia(ANUAL)
+                .faixa(1)
+                .limiteInferior(BigDecimal.ZERO)
+                .limiteSuperior(new BigDecimal("29145.60"))
+                .aliquota(BigDecimal.ZERO)
+                .deducao(BigDecimal.ZERO)
+                .descricao("Isento")
+                .build());
+
+        faixas.add(IrTabelaTributacao.builder()
+                .anoCalendario(ano)
+                .tipoIncidencia(ANUAL)
+                .faixa(2)
+                .limiteInferior(new BigDecimal("29145.61"))
+                .limiteSuperior(new BigDecimal("33919.80"))
+                .aliquota(new BigDecimal("0.075"))
+                .deducao(new BigDecimal("2185.92"))
+                .descricao("7,5%")
+                .build());
+
+        faixas.add(IrTabelaTributacao.builder()
+                .anoCalendario(ano)
+                .tipoIncidencia(ANUAL)
+                .faixa(3)
+                .limiteInferior(new BigDecimal("33919.81"))
+                .limiteSuperior(new BigDecimal("45012.60"))
+                .aliquota(new BigDecimal("0.15"))
+                .deducao(new BigDecimal("4729.91"))
+                .descricao("15%")
+                .build());
+
+        faixas.add(IrTabelaTributacao.builder()
+                .anoCalendario(ano)
+                .tipoIncidencia(ANUAL)
+                .faixa(4)
+                .limiteInferior(new BigDecimal("45012.61"))
+                .limiteSuperior(new BigDecimal("55976.16"))
+                .aliquota(new BigDecimal("0.225"))
+                .deducao(new BigDecimal("8105.85"))
+                .descricao("22,5%")
+                .build());
+
+        faixas.add(IrTabelaTributacao.builder()
+                .anoCalendario(ano)
+                .tipoIncidencia(ANUAL)
+                .faixa(5)
+                .limiteInferior(new BigDecimal("55976.17"))
+                .limiteSuperior(null)
+                .aliquota(new BigDecimal("0.275"))
+                .deducao(new BigDecimal("10904.66"))
+                .descricao("27,5%")
+                .build());
+
+        tributacaoService.salvarFaixas(faixas).subscribe();
+
+        IrParametrosAnuais params = IrParametrosAnuais.builder()
+                .anoCalendario(ano)
+                .tipoIncidencia(ANUAL)
+                .deducaoDependente(new BigDecimal("2275.08"))
+                .limiteInstrucao(new BigDecimal("3561.50"))
+                .limiteInssDomestico(IrTributacaoParametrosUtil.limiteInssDomestico(ano))
+                .limiteDescontoSimplificado(new BigDecimal("17640.00"))
+                .isencao65Anos(new BigDecimal("29145.60"))
+                .reducaoAnualAtiva(true)
+                .reducaoRendimentoLimiteIsencao(new BigDecimal("60000.00"))
+                .reducaoMaximaCompleta(new BigDecimal("2694.15"))
+                .reducaoConstanteLinear(new BigDecimal("8429.73"))
+                .reducaoCoeficienteLinear(new BigDecimal("0.095575"))
+                .reducaoRendimentoLimiteSuperior(new BigDecimal("88200.00"))
+                .build();
+
+        tributacaoService.salvarParametros(params).subscribe();
+
+        log.debug("Tributação 2026 (ANUAL) salva");
     }
 }

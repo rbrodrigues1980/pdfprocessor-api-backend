@@ -1,12 +1,18 @@
 package br.com.verticelabs.pdfprocessor.infrastructure.ai;
 
 import br.com.verticelabs.pdfprocessor.domain.model.PayrollEntry;
+import br.com.verticelabs.pdfprocessor.domain.service.IncomeTaxDeclarationService.IncomeTaxInfo;
+import br.com.verticelabs.pdfprocessor.domain.service.IncomeTaxDeclarationService.IncomeTaxInfo.DependenteInfo;
+import br.com.verticelabs.pdfprocessor.domain.service.IncomeTaxDeclarationService.IncomeTaxInfo.DoacaoEfetuada;
+import br.com.verticelabs.pdfprocessor.domain.service.IncomeTaxDeclarationService.IncomeTaxInfo.FontePagadora;
+import br.com.verticelabs.pdfprocessor.domain.service.IncomeTaxDeclarationService.IncomeTaxInfo.PagamentoEfetuado;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -331,6 +337,189 @@ public class GeminiResponseParser {
 
         log.warn("Formato de competência não reconhecido: {}", competencia);
         return null;
+    }
+
+    // ==========================================
+    // DECLARAÇÃO DE IMPOSTO DE RENDA (IRPF)
+    // ==========================================
+
+    /**
+     * Parseia a resposta JSON do Gemini (prompt IR_RESUMO_EXTRACTION) em um objeto IncomeTaxInfo.
+     *
+     * <p>O JSON esperado segue o formato definido em {@code GeminiPrompts.IR_RESUMO_EXTRACTION},
+     * com campos como exercicio, anoCalendario, nome, cpf, rendimentosTributaveis,
+     * deducoes (objeto aninhado), baseCalculoImposto, totalImpostoDevido, etc.</p>
+     *
+     * @param jsonResponse resposta JSON do Gemini
+     * @return IncomeTaxInfo preenchido, ou null se o parse falhar
+     */
+    public static IncomeTaxInfo parseIncomeTaxResponse(String jsonResponse) {
+        if (jsonResponse == null || jsonResponse.trim().isEmpty()) {
+            log.warn("Resposta JSON do Gemini (IR) vazia.");
+            return null;
+        }
+
+        String jsonToParse = jsonResponse.trim();
+        if (!jsonToParse.endsWith("}")) {
+            jsonToParse = tryRepairTruncatedJson(jsonToParse);
+        }
+
+        try {
+            JsonNode root = mapper.readTree(jsonToParse);
+
+            // Dados básicos
+            String exercicio        = getTextOrNull(root, "exercicio");
+            String anoCalendario    = getTextOrNull(root, "anoCalendario");
+            String nome             = getTextOrNull(root, "nome");
+            String cpf              = getTextOrNull(root, "cpf");
+            String tipoDeclaracao   = getTextOrNull(root, "tipoDeclaracao");
+
+            // Tipo de tributação derivado do modeloDeclaracao retornado pelo Gemini
+            // Gemini retorna "COMPLETA" para Deduções Legais e "SIMPLIFICADA" para Desconto Simplificado
+            String modeloDeclaracao = getTextOrNull(root, "modeloDeclaracao");
+            String tipoTributacao = null;
+            if (modeloDeclaracao != null) {
+                if (modeloDeclaracao.toUpperCase().contains("COMPLET")) {
+                    tipoTributacao = "COMPLETO";
+                } else if (modeloDeclaracao.toUpperCase().contains("SIMPLIF")) {
+                    tipoTributacao = "SIMPLIFICADO";
+                }
+            }
+
+            // Rendimentos e base
+            BigDecimal rendimentosTributaveis = getDecimalOrNull(root, "rendimentosTributaveis");
+            JsonNode rendimentosNode = root.get("rendimentos");
+            BigDecimal rendTitularPJ = null;
+            BigDecimal rendDepPJ = null;
+            BigDecimal rendTitularPF = null;
+            BigDecimal rendDepPF = null;
+            BigDecimal rendAcumTitular = null;
+            BigDecimal rendAcumDep = null;
+            BigDecimal resultadoRural = null;
+            if (rendimentosNode != null && rendimentosNode.isObject()) {
+                rendTitularPJ = getDecimalOrNull(rendimentosNode, "titularPJ");
+                rendDepPJ = getDecimalOrNull(rendimentosNode, "dependentesPJ");
+                rendTitularPF = getDecimalOrNull(rendimentosNode, "titularPF");
+                rendDepPF = getDecimalOrNull(rendimentosNode, "dependentesPF");
+                rendAcumTitular = getDecimalOrNull(rendimentosNode, "acumuladosTitular");
+                rendAcumDep = getDecimalOrNull(rendimentosNode, "acumuladosDependentes");
+                resultadoRural = getDecimalOrNull(rendimentosNode, "atividadeRural");
+                BigDecimal rendTotal = getDecimalOrNull(rendimentosNode, "total");
+                if (rendimentosTributaveis == null) {
+                    rendimentosTributaveis = rendTotal;
+                }
+            }
+            BigDecimal baseCalculoImposto     = getDecimalOrNull(root, "baseCalculoImposto");
+
+            // IMPOSTO DEVIDO
+            BigDecimal impostoDevido                      = getDecimalOrNull(root, "impostoDevido");
+            BigDecimal deducaoIncentivo                   = getDecimalOrNull(root, "deducaoIncentivo");
+            BigDecimal impostoDevidoI                     = getDecimalOrNull(root, "impostoDevidoI");
+            BigDecimal contribuicaoPrevEmpregadorDomestico = getDecimalOrNull(root, "contribuicaoPrevEmpregadorDomestico");
+            BigDecimal impostoDevidoII                    = getDecimalOrNull(root, "impostoDevidoII");
+            BigDecimal impostoDevidoRRA                   = getDecimalOrNull(root, "impostoDevidoRRA");
+            BigDecimal totalImpostoDevido                 = getDecimalOrNull(root, "totalImpostoDevido");
+
+            // RESULTADO
+            BigDecimal saldoImpostoPagar = getDecimalOrNull(root, "saldoImpostoPagar");
+            BigDecimal impostoRestituir  = getDecimalOrNull(root, "impostoRestituir");
+
+            // Outros resumo
+            BigDecimal descontoSimplificado = getDecimalOrNull(root, "descontoSimplificado");
+            BigDecimal aliquotaEfetiva      = getDecimalOrNull(root, "aliquotaEfetiva");
+
+            // DEDUÇÕES (objeto aninhado)
+            JsonNode deducoesNode = root.get("deducoes");
+            BigDecimal deducoesTotal               = null;
+            BigDecimal deducoesContribPrevOficial  = null;
+            BigDecimal deducoesContribPrevRRA      = null;
+            BigDecimal deducoesContribPrevCompl    = null;
+            BigDecimal deducoesDependentes         = null;
+            BigDecimal deducoesInstrucao           = null;
+            BigDecimal deducoesMedicas             = null;
+            BigDecimal deducoesPensaoJudicial      = null;
+            BigDecimal deducoesPensaoEscritura     = null;
+            BigDecimal deducoesPensaoRRA           = null;
+            BigDecimal deducoesLivroCaixa          = null;
+
+            if (deducoesNode != null && deducoesNode.isObject()) {
+                deducoesTotal              = getDecimalOrNull(deducoesNode, "total");
+                deducoesContribPrevOficial = getDecimalOrNull(deducoesNode, "previdenciaOficial");
+                deducoesContribPrevRRA     = getDecimalOrNull(deducoesNode, "previdenciaOficialRRA");
+                deducoesContribPrevCompl   = getDecimalOrNull(deducoesNode, "previdenciaComplementar");
+                deducoesDependentes        = getDecimalOrNull(deducoesNode, "dependentes");
+                deducoesInstrucao          = getDecimalOrNull(deducoesNode, "instrucao");
+                deducoesMedicas            = getDecimalOrNull(deducoesNode, "despesasMedicas");
+                deducoesPensaoJudicial     = getDecimalOrNull(deducoesNode, "pensaoAlimenticiaJudicial");
+                deducoesPensaoEscritura    = getDecimalOrNull(deducoesNode, "pensaoAlimenticiaEscritura");
+                deducoesPensaoRRA          = getDecimalOrNull(deducoesNode, "pensaoAlimenticiaRRA");
+                deducoesLivroCaixa         = getDecimalOrNull(deducoesNode, "livrosCaixa");
+            }
+
+            // IMPOSTO PAGO (objeto aninhado)
+            JsonNode impostoPagoNode = root.get("impostoPago");
+            BigDecimal impostoPagoTotal              = null;
+            BigDecimal impostoRetidoFonteTitular     = null;
+            BigDecimal impostoRetidoFonteDependentes = null;
+            BigDecimal carneLeaoTitular              = null;
+            BigDecimal carneLeaoDependentes          = null;
+            BigDecimal impostoComplementar           = null;
+            BigDecimal impostoPagoExterior           = null;
+            BigDecimal impostoRetidoFonteLei11033    = null;
+            BigDecimal impostoRetidoRRA              = null;
+
+            if (impostoPagoNode != null && impostoPagoNode.isObject()) {
+                impostoPagoTotal              = getDecimalOrNull(impostoPagoNode, "total");
+                impostoRetidoFonteTitular     = getDecimalOrNull(impostoPagoNode, "retidoFonteTitular");
+                impostoRetidoFonteDependentes = getDecimalOrNull(impostoPagoNode, "retidoFonteDependentes");
+                carneLeaoTitular              = getDecimalOrNull(impostoPagoNode, "carneLeaoTitular");
+                carneLeaoDependentes          = getDecimalOrNull(impostoPagoNode, "carneLeaoDependentes");
+                impostoComplementar           = getDecimalOrNull(impostoPagoNode, "complementar");
+                impostoPagoExterior           = getDecimalOrNull(impostoPagoNode, "exterior");
+                impostoRetidoFonteLei11033    = getDecimalOrNull(impostoPagoNode, "retidoFonteLei11033");
+                impostoRetidoRRA              = getDecimalOrNull(impostoPagoNode, "retidoRRA");
+            }
+
+            log.info("Gemini IR parse — nome={}, cpf={}, exercicio={}, anoCalendario={}, " +
+                    "rendimentos={}, totalDevido={}, saldoPagar={}, restituir={}",
+                    nome, cpf, exercicio, anoCalendario,
+                    rendimentosTributaveis, totalImpostoDevido, saldoImpostoPagar, impostoRestituir);
+
+            IncomeTaxInfo parsed = new IncomeTaxInfo(
+                    nome, cpf, anoCalendario, exercicio,
+                    baseCalculoImposto, impostoDevido, deducaoIncentivo, impostoDevidoI,
+                    contribuicaoPrevEmpregadorDomestico, impostoDevidoII, impostoDevidoRRA,
+                    totalImpostoDevido, saldoImpostoPagar,
+                    rendimentosTributaveis, deducoesTotal,
+                    impostoRetidoFonteTitular, impostoPagoTotal, impostoRestituir,
+                    deducoesContribPrevOficial, deducoesContribPrevRRA, deducoesContribPrevCompl,
+                    deducoesDependentes, deducoesInstrucao, deducoesMedicas,
+                    deducoesPensaoJudicial, deducoesPensaoEscritura, deducoesPensaoRRA, deducoesLivroCaixa,
+                    impostoRetidoFonteDependentes, carneLeaoTitular, carneLeaoDependentes,
+                    impostoComplementar, impostoPagoExterior, impostoRetidoFonteLei11033, impostoRetidoRRA,
+                    descontoSimplificado, aliquotaEfetiva,
+                    tipoTributacao, null, null, tipoDeclaracao, null,
+                    null, null, null, null,
+                    null, null,
+                    Collections.<PagamentoEfetuado>emptyList(),
+                    Collections.<FontePagadora>emptyList(),
+                    null,
+                    Collections.<DependenteInfo>emptyList(),
+                    null,
+                    Collections.<DependenteInfo>emptyList(),
+                    rendTitularPJ, rendDepPJ, rendTitularPF, rendDepPF,
+                    resultadoRural, rendAcumTitular, rendAcumDep,
+                    null, null, null, null, null, null, null, null, null, null, null,
+                    Collections.<DoacaoEfetuada>emptyList()
+            );
+            return br.com.verticelabs.pdfprocessor.infrastructure.incometax.IncomeTaxGeminiHelper.enrich(parsed);
+
+        } catch (Exception e) {
+            log.error("Erro ao parsear JSON do Gemini (IR): {}", e.getMessage());
+            log.debug("JSON recebido: {}", jsonResponse.length() > 500
+                    ? jsonResponse.substring(0, 500) + "..." : jsonResponse);
+            return null;
+        }
     }
 
     private static String getTextOrNull(JsonNode node, String field) {

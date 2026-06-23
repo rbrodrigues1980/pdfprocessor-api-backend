@@ -18,4 +18,3 @@ public class TenantResponse {
     private Boolean ativo;
     private Instant createdAt;
 }
-

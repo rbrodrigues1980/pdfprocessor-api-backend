@@ -60,5 +60,12 @@ public class PayrollDocument {
 
     @Builder.Default
     private List<ProcessingEvent> processingLog = new ArrayList<>(); // Log de eventos do processamento
+
+    /**
+     * Dados extraídos da declaração de IRPF.
+     * Preenchido apenas quando {@link #tipo} for {@code INCOME_TAX}.
+     * Contém: identificação, controle, dependentes, alimentandos, fontes pagadoras e resumo financeiro.
+     */
+    private IrpfDeclaracaoData irpfData;
 }
 

@@ -1,5 +1,6 @@
 package br.com.verticelabs.pdfprocessor.application.documents;
 
+import br.com.verticelabs.pdfprocessor.application.incometax.IrpfDeclaracaoDataMapper;
 import br.com.verticelabs.pdfprocessor.domain.exceptions.InvalidPdfException;
 import br.com.verticelabs.pdfprocessor.domain.model.*;
 import br.com.verticelabs.pdfprocessor.domain.repository.PayrollDocumentRepository;
@@ -56,6 +57,7 @@ public class DocumentProcessUseCase {
     private final PdfLineParser lineParser;
     private final PdfNormalizer normalizer;
     private final RubricaValidator rubricaValidator;
+    private final IrpfDeclaracaoDataMapper irpfDeclaracaoDataMapper;
 
     // Limite mínimo de caracteres para considerar que o PDF tem texto suficiente
     // PDFs abaixo deste limite são considerados escaneados e usarão Gemini AI
@@ -64,6 +66,15 @@ public class DocumentProcessUseCase {
     // Proporção mínima de caracteres alfanuméricos para considerar texto legível.
     // PDFs com fontes sem mapeamento Unicode geram texto com alta proporção de símbolos.
     private static final double MIN_ALPHANUMERIC_RATIO = 0.5;
+
+    // Palavras-chave que indicam texto legível de declaração IRPF
+    private static final String[] INCOME_TAX_KEYWORDS = {
+            "RESUMO", "IMPOSTO DEVIDO", "RENDIMENTOS TRIBUT", "DEDU", "DECLAR",
+            "ANO-CALEND", "EXERC", "CPF", "IMPOSTO A RESTITUIR", "BASE DE C"
+    };
+
+    /** Páginas finais a tentar com Gemini quando o PDF é digitalizado (RESUMO costuma estar no fim). */
+    private static final int SCANNED_IR_RESUMO_PAGE_LOOKBACK = 10;
 
     // Palavras-chave que indicam que o texto é de um contracheque legível
     private static final String[] PAYROLL_KEYWORDS = {
@@ -1147,9 +1158,211 @@ public class DocumentProcessUseCase {
     }
 
     /**
+     * Verifica se a extração do IR via iText retornou dados suficientes.
+     * Considera insuficiente quando não há identificador (CPF ou ano-calendário)
+     * nem nenhum valor monetário relevante.
+     */
+    private boolean isIncomeTaxInfoSufficient(
+            br.com.verticelabs.pdfprocessor.domain.service.IncomeTaxDeclarationService.IncomeTaxInfo info) {
+        return br.com.verticelabs.pdfprocessor.infrastructure.incometax.IncomeTaxGeminiHelper
+                .isIncomeTaxInfoSufficient(info);
+    }
+
+    /**
+     * Verifica se o PDF de IR é digitalizado (sem texto embutido legível).
+     */
+    private Mono<Boolean> isIncomeTaxPdfScanned(byte[] pdfBytes) {
+        return pdfService.getTotalPages(new ByteArrayInputStream(pdfBytes))
+                .flatMap(totalPages -> Flux.range(1, totalPages)
+                        .concatMap(page -> pdfService.extractTextFromPage(
+                                        new ByteArrayInputStream(pdfBytes), page)
+                                .defaultIfEmpty(""))
+                        .collectList()
+                        .map(pages -> !isIncomeTaxTextReadable(String.join("\n", pages))));
+    }
+
+    private boolean isIncomeTaxTextReadable(String text) {
+        if (!isTextReadable(text)) {
+            return false;
+        }
+        String upper = text.toUpperCase();
+        if (!upper.contains("RESUMO")) {
+            return false;
+        }
+        for (String keyword : INCOME_TAX_KEYWORDS) {
+            if (upper.contains(keyword)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Usa Gemini 2.5 para extrair IR. PDFs digitalizados usam Pro e percorrem as últimas páginas.
+     */
+    private Mono<br.com.verticelabs.pdfprocessor.domain.service.IncomeTaxDeclarationService.IncomeTaxInfo>
+            extractIncomeTaxWithGemini(PayrollDocument document, byte[] pdfBytes, boolean scannedPdf) {
+
+        if (!aiPdfExtractionService.isEnabled()) {
+            log.warn("⚠️ Gemini AI desabilitado — fallback IR não será executado.");
+            return Mono.empty();
+        }
+
+        String modelForIr = scannedPdf
+                ? aiPdfExtractionService.getFallbackModelName()
+                : aiPdfExtractionService.getPrimaryModelName();
+
+        log.info("🤖 Acionando Gemini 2.5 [{}] para IR (digitalizado={})...", modelForIr, scannedPdf);
+
+        addInfoEvent(document, null, ProcessingEventType.GEMINI_EXTRACTION_STARTED,
+                String.format("Extração de IR via Gemini 2.5 [%s]%s.",
+                        modelForIr, scannedPdf ? " — PDF digitalizado" : " — fallback iText"),
+                Map.of("model", modelForIr, "scannedPdf", scannedPdf));
+
+        return resolveCandidateResumoPages(pdfBytes, scannedPdf)
+                .flatMap(pages -> tryGeminiIrExtractionOnPages(document, pdfBytes, pages, scannedPdf));
+    }
+
+    private Mono<br.com.verticelabs.pdfprocessor.domain.service.IncomeTaxDeclarationService.IncomeTaxInfo>
+            extractIncomeTaxWithGemini(PayrollDocument document, byte[] pdfBytes) {
+        return extractIncomeTaxWithGemini(document, pdfBytes, false);
+    }
+
+    private Mono<List<Integer>> resolveCandidateResumoPages(byte[] pdfBytes, boolean scannedPdf) {
+        return pdfService.getTotalPages(new ByteArrayInputStream(pdfBytes))
+                .flatMap(totalPages -> {
+                    if (scannedPdf) {
+                        List<Integer> pages = new ArrayList<>();
+                        int start = Math.max(1, totalPages - SCANNED_IR_RESUMO_PAGE_LOOKBACK + 1);
+                        for (int p = totalPages; p >= start; p--) {
+                            pages.add(p);
+                        }
+                        log.info("📄 PDF digitalizado: candidatas RESUMO = {} (de {} páginas)", pages, totalPages);
+                        return Mono.just(pages);
+                    }
+                    return Flux.range(1, totalPages)
+                            .concatMap(page -> pdfService
+                                    .extractTextFromPage(new ByteArrayInputStream(pdfBytes), page)
+                                    .filter(text -> text != null && text.toUpperCase().contains("RESUMO"))
+                                    .map(text -> page))
+                            .next()
+                            .map(page -> List.of(page))
+                            .defaultIfEmpty(List.of(Math.max(1, totalPages)));
+                });
+    }
+
+    private Mono<br.com.verticelabs.pdfprocessor.domain.service.IncomeTaxDeclarationService.IncomeTaxInfo>
+            tryGeminiIrExtractionOnPages(
+                    PayrollDocument document, byte[] pdfBytes, List<Integer> candidatePages, boolean scannedPdf) {
+
+        return Flux.fromIterable(candidatePages)
+                .concatMap(page -> {
+                    Mono<br.com.verticelabs.pdfprocessor.domain.service.IncomeTaxDeclarationService.IncomeTaxInfo> multiPageFirst =
+                            scannedPdf && page > 1
+                                    ? extractIncomeTaxFromGeminiMultiPage(document, pdfBytes, page - 1, page, scannedPdf)
+                                    : Mono.empty();
+                    return multiPageFirst
+                            .switchIfEmpty(extractIncomeTaxFromGeminiPage(document, pdfBytes, page, true, scannedPdf))
+                            .switchIfEmpty(extractIncomeTaxFromGeminiPage(document, pdfBytes, page, false, scannedPdf))
+                            .switchIfEmpty(!scannedPdf && page > 1
+                                    ? extractIncomeTaxFromGeminiMultiPage(document, pdfBytes, page - 1, page, scannedPdf)
+                                    : Mono.empty());
+                })
+                .next();
+    }
+
+    private Mono<br.com.verticelabs.pdfprocessor.domain.service.IncomeTaxDeclarationService.IncomeTaxInfo>
+            extractIncomeTaxFromGeminiMultiPage(
+                    PayrollDocument document, byte[] pdfBytes, int pageBefore, int pageAfter, boolean scannedPdf) {
+
+        String modelName = aiPdfExtractionService.getFallbackModelName();
+        log.info("🤖 Gemini IR multi-página: {}+{} com {}...", pageBefore, pageAfter, modelName);
+        long start = System.currentTimeMillis();
+
+        return saveIntermediateProgress(document)
+                .then(aiPdfExtractionService.extractIncomeTaxDataMultiPageWithPro(
+                        pdfBytes, List.of(pageBefore, pageAfter)))
+                .flatMap(jsonResponse -> {
+                    long elapsed = System.currentTimeMillis() - start;
+                    if (jsonResponse == null || jsonResponse.trim().isEmpty()) {
+                        return Mono.empty();
+                    }
+
+                    var irInfo = GeminiResponseParser.parseIncomeTaxResponse(jsonResponse);
+                    if (irInfo == null || !isIncomeTaxInfoSufficient(irInfo)) {
+                        log.warn("⚠️ Gemini [{}] págs. {}+{}: dados insuficientes ({}ms)",
+                                modelName, pageBefore, pageAfter, elapsed);
+                        return Mono.empty();
+                    }
+
+                    log.info("✅ Gemini 2.5 [{}] extraiu IR nas págs. {}+{} em {}ms",
+                            modelName, pageBefore, pageAfter, elapsed);
+                    addInfoEvent(document, pageAfter, ProcessingEventType.GEMINI_EXTRACTION_COMPLETED,
+                            String.format("Gemini 2.5 [%s] extraiu IR (págs. %d+%d). cpf=%s, ano=%s, total=%s",
+                                    modelName, pageBefore, pageAfter, irInfo.getCpf(),
+                                    irInfo.getAnoCalendario(), irInfo.getTotalImpostoDevido()),
+                            Map.of("model", modelName, "scannedPdf", scannedPdf,
+                                    "processingTimeMs", elapsed, "resumoPage", pageAfter,
+                                    "multiPage", true));
+                    return Mono.just(irInfo);
+                })
+                .onErrorResume(e -> {
+                    log.error("❌ Gemini [{}] págs. {}+{}: {}", modelName, pageBefore, pageAfter, e.getMessage());
+                    return Mono.empty();
+                });
+    }
+
+    private Mono<br.com.verticelabs.pdfprocessor.domain.service.IncomeTaxDeclarationService.IncomeTaxInfo>
+            extractIncomeTaxFromGeminiPage(
+                    PayrollDocument document, byte[] pdfBytes, int resumoPage,
+                    boolean useProModel, boolean scannedPdf) {
+
+        String modelName = useProModel
+                ? aiPdfExtractionService.getFallbackModelName()
+                : aiPdfExtractionService.getPrimaryModelName();
+
+        log.info("🤖 Gemini IR: página {} com {}...", resumoPage, modelName);
+        long start = System.currentTimeMillis();
+
+        Mono<String> geminiCall = useProModel
+                ? aiPdfExtractionService.extractIncomeTaxDataWithPro(pdfBytes, resumoPage)
+                : aiPdfExtractionService.extractIncomeTaxData(pdfBytes, resumoPage);
+
+        return saveIntermediateProgress(document)
+                .then(geminiCall)
+                .flatMap(jsonResponse -> {
+                    long elapsed = System.currentTimeMillis() - start;
+                    if (jsonResponse == null || jsonResponse.trim().isEmpty()) {
+                        return Mono.empty();
+                    }
+
+                    var irInfo = GeminiResponseParser.parseIncomeTaxResponse(jsonResponse);
+                    if (irInfo == null || !isIncomeTaxInfoSufficient(irInfo)) {
+                        log.warn("⚠️ Gemini [{}] pág. {}: dados insuficientes ({}ms)", modelName, resumoPage, elapsed);
+                        return Mono.empty();
+                    }
+
+                    log.info("✅ Gemini 2.5 [{}] extraiu IR na pág. {} em {}ms", modelName, resumoPage, elapsed);
+                    addInfoEvent(document, resumoPage, ProcessingEventType.GEMINI_EXTRACTION_COMPLETED,
+                            String.format("Gemini 2.5 [%s] extraiu IR (pág. %d). cpf=%s, ano=%s, total=%s",
+                                    modelName, resumoPage, irInfo.getCpf(),
+                                    irInfo.getAnoCalendario(), irInfo.getTotalImpostoDevido()),
+                            Map.of("model", modelName, "scannedPdf", scannedPdf,
+                                    "processingTimeMs", elapsed, "resumoPage", resumoPage));
+                    return Mono.just(irInfo);
+                })
+                .onErrorResume(e -> {
+                    log.error("❌ Gemini [{}] pág. {}: {}", modelName, resumoPage, e.getMessage());
+                    return Mono.empty();
+                });
+    }
+
+    /**
      * Processa documentos de declaração de IR, extraindo informações específicas
      * (nome, CPF, exercício, ano-calendário, imposto devido) e salvando como
      * entries.
+     *
+     * <p>Fluxo: digitalizado → Gemini 2.5 Pro; digital → iText → Gemini 2.5 se insuficiente.</p>
      */
     private Mono<Long> processIncomeTaxDocument(PayrollDocument document) {
         log.info("Processando declaração de IR: {}", document.getId());
@@ -1163,12 +1376,80 @@ public class DocumentProcessUseCase {
         }
 
         return loadPdfFromGridFs(document.getOriginalFileId())
-                .flatMap(pdfBytes -> {
-                    log.info("PDF carregado do GridFS. Extraindo informações da declaração de IR...");
-                    return iTextIncomeTaxService.extractIncomeTaxInfo(
-                            new ByteArrayInputStream(pdfBytes));
+                .flatMap(pdfBytes -> isIncomeTaxPdfScanned(pdfBytes)
+                        .flatMap(scanned -> {
+                            if (scanned) {
+                                log.info("📷 Declaração IR digitalizada detectada — pulando iText, usando Gemini 2.5 Pro.");
+                                addInfoEvent(document, null, ProcessingEventType.TEXT_UNREADABLE,
+                                        "PDF digitalizado detectado. Extração via Gemini 2.5 Pro (sem iText).",
+                                        Map.of("scannedPdf", true));
+
+                                if (!aiPdfExtractionService.isEnabled()) {
+                                    return Mono.error(new IllegalStateException(
+                                            "PDF digitalizado requer Gemini AI habilitado (gemini.enabled + config no banco)."));
+                                }
+                                return extractIncomeTaxWithGemini(document, pdfBytes, true)
+                                        .switchIfEmpty(Mono.error(new IllegalStateException(
+                                                "Gemini 2.5 não conseguiu extrair dados da declaração digitalizada.")));
+                            }
+                            return extractIncomeTaxWithITextThenGemini(document, pdfBytes);
+                        }))
+                .flatMap(incomeTaxInfo -> processIncomeTaxDocumentEntries(document, tenantId, incomeTaxInfo))
+                .onErrorResume(error -> {
+                    log.error("Erro ao processar declaração de IR", error);
+                    document.setStatus(DocumentStatus.ERROR);
+                    document.setErro(error.getMessage());
+                    return documentRepository.save(document)
+                            .then(Mono.error(error));
+                });
+    }
+
+    private Mono<br.com.verticelabs.pdfprocessor.domain.service.IncomeTaxDeclarationService.IncomeTaxInfo>
+            extractIncomeTaxWithITextThenGemini(PayrollDocument document, byte[] pdfBytes) {
+        log.info("PDF carregado do GridFS. Extraindo informações da declaração de IR via iText...");
+
+        addInfoEvent(document, null, ProcessingEventType.TEXT_EXTRACTED,
+                "Iniciando extração de IR via iText.");
+
+        return iTextIncomeTaxService.extractIncomeTaxInfo(new ByteArrayInputStream(pdfBytes))
+                .flatMap(iTextInfo -> {
+                    if (isIncomeTaxInfoSufficient(iTextInfo)) {
+                        log.info("✅ iText extraiu dados suficientes de IR. cpf={}, anoCalendario={}",
+                                iTextInfo.getCpf(), iTextInfo.getAnoCalendario());
+                        addInfoEvent(document, null, ProcessingEventType.TEXT_EXTRACTED,
+                                String.format("iText extraiu dados de IR com sucesso. cpf=%s, anoCalendario=%s, totalDevido=%s",
+                                        iTextInfo.getCpf(), iTextInfo.getAnoCalendario(), iTextInfo.getTotalImpostoDevido()));
+                        return Mono.just(iTextInfo);
+                    }
+
+                    log.warn("⚠️ iText retornou dados insuficientes de IR (cpf={}, anoCalendario={}). " +
+                            "Acionando fallback Gemini...",
+                            iTextInfo.getCpf(), iTextInfo.getAnoCalendario());
+                    addWarnEvent(document, null, ProcessingEventType.TEXT_UNREADABLE,
+                            String.format("iText retornou dados insuficientes (cpf=%s, anoCalendario=%s). " +
+                                    "Acionando fallback Gemini 2.5.",
+                                    iTextInfo.getCpf(), iTextInfo.getAnoCalendario()),
+                            Map.of());
+
+                    return extractIncomeTaxWithGemini(document, pdfBytes, false)
+                            .switchIfEmpty(Mono.just(iTextInfo));
                 })
-                .flatMap(incomeTaxInfo -> {
+                .onErrorResume(iTextError -> {
+                    log.warn("⚠️ iText falhou ao extrair IR: {}. Acionando fallback Gemini...",
+                            iTextError.getMessage());
+                    addWarnEvent(document, null, ProcessingEventType.TEXT_UNREADABLE,
+                            String.format("iText falhou: %s. Acionando fallback Gemini 2.5.", iTextError.getMessage()),
+                            Map.of("errorMessage", iTextError.getMessage()));
+
+                    return extractIncomeTaxWithGemini(document, pdfBytes, false)
+                            .switchIfEmpty(Mono.error(iTextError));
+                });
+    }
+
+    private Mono<Long> processIncomeTaxDocumentEntries(
+            PayrollDocument document,
+            String tenantId,
+            br.com.verticelabs.pdfprocessor.domain.service.IncomeTaxDeclarationService.IncomeTaxInfo incomeTaxInfo) {
                     log.info("Informações extraídas da declaração de IR:");
                     log.info("  Nome: {}, CPF: {}, Exercício: {}, Ano-Calendário: {}",
                             incomeTaxInfo.getNome(), incomeTaxInfo.getCpf(),
@@ -1183,9 +1464,18 @@ public class DocumentProcessUseCase {
 
                     // Criar entries para cada informação
                     List<PayrollEntry> entries = new ArrayList<>();
-                    String referencia = incomeTaxInfo.getAnoCalendario() != null
-                            ? incomeTaxInfo.getAnoCalendario() + "-00"
-                            : null;
+                    // Formato especial para IR: "exercicio-anoCalendario" (ex: "2016-2015")
+                    // O frontend detecta quando o "mês" > 1000 e exibe como "Exercício 2016 / AC 2015"
+                    String referencia;
+                    if (incomeTaxInfo.getExercicio() != null && incomeTaxInfo.getAnoCalendario() != null) {
+                        referencia = incomeTaxInfo.getExercicio() + "-" + incomeTaxInfo.getAnoCalendario();
+                    } else if (incomeTaxInfo.getAnoCalendario() != null) {
+                        referencia = incomeTaxInfo.getAnoCalendario() + "-00";
+                    } else if (incomeTaxInfo.getExercicio() != null) {
+                        referencia = incomeTaxInfo.getExercicio() + "-00";
+                    } else {
+                        referencia = null;
+                    }
 
                     // Entry para Nome
                     if (incomeTaxInfo.getNome() != null && !incomeTaxInfo.getNome().trim().isEmpty()) {
@@ -1395,12 +1685,96 @@ public class DocumentProcessUseCase {
                                 "Alíquota efetiva (%)", incomeTaxInfo.getAliquotaEfetiva(), referencia));
                     }
 
+                    // --- NOVOS CAMPOS DE IDENTIFICAÇÃO E RESUMO ---
+
+                    // Tipo de tributação — informação crítica solicitada
+                    if (incomeTaxInfo.getTipoTributacao() != null) {
+                        entries.add(createEntry(tenantId, document.getId(), "IR_TIPO_TRIBUTACAO",
+                                incomeTaxInfo.getTipoTributacao(), null, referencia));
+                    }
+
+                    if (incomeTaxInfo.getDataNascimento() != null && !incomeTaxInfo.getDataNascimento().isEmpty()) {
+                        entries.add(createEntry(tenantId, document.getId(), "IR_DATA_NASCIMENTO",
+                                incomeTaxInfo.getDataNascimento(), null, referencia));
+                    }
+
+                    if (incomeTaxInfo.getTituloEleitoral() != null && !incomeTaxInfo.getTituloEleitoral().isEmpty()) {
+                        entries.add(createEntry(tenantId, document.getId(), "IR_TITULO_ELEITORAL",
+                                incomeTaxInfo.getTituloEleitoral(), null, referencia));
+                    }
+
+                    if (incomeTaxInfo.getTipoDeclaracao() != null && !incomeTaxInfo.getTipoDeclaracao().isEmpty()) {
+                        entries.add(createEntry(tenantId, document.getId(), "IR_TIPO_DECLARACAO",
+                                incomeTaxInfo.getTipoDeclaracao(), null, referencia));
+                    }
+
+                    if (incomeTaxInfo.getDataEntrega() != null && !incomeTaxInfo.getDataEntrega().isEmpty()) {
+                        entries.add(createEntry(tenantId, document.getId(), "IR_DATA_ENTREGA",
+                                incomeTaxInfo.getDataEntrega(), null, referencia));
+                    }
+
+                    // Evolução patrimonial
+                    if (incomeTaxInfo.getBensAnterior() != null) {
+                        entries.add(createEntry(tenantId, document.getId(), "IR_BENS_DIREITOS_ANTERIOR",
+                                "Bens e direitos 31/12 (ano anterior)", incomeTaxInfo.getBensAnterior(), referencia));
+                    }
+
+                    if (incomeTaxInfo.getBensAtual() != null) {
+                        entries.add(createEntry(tenantId, document.getId(), "IR_BENS_DIREITOS_ATUAL",
+                                "Bens e direitos 31/12 (ano atual)", incomeTaxInfo.getBensAtual(), referencia));
+                    }
+
+                    if (incomeTaxInfo.getDividasAnterior() != null) {
+                        entries.add(createEntry(tenantId, document.getId(), "IR_DIVIDAS_ANTERIOR",
+                                "Dívidas e ônus reais 31/12 (ano anterior)", incomeTaxInfo.getDividasAnterior(), referencia));
+                    }
+
+                    if (incomeTaxInfo.getDividasAtual() != null) {
+                        entries.add(createEntry(tenantId, document.getId(), "IR_DIVIDAS_ATUAL",
+                                "Dívidas e ônus reais 31/12 (ano atual)", incomeTaxInfo.getDividasAtual(), referencia));
+                    }
+
+                    // Outras informações do RESUMO
+                    if (incomeTaxInfo.getRendimentosIsentos() != null) {
+                        entries.add(createEntry(tenantId, document.getId(), "IR_RENDIMENTOS_ISENTOS",
+                                "Rendimentos isentos e não tributáveis", incomeTaxInfo.getRendimentosIsentos(), referencia));
+                    }
+
+                    if (incomeTaxInfo.getRendimentosTributacaoExclusiva() != null) {
+                        entries.add(createEntry(tenantId, document.getId(), "IR_RENDIMENTOS_TRIB_EXCLUSIVA",
+                                "Rendimentos sujeitos à tributação exclusiva/definitiva",
+                                incomeTaxInfo.getRendimentosTributacaoExclusiva(), referencia));
+                    }
+
+                    // Pagamentos efetuados
+                    if (incomeTaxInfo.getPagamentosEfetuados() != null) {
+                        for (var pagamento : incomeTaxInfo.getPagamentosEfetuados()) {
+                            String rubricaCodigo = "IR_PAGAMENTO_" + pagamento.getCodigo();
+                            String descricao = "Pagamento cód." + pagamento.getCodigo()
+                                    + " - " + pagamento.getNomeBeneficiario()
+                                    + " (" + pagamento.getCpfCnpj() + ")";
+                            entries.add(createEntry(tenantId, document.getId(), rubricaCodigo,
+                                    descricao, pagamento.getValorPago(), referencia));
+                        }
+                    }
+
                     log.info("Criadas {} entries para declaração de IR", entries.size());
 
-                    // Salvar entries
+                    // Atualizar irpfData com todos os campos extraídos (independente de entries)
+                    document.setIrpfData(irpfDeclaracaoDataMapper.fromIncomeTaxInfo(incomeTaxInfo));
+                    log.info("✅ irpfData atualizado com dados extraídos (pagamentos={}, doações={})",
+                            incomeTaxInfo.getPagamentosEfetuados() != null
+                                    ? incomeTaxInfo.getPagamentosEfetuados().size() : 0,
+                            incomeTaxInfo.getDoacoesEfetuadas() != null
+                                    ? incomeTaxInfo.getDoacoesEfetuadas().size() : 0);
+
+                    // Salvar entries (ou apenas o documento se entries vazio)
                     if (entries.isEmpty()) {
                         log.warn("Nenhuma informação foi extraída da declaração de IR");
-                        return Mono.just(0L);
+                        document.setStatus(DocumentStatus.PROCESSED);
+                        document.setDataProcessamento(Instant.now());
+                        document.setTotalEntries(0L);
+                        return documentRepository.save(document).thenReturn(0L);
                     }
 
                     return entryRepository.saveAll(Flux.fromIterable(entries))
@@ -1409,10 +1783,8 @@ public class DocumentProcessUseCase {
                                 log.info("✅ {} entries de declaração de IR salvas com sucesso", count);
                             })
                             .flatMap(count -> {
-                                // Atualizar documento com status PROCESSED e informações extraídas
                                 log.info("Processamento da declaração de IR concluído. Total de entries: {}", count);
 
-                                // Atualizar documento com status PROCESSED
                                 document.setStatus(DocumentStatus.PROCESSED);
                                 document.setDataProcessamento(Instant.now());
                                 document.setTotalEntries(count);
@@ -1440,14 +1812,6 @@ public class DocumentProcessUseCase {
                                 return documentRepository.save(document)
                                         .thenReturn(count);
                             });
-                })
-                .onErrorResume(error -> {
-                    log.error("Erro ao processar declaração de IR", error);
-                    document.setStatus(DocumentStatus.ERROR);
-                    document.setErro(error.getMessage());
-                    return documentRepository.save(document)
-                            .then(Mono.error(error));
-                });
     }
 
     /**

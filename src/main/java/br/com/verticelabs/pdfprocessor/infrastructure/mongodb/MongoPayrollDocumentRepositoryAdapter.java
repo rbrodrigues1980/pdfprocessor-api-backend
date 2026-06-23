@@ -4,13 +4,18 @@ import br.com.verticelabs.pdfprocessor.domain.model.DocumentStatus;
 import br.com.verticelabs.pdfprocessor.domain.model.DocumentType;
 import br.com.verticelabs.pdfprocessor.domain.model.PayrollDocument;
 import br.com.verticelabs.pdfprocessor.domain.repository.PayrollDocumentRepository;
+import br.com.verticelabs.pdfprocessor.interfaces.dashboard.dto.DashboardChartItem;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.ReactiveMongoTemplate;
+import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+
+import java.util.Map;
 
 @Component
 @RequiredArgsConstructor
@@ -101,6 +106,27 @@ public class MongoPayrollDocumentRepositoryAdapter implements PayrollDocumentRep
     @Override
     public Mono<Long> countAll() {
         return repository.count();
+    }
+
+    @Override
+    public Flux<DashboardChartItem> countDocumentosPorAno(String tenantId) {
+        Criteria criteria = Criteria.where("anoDetectado").ne(null);
+        if (tenantId != null) {
+            criteria = criteria.and("tenantId").is(tenantId);
+        }
+
+        Aggregation aggregation = Aggregation.newAggregation(
+                Aggregation.match(criteria),
+                Aggregation.group("anoDetectado").count().as("valor"),
+                Aggregation.sort(Sort.Direction.ASC, "_id"),
+                Aggregation.project("valor").and("_id").as("label")
+        );
+
+        return mongoTemplate.aggregate(aggregation, "payroll_documents", Map.class)
+                .map(doc -> DashboardChartItem.builder()
+                        .label(doc.get("label").toString())
+                        .valor(((Number) doc.get("valor")).longValue())
+                        .build());
     }
 
     @Override

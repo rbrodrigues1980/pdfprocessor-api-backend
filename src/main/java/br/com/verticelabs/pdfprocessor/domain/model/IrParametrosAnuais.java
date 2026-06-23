@@ -52,6 +52,13 @@ public class IrParametrosAnuais {
     private BigDecimal limiteInstrucao;
 
     /**
+     * Limite anual da dedução de INSS patronal de empregador doméstico (R$).
+     * Ativo apenas AC 2016–2018; zero nos demais anos.
+     */
+    @Field("limiteInssDomestico")
+    private BigDecimal limiteInssDomestico;
+
+    /**
      * Limite de desconto simplificado (R$)
      */
     @Field("limiteDescontoSimplificado")
@@ -62,6 +69,32 @@ public class IrParametrosAnuais {
      */
     @Field("isencao65Anos")
     private BigDecimal isencao65Anos;
+
+    /**
+     * Tabela de Redução Anual (Lei 15.270/2025) — a partir do ano-calendário 2026 (Ex. 2027).
+     */
+    @Field("reducaoAnualAtiva")
+    private Boolean reducaoAnualAtiva;
+
+    /** Rendimentos tributáveis até este valor: redução para zerar imposto. */
+    @Field("reducaoRendimentoLimiteIsencao")
+    private BigDecimal reducaoRendimentoLimiteIsencao;
+
+    /** Valor máximo de redução na faixa de isenção (R$ 2.694,15). */
+    @Field("reducaoMaximaCompleta")
+    private BigDecimal reducaoMaximaCompleta;
+
+    /** Constante da redução linear decrescente (R$ 8.429,73). */
+    @Field("reducaoConstanteLinear")
+    private BigDecimal reducaoConstanteLinear;
+
+    /** Coeficiente da redução linear (0,095575). */
+    @Field("reducaoCoeficienteLinear")
+    private BigDecimal reducaoCoeficienteLinear;
+
+    /** Acima deste rendimento a redução é zero (R$ 88.200,00). */
+    @Field("reducaoRendimentoLimiteSuperior")
+    private BigDecimal reducaoRendimentoLimiteSuperior;
 
     @Field("createdAt")
     private LocalDateTime createdAt;

@@ -12,7 +12,6 @@ import java.util.Map;
 public class PersonMapper {
     
     public PersonResponse toResponse(Person person) {
-        // Garantir que a lista de documentos seja mutável (evita UnsupportedOperationException)
         java.util.List<String> documentos = person.getDocumentos() != null 
                 ? new java.util.ArrayList<>(person.getDocumentos()) 
                 : new java.util.ArrayList<>();
@@ -23,15 +22,18 @@ public class PersonMapper {
                 .cpf(person.getCpf())
                 .nome(person.getNome())
                 .matricula(person.getMatricula())
+                .empresaId(person.getEmpresaId())
+                .percentualHonorarioId(person.getPercentualHonorarioId())
                 .documentos(documentos)
                 .ativo(person.getAtivo())
+                .validado(Boolean.TRUE.equals(person.getValidado()))
+                .validadoEm(person.getValidadoEm())
                 .createdAt(person.getCreatedAt())
                 .updatedAt(person.getUpdatedAt())
                 .build();
     }
     
     public PersonRubricasMatrixResponse toMatrixResponse(PersonRubricasMatrixUseCase.PersonRubricasMatrixResponse useCaseResponse) {
-        // Converter o Map interno para o DTO
         java.util.Map<String, java.util.Map<String, PersonRubricasMatrixResponse.RubricaMatrixCell>> matrixDto = 
                 new java.util.HashMap<>();
         
@@ -68,4 +70,3 @@ public class PersonMapper {
                 .build();
     }
 }
-

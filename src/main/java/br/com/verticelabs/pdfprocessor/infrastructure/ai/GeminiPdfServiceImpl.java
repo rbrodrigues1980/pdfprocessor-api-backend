@@ -63,6 +63,10 @@ import java.util.List;
 @Service
 public class GeminiPdfServiceImpl implements AiPdfExtractionService {
 
+    private static final float DEFAULT_RENDER_DPI = 300f;
+    /** DPI maior para RESUMO IR — melhora leitura de valores em PDFs digitalizados. */
+    private static final float IR_EXTRACTION_DPI = 400f;
+
     private final GeminiConfig config;
     private final SystemConfigRepository configRepository;
     private VertexAI vertexAI;
@@ -166,7 +170,19 @@ public class GeminiPdfServiceImpl implements AiPdfExtractionService {
     @Override
     public Mono<String> extractIncomeTaxData(byte[] pdfBytes, int pageNumber) {
         return processWithModel(primaryModel, config.getModel(), pdfBytes, pageNumber,
-                GeminiPrompts.IR_RESUMO_EXTRACTION);
+                GeminiPrompts.IR_RESUMO_EXTRACTION, IR_EXTRACTION_DPI);
+    }
+
+    @Override
+    public Mono<String> extractIncomeTaxDataWithPro(byte[] pdfBytes, int pageNumber) {
+        return processWithModel(fallbackModel, config.getFallbackModel(), pdfBytes, pageNumber,
+                GeminiPrompts.IR_RESUMO_EXTRACTION, IR_EXTRACTION_DPI);
+    }
+
+    @Override
+    public Mono<String> extractIncomeTaxDataMultiPageWithPro(byte[] pdfBytes, List<Integer> pages) {
+        return processMultiPageWithModel(fallbackModel, config.getFallbackModel(), pdfBytes, pages,
+                GeminiPrompts.IR_RESUMO_EXTRACTION_MULTIPAGE, IR_EXTRACTION_DPI);
     }
 
     @Override
@@ -337,6 +353,11 @@ public class GeminiPdfServiceImpl implements AiPdfExtractionService {
      */
     private Mono<String> processWithModel(GenerativeModel model, String modelName,
                                           byte[] pdfBytes, int pageNumber, String prompt) {
+        return processWithModel(model, modelName, pdfBytes, pageNumber, prompt, DEFAULT_RENDER_DPI);
+    }
+
+    private Mono<String> processWithModel(GenerativeModel model, String modelName,
+                                          byte[] pdfBytes, int pageNumber, String prompt, float dpi) {
         if (!isEnabled()) {
             log.warn("Gemini AI desabilitado. Retornando vazio para página {}.", pageNumber);
             return Mono.just("");
@@ -347,8 +368,8 @@ public class GeminiPdfServiceImpl implements AiPdfExtractionService {
             long startTime = System.currentTimeMillis();
 
             try {
-                // 1. Converter página do PDF para imagem PNG (300 DPI)
-                byte[] imageBytes = convertPdfPageToImage(pdfBytes, pageNumber);
+                // 1. Converter página do PDF para imagem PNG
+                byte[] imageBytes = convertPdfPageToImage(pdfBytes, pageNumber, dpi);
                 log.debug("  Imagem gerada: {} bytes ({} KB)", imageBytes.length, imageBytes.length / 1024);
 
                 // 2. Enviar para Gemini Vision (imagem + prompt)
@@ -391,6 +412,11 @@ public class GeminiPdfServiceImpl implements AiPdfExtractionService {
      */
     private Mono<String> processMultiPageWithModel(GenerativeModel model, String modelName,
                                                     byte[] pdfBytes, List<Integer> pages, String prompt) {
+        return processMultiPageWithModel(model, modelName, pdfBytes, pages, prompt, DEFAULT_RENDER_DPI);
+    }
+
+    private Mono<String> processMultiPageWithModel(GenerativeModel model, String modelName,
+                                                    byte[] pdfBytes, List<Integer> pages, String prompt, float dpi) {
         if (!isEnabled()) {
             log.warn("Gemini AI desabilitado. Retornando vazio para páginas {}.", pages);
             return Mono.just("");
@@ -405,7 +431,7 @@ public class GeminiPdfServiceImpl implements AiPdfExtractionService {
                 List<Object> multiModalParts = new ArrayList<>();
                 multiModalParts.add(prompt);
                 for (int pageNumber : pages) {
-                    byte[] imageBytes = convertPdfPageToImage(pdfBytes, pageNumber);
+                    byte[] imageBytes = convertPdfPageToImage(pdfBytes, pageNumber, dpi);
                     log.debug("  Página {} - Imagem: {} bytes ({} KB)", pageNumber, imageBytes.length, imageBytes.length / 1024);
                     multiModalParts.add(PartMaker.fromMimeTypeAndData("image/png", imageBytes));
                 }
@@ -464,6 +490,10 @@ public class GeminiPdfServiceImpl implements AiPdfExtractionService {
      * @throws Exception se a conversão falhar
      */
     private byte[] convertPdfPageToImage(byte[] pdfBytes, int pageNumber) throws Exception {
+        return convertPdfPageToImage(pdfBytes, pageNumber, DEFAULT_RENDER_DPI);
+    }
+
+    private byte[] convertPdfPageToImage(byte[] pdfBytes, int pageNumber, float dpi) throws Exception {
         try (PDDocument document = Loader.loadPDF(pdfBytes)) {
             PDFRenderer renderer = new PDFRenderer(document);
 
@@ -475,7 +505,7 @@ public class GeminiPdfServiceImpl implements AiPdfExtractionService {
                                 document.getNumberOfPages() + " páginas.");
             }
 
-            BufferedImage image = renderer.renderImageWithDPI(pageIndex, 300, ImageType.RGB);
+            BufferedImage image = renderer.renderImageWithDPI(pageIndex, dpi, ImageType.RGB);
 
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             ImageIO.write(image, "PNG", baos);

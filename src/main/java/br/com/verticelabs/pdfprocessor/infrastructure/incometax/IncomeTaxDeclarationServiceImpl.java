@@ -632,8 +632,7 @@ public class IncomeTaxDeclarationServiceImpl implements IncomeTaxDeclarationServ
                                                                                                         impostoRetidoFonteTitular,
                                                                                                         impostoPagoTotal,
                                                                                                         impostoRestituir,
-                                                                                                        // Campos
-                                                                                                        // DEDUÇÕES
+                                                                                                        // Campos DEDUÇÕES
                                                                                                         deducoesContribPrevOficial,
                                                                                                         deducoesContribPrevRRA,
                                                                                                         deducoesContribPrevCompl,
@@ -644,8 +643,7 @@ public class IncomeTaxDeclarationServiceImpl implements IncomeTaxDeclarationServ
                                                                                                         deducoesPensaoEscritura,
                                                                                                         deducoesPensaoRRA,
                                                                                                         deducoesLivroCaixa,
-                                                                                                        // Campos
-                                                                                                        // IMPOSTO PAGO
+                                                                                                        // Campos IMPOSTO PAGO
                                                                                                         impostoRetidoFonteDependentes,
                                                                                                         carneLeaoTitular,
                                                                                                         carneLeaoDependentes,
@@ -655,7 +653,23 @@ public class IncomeTaxDeclarationServiceImpl implements IncomeTaxDeclarationServ
                                                                                                         impostoRetidoRRA,
                                                                                                         // Campos 2017+
                                                                                                         descontoSimplificado,
-                                                                                                        aliquotaEfetiva);
+                                                                                                        aliquotaEfetiva,
+                                                                                                        // Identificação/evolução/outras (não impl na legada)
+                                                                                                        null, null, null, null, null,
+                                                                                                        null, null, null, null,
+                                                                                                        null, null,
+                                                                                                        java.util.Collections.emptyList(),
+                                                                                                        java.util.Collections.emptyList(),
+                                                                                                        null,
+                                                                                                        java.util.Collections.emptyList(),
+                                                                                                        null,
+                                                                                                        java.util.Collections.emptyList(),
+                                                                                                        // Linhas individuais rendimentos (não impl na legada)
+                                                                                                        null, null, null, null, null, null, null,
+                                                                                                        // Outras informações (não impl na legada)
+                                                                                                        null, null, null, null, null, null, null, null, null, null, null,
+                                                                                                        // Doações efetuadas
+                                                                                                        java.util.Collections.emptyList());
                                                                                 });
                                                         })
                                                         .onErrorResume(e -> {

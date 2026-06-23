@@ -1,6 +1,12 @@
 package br.com.verticelabs.pdfprocessor.interfaces.api;
 
+import br.com.verticelabs.pdfprocessor.application.tributacao.IrCalculoProgressivoService;
+import br.com.verticelabs.pdfprocessor.application.tributacao.IrSimuladorMotorService;
 import br.com.verticelabs.pdfprocessor.application.tributacao.IrTributacaoService;
+import br.com.verticelabs.pdfprocessor.application.tributacao.dto.CalcularIrpfRequest;
+import br.com.verticelabs.pdfprocessor.application.tributacao.dto.ResultadoCalculoIrpfDTO;
+import br.com.verticelabs.pdfprocessor.application.tributacao.dto.SimuladorIrpfRequest;
+import br.com.verticelabs.pdfprocessor.application.tributacao.dto.SimuladorIrpfResponse;
 import br.com.verticelabs.pdfprocessor.domain.model.IrParametrosAnuais;
 import br.com.verticelabs.pdfprocessor.domain.model.IrTabelaTributacao;
 import br.com.verticelabs.pdfprocessor.interfaces.api.dto.FaixaTributacaoDTO;
@@ -16,6 +22,7 @@ import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -30,6 +37,8 @@ import java.util.stream.Collectors;
 public class IrTributacaoController {
 
     private final IrTributacaoService tributacaoService;
+    private final IrCalculoProgressivoService calculoProgressivoService;
+    private final IrSimuladorMotorService simuladorMotorService;
 
     /**
      * Lista anos disponíveis para um tipo de incidência.
@@ -133,6 +142,64 @@ public class IrTributacaoController {
                 .then(Mono.just(ResponseEntity.noContent().<Void>build()));
     }
 
+    /**
+     * Calcula imposto progressivo anual (simulador IRPF).
+     */
+    @PostMapping("/calcular")
+    @Operation(summary = "Calcular imposto progressivo anual")
+    public Mono<ResponseEntity<ResultadoCalculoIrpfDTO>> calcular(@RequestBody CalcularIrpfRequest request) {
+        Integer ano = request.getAnoCalendario();
+        String tipo = request.getTipoIncidencia() != null ? request.getTipoIncidencia().toUpperCase() : "ANUAL";
+
+        if (ano == null) {
+            return Mono.just(ResponseEntity.badRequest().build());
+        }
+
+        return Mono.zip(
+                tributacaoService.buscarFaixas(ano, tipo).collectList(),
+                tributacaoService.buscarParametros(ano, tipo).defaultIfEmpty(new IrParametrosAnuais())
+        ).map(tuple -> {
+            List<IrTabelaTributacao> faixas = tuple.getT1();
+            if (faixas.isEmpty()) {
+                return ResponseEntity.notFound().<ResultadoCalculoIrpfDTO>build();
+            }
+            ResultadoCalculoIrpfDTO resultado = calculoProgressivoService.calcular(
+                    faixas,
+                    request.getRendimentosTributaveis(),
+                    request.getTotalDeducoes(),
+                    request.getDeducoesEspeciais(),
+                    tuple.getT2());
+            return ResponseEntity.ok(resultado);
+        });
+    }
+
+    /**
+     * Simula IRPF completo: modelos Completo e Simplificado + itens 7–10 da declaração.
+     */
+    @PostMapping("/simular")
+    @Operation(summary = "Simular IRPF (Completo vs Simplificado + resumo declaração)")
+    public Mono<ResponseEntity<SimuladorIrpfResponse>> simular(@RequestBody SimuladorIrpfRequest request) {
+        Integer ano = request.getAnoCalendario();
+        String tipo = request.getTipoIncidencia() != null ? request.getTipoIncidencia().toUpperCase() : "ANUAL";
+
+        if (ano == null) {
+            return Mono.just(ResponseEntity.badRequest().build());
+        }
+
+        return Mono.zip(
+                tributacaoService.buscarFaixas(ano, tipo).collectList(),
+                tributacaoService.buscarParametros(ano, tipo).defaultIfEmpty(new IrParametrosAnuais())
+        ).map(tuple -> {
+            List<IrTabelaTributacao> faixas = tuple.getT1();
+            if (faixas.isEmpty()) {
+                return ResponseEntity.notFound().<SimuladorIrpfResponse>build();
+            }
+            faixas.sort(Comparator.comparingInt(f -> f.getFaixa() != null ? f.getFaixa() : 0));
+            SimuladorIrpfResponse resultado = simuladorMotorService.simular(request, faixas, tuple.getT2());
+            return ResponseEntity.ok(resultado);
+        });
+    }
+
     // ========== Mapeamentos ==========
 
     private FaixaTributacaoDTO toFaixaDTO(IrTabelaTributacao entity) {
@@ -163,8 +230,15 @@ public class IrTributacaoController {
         return ParametrosAnuaisDTO.builder()
                 .deducaoDependente(entity.getDeducaoDependente())
                 .limiteInstrucao(entity.getLimiteInstrucao())
+                .limiteInssDomestico(entity.getLimiteInssDomestico())
                 .limiteDescontoSimplificado(entity.getLimiteDescontoSimplificado())
                 .isencao65Anos(entity.getIsencao65Anos())
+                .reducaoAnualAtiva(entity.getReducaoAnualAtiva())
+                .reducaoRendimentoLimiteIsencao(entity.getReducaoRendimentoLimiteIsencao())
+                .reducaoMaximaCompleta(entity.getReducaoMaximaCompleta())
+                .reducaoConstanteLinear(entity.getReducaoConstanteLinear())
+                .reducaoCoeficienteLinear(entity.getReducaoCoeficienteLinear())
+                .reducaoRendimentoLimiteSuperior(entity.getReducaoRendimentoLimiteSuperior())
                 .build();
     }
 
@@ -174,8 +248,15 @@ public class IrTributacaoController {
                 .tipoIncidencia(tipo)
                 .deducaoDependente(dto.getDeducaoDependente())
                 .limiteInstrucao(dto.getLimiteInstrucao())
+                .limiteInssDomestico(dto.getLimiteInssDomestico())
                 .limiteDescontoSimplificado(dto.getLimiteDescontoSimplificado())
                 .isencao65Anos(dto.getIsencao65Anos())
+                .reducaoAnualAtiva(dto.getReducaoAnualAtiva())
+                .reducaoRendimentoLimiteIsencao(dto.getReducaoRendimentoLimiteIsencao())
+                .reducaoMaximaCompleta(dto.getReducaoMaximaCompleta())
+                .reducaoConstanteLinear(dto.getReducaoConstanteLinear())
+                .reducaoCoeficienteLinear(dto.getReducaoCoeficienteLinear())
+                .reducaoRendimentoLimiteSuperior(dto.getReducaoRendimentoLimiteSuperior())
                 .build();
     }
 }

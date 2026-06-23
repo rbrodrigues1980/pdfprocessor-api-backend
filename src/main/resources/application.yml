@@ -58,7 +58,8 @@ app:
     # APP_CORS_EXTRA_ORIGINS=https://meu-frontend.us-central1.run.app,https://meudominio.com
   logging:
     mongo:
-      enabled: false
+      enabled: true
+      retention-days: 30
 
 # Netty — reduzir ruído do ByteBuf LEAK warning (comum em Spring WebFlux + MongoDB reativo)
 logging:

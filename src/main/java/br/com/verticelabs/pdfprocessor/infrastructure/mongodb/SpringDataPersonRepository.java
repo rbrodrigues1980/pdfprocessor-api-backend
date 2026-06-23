@@ -17,6 +17,12 @@ public interface SpringDataPersonRepository extends ReactiveMongoRepository<Pers
     Mono<Long> countByTenantId(String tenantId);
     
     Mono<Person> findByTenantIdAndId(String tenantId, String id);
+
+    Flux<Person> findByValidadoTrue();
+
+    Mono<Long> countByValidadoTrue();
+
+    Mono<Long> countByEmpresaId(String empresaId);
     
     // Métodos legados
     @Deprecated

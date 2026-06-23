@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 
@@ -18,9 +19,16 @@ public class PersonResponse {
     private String cpf;
     private String nome;
     private String matricula;
+    private String empresaId;
+    private String empresaNome;
+    private String empresaSigla;
+    private String percentualHonorarioId;
+    private BigDecimal percentualHonorarios;
+    private String percentualDescricao;
     private List<String> documentos;
     private Boolean ativo;
+    private Boolean validado;
+    private Instant validadoEm;
     private Instant createdAt;
     private Instant updatedAt;
 }
-

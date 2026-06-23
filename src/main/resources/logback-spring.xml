@@ -67,11 +67,12 @@
     <!-- MongoDB Appender Configuration -->
     <springProperty scope="context" name="MONGO_URI" source="spring.data.mongodb.uri" defaultValue=""/>
     <springProperty scope="context" name="MONGO_LOGGING_ENABLED" source="app.logging.mongo.enabled" defaultValue="false"/>
+    <springProperty scope="context" name="MONGO_LOGGING_RETENTION_DAYS" source="app.logging.mongo.retention-days" defaultValue="30"/>
 
     <appender name="MONGO" class="br.com.verticelabs.pdfprocessor.infrastructure.logging.MongoAppender">
         <uri>${MONGO_URI}</uri>
         <collection>logs</collection>
-        <retentionDays>30</retentionDays>
+        <retentionDays>${MONGO_LOGGING_RETENTION_DAYS}</retentionDays>
         <enabled>${MONGO_LOGGING_ENABLED}</enabled>
     </appender>
 

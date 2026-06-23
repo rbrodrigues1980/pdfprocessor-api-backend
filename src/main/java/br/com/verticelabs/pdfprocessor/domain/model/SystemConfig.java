@@ -63,4 +63,9 @@ public class SystemConfig {
     public static final String KEY_AI_ENABLED = "ai.enabled";
     public static final String KEY_AI_MODEL = "ai.model";
     public static final String KEY_AI_FALLBACK_MODEL = "ai.fallback-model";
+
+    public static final String KEY_REPASSE_VALOR_UNITARIO = "repasse.valor_unitario";
+    public static final String KEY_REPASSE_ANO_BASE = "repasse.ano_base";
+
+    public static final String KEY_LOGS_RETENTION = "logs.retention";
 }

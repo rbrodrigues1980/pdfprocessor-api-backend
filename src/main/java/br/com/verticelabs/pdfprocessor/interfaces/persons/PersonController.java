@@ -45,11 +45,13 @@ public class PersonController {
         private final ListPersonsUseCase listPersonsUseCase;
         private final PersonRubricasMatrixUseCase personRubricasMatrixUseCase;
         private final PersonMapper personMapper;
+        private final PersonResponseEnricher personResponseEnricher;
         private final CreatePersonUseCase createPersonUseCase;
         private final UpdatePersonUseCase updatePersonUseCase;
         private final DeletePersonUseCase deletePersonUseCase;
         private final ActivatePersonUseCase activatePersonUseCase;
         private final DeactivatePersonUseCase deactivatePersonUseCase;
+        private final MarkPersonAsValidatedUseCase markPersonAsValidatedUseCase;
         private final GetPersonByIdUseCase getPersonByIdUseCase;
         private final DocumentUploadUseCase documentUploadUseCase;
         private final BulkDocumentUploadUseCase bulkDocumentUploadUseCase;
@@ -67,10 +69,8 @@ public class PersonController {
                                 request.getNome());
 
                 return createPersonUseCase.execute(request)
-                                .map(person -> {
-                                        PersonResponse response = personMapper.toResponse(person);
-                                        return ResponseEntity.status(HttpStatus.CREATED).body((Object) response);
-                                });
+                                .flatMap(person -> personResponseEnricher.enrich(person)
+                                                .map(response -> ResponseEntity.status(HttpStatus.CREATED).body((Object) response)));
         }
 
         /**
@@ -82,10 +82,8 @@ public class PersonController {
                 log.debug("📥 GET /api/v1/persons/{} - Buscar pessoa por ID", id);
 
                 return getPersonByIdUseCase.execute(id)
-                                .map(person -> {
-                                        PersonResponse response = personMapper.toResponse(person);
-                                        return ResponseEntity.ok((Object) response);
-                                });
+                                .flatMap(person -> personResponseEnricher.enrich(person)
+                                                .map(response -> ResponseEntity.ok((Object) response)));
         }
 
         /**
@@ -100,10 +98,8 @@ public class PersonController {
                                 id, request.getNome(), request.getMatricula());
 
                 return updatePersonUseCase.execute(id, request)
-                                .map(person -> {
-                                        PersonResponse response = personMapper.toResponse(person);
-                                        return ResponseEntity.ok((Object) response);
-                                });
+                                .flatMap(person -> personResponseEnricher.enrich(person)
+                                                .map(response -> ResponseEntity.ok((Object) response)));
         }
 
         /**
@@ -127,10 +123,8 @@ public class PersonController {
                 log.debug("📥 PATCH /api/v1/persons/{}/activate - Ativar pessoa", id);
 
                 return activatePersonUseCase.execute(id)
-                                .map(person -> {
-                                        PersonResponse response = personMapper.toResponse(person);
-                                        return ResponseEntity.ok((Object) response);
-                                });
+                                .flatMap(person -> personResponseEnricher.enrich(person)
+                                                .map(response -> ResponseEntity.ok((Object) response)));
         }
 
         /**
@@ -142,10 +136,21 @@ public class PersonController {
                 log.debug("📥 PATCH /api/v1/persons/{}/deactivate - Desativar pessoa", id);
 
                 return deactivatePersonUseCase.execute(id)
-                                .map(person -> {
-                                        PersonResponse response = personMapper.toResponse(person);
-                                        return ResponseEntity.ok((Object) response);
-                                });
+                                .flatMap(person -> personResponseEnricher.enrich(person)
+                                                .map(response -> ResponseEntity.ok((Object) response)));
+        }
+
+        /**
+         * PATCH /api/v1/persons/{id}/validate
+         * Marca o cliente como validado (processamento concluído e correto). Ação irreversível.
+         */
+        @PatchMapping("/{id}/validate")
+        public Mono<ResponseEntity<Object>> markPersonAsValidated(@PathVariable String id) {
+                log.info("📥 PATCH /api/v1/persons/{}/validate - Marcar cliente como validado", id);
+
+                return markPersonAsValidatedUseCase.execute(id)
+                                .flatMap(person -> personResponseEnricher.enrich(person)
+                                                .map(response -> ResponseEntity.ok((Object) response)));
         }
 
         /**
@@ -157,16 +162,14 @@ public class PersonController {
                         @RequestParam(required = false) String nome,
                         @RequestParam(required = false) String cpf,
                         @RequestParam(required = false) String matricula,
+                        @RequestParam(required = false) Boolean validado,
                         @RequestParam(defaultValue = "0") int page,
                         @RequestParam(defaultValue = "100") int size) {
-                log.debug("📥 GET /api/v1/persons - Listar pessoas (page={}, size={})", page, size);
+                log.debug("📥 GET /api/v1/persons - Listar pessoas (page={}, size={}, validado={})", page, size, validado);
 
-                return listPersonsUseCase.execute(nome, cpf, matricula, page, size)
-                                .flatMap(result -> {
-                                        List<PersonResponse> personResponses = result.persons().stream()
-                                                        .map(personMapper::toResponse)
-                                                        .collect(Collectors.toList());
-
+                return listPersonsUseCase.execute(nome, cpf, matricula, validado, page, size)
+                                .flatMap(result -> personResponseEnricher.enrichAll(result.persons())
+                                                .map(personResponses -> {
                                         PersonListResponse response = PersonListResponse.builder()
                                                         .content(personResponses)
                                                         .totalElements(result.total())
@@ -177,8 +180,8 @@ public class PersonController {
                                                         .hasPrevious(result.page() > 0)
                                                         .build();
 
-                                        return Mono.just(ResponseEntity.ok(response));
-                                });
+                                        return ResponseEntity.ok(response);
+                                }));
         }
 
         /**
