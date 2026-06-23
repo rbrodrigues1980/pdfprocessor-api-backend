@@ -34,9 +34,9 @@ bin/
 # Compiled class files
 *.class
 
-# Log files
+# Log files (apenas diretório de runtime na raiz; não ignora pacotes Java */logs/*)
 *.log
-logs/
+/logs/
 *.log.*
 
 # Package Files
