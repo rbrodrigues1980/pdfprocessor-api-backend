@@ -1,5 +1,6 @@
 package br.com.verticelabs.pdfprocessor.application.selic;
 
+import br.com.verticelabs.pdfprocessor.application.selic.dto.SelicReceitaCalculoResponse;
 import br.com.verticelabs.pdfprocessor.domain.model.SelicMensalEntity;
 import br.com.verticelabs.pdfprocessor.domain.model.TaxaSelic;
 import br.com.verticelabs.pdfprocessor.domain.repository.TaxaSelicRepository;
@@ -30,6 +31,7 @@ public class TaxaSelicService {
     private final BcbSelicClient bcbClient;
     private final BcbSelicMensalClient bcbSelicMensalClient;
     private final SpringDataSelicMensalRepository selicMensalRepository;
+    private final CalculadoraSelicReceitaService calculadoraSelicReceitaService;
 
     // ========== Consultas ==========
 
@@ -218,217 +220,63 @@ public class TaxaSelicService {
         private Integer reuniaoCopom;
     }
 
-    // ========== Cálculo SELIC para Receita Federal ==========
-
     /**
-     * Calcula a SELIC acumulada para fins de Receita Federal (restituição/débitos).
-     * 
-     * Regras RFB:
-     * - Período começa no MÊS SEGUINTE ao pagamento/declaração
-     * - Utiliza taxa MENSAL (calculada a partir das taxas efetivas por período)
-     * - Período vai até o mês de atualização
-     * 
-     * Exemplo: Pagamento em 30/04/2017, atualização em 31/08/2025
-     * - Período: Maio/2017 até Agosto/2025 = 100 meses
-     * 
-     * @param dataPagamento   Data do pagamento original
-     * @param dataAtualizacao Data de atualização (quando o valor será corrigido)
-     * @return Mono com o resultado do cálculo no formato RFB
+     * Calcula a SELIC para fins de Receita Federal (Lei nº 9.250/1995).
+     * Período: mês seguinte ao pagamento até o mês da atualização/restituição.
+     * Acumulação simples das taxas mensais (série 4390) + 1% fixo no último mês.
      */
-    public Mono<SelicReceitaFederalResult> calcularSelicReceitaFederal(LocalDate dataPagamento,
-            LocalDate dataAtualizacao) {
-        log.info("Calculando SELIC Receita Federal: pagamento={}, atualização={}", dataPagamento, dataAtualizacao);
-
-        // Período inicia no mês seguinte ao pagamento
-        java.time.YearMonth mesInicio = java.time.YearMonth.from(dataPagamento).plusMonths(1);
-        java.time.YearMonth mesFim = java.time.YearMonth.from(dataAtualizacao);
-
-        // Se mês fim < mês inicio, retorna zero
-        if (mesFim.isBefore(mesInicio)) {
-            return Mono.just(new SelicReceitaFederalResult(
-                    dataPagamento, dataAtualizacao,
-                    java.math.BigDecimal.ZERO, java.math.BigDecimal.ONE,
-                    0, java.util.Collections.emptyList()));
-        }
-
-        // Buscar taxas mensais da tabela SELIC mensal (série 4390 do BCB)
-        return selicMensalRepository.findAllByOrderByAnoDescMesDesc()
-                .collectList()
-                .map(taxasMensais -> calcularSelicMensalReal(taxasMensais, mesInicio, mesFim, dataPagamento,
-                        dataAtualizacao));
-    }
-
-    /**
-     * Calcula SELIC usando taxas mensais REAIS do BCB (série 4390).
-     */
-    private SelicReceitaFederalResult calcularSelicMensalReal(
-            java.util.List<SelicMensalEntity> taxasMensais,
-            java.time.YearMonth mesInicio,
-            java.time.YearMonth mesFim,
+    public Mono<SelicReceitaCalculoResponse> calcularSelicReceitaFederal(
+            LocalDate dataVencimento,
             LocalDate dataPagamento,
-            LocalDate dataAtualizacao) {
+            java.math.BigDecimal valorOriginal) {
 
-        // Criar mapa para lookup rápido: "ANO-MES" -> taxa
-        java.util.Map<String, java.math.BigDecimal> mapaTaxas = new java.util.HashMap<>();
-        for (SelicMensalEntity taxa : taxasMensais) {
-            String chave = taxa.getAno() + "-" + taxa.getMes();
-            mapaTaxas.put(chave, taxa.getTaxa());
-        }
+        log.info("Calculando SELIC Receita Federal: vencimento={}, pagamento={}, valor={}",
+                dataVencimento, dataPagamento, valorOriginal);
 
-        java.math.BigDecimal fatorAcumulado = java.math.BigDecimal.ONE;
-        java.util.List<SelicMensal> mesesDetalhados = new java.util.ArrayList<>();
-        int totalMeses = 0;
+        java.time.YearMonth mesAnoInicio = java.time.YearMonth.from(dataVencimento);
+        java.time.YearMonth mesAnoFim = java.time.YearMonth.from(dataPagamento);
 
-        java.time.YearMonth mesAtual = mesInicio;
-        while (!mesAtual.isAfter(mesFim)) {
-            String chave = mesAtual.getYear() + "-" + mesAtual.getMonthValue();
-            java.math.BigDecimal taxaMes = mapaTaxas.getOrDefault(chave, java.math.BigDecimal.ZERO);
-
-            // Acumular fator: (1 + taxa/100)
-            java.math.BigDecimal fatorMes = java.math.BigDecimal.ONE.add(
-                    taxaMes.divide(new java.math.BigDecimal("100"), 10, java.math.RoundingMode.HALF_UP));
-            fatorAcumulado = fatorAcumulado.multiply(fatorMes);
-
-            mesesDetalhados.add(new SelicMensal(
-                    mesAtual.getYear(),
-                    mesAtual.getMonthValue(),
-                    taxaMes));
-
-            totalMeses++;
-            mesAtual = mesAtual.plusMonths(1);
-        }
-
-        // Taxa acumulada = (fator - 1) * 100
-        java.math.BigDecimal taxaAcumulada = fatorAcumulado.subtract(java.math.BigDecimal.ONE)
-                .multiply(new java.math.BigDecimal("100"))
-                .setScale(2, java.math.RoundingMode.HALF_UP);
-
-        log.info("SELIC Receita Federal (mensal real): {} a {} = {}% ({} meses)",
-                mesInicio, mesFim, taxaAcumulada, totalMeses);
-
-        return new SelicReceitaFederalResult(
-                dataPagamento, dataAtualizacao,
-                taxaAcumulada,
-                fatorAcumulado.setScale(8, java.math.RoundingMode.HALF_UP),
-                totalMeses, mesesDetalhados);
+        return calculadoraSelicReceitaService.calcular(mesAnoInicio, mesAnoFim, valorOriginal)
+                .map(result -> result.enriquecer(dataVencimento, dataPagamento));
     }
+
+    /** @deprecated use {@link #calcularSelicReceitaFederal(LocalDate, LocalDate, java.math.BigDecimal)} */
+    @Deprecated
+    public Mono<SelicReceitaCalculoResponse> calcularSelicReceitaFederal(LocalDate dataPagamento,
+            LocalDate dataAtualizacao) {
+        return calcularSelicReceitaFederal(dataPagamento, dataAtualizacao, java.math.BigDecimal.ZERO);
+    }
+
+    // ========== Sincronização BCB ==========
 
     /**
-     * Calcula a SELIC mensal para cada mês do período.
+     * Sincroniza SELIC mensal (série SGS 4390) — usada pela Receita Federal.
+     * Sempre faz upsert para incluir meses novos (ex.: 2026).
      */
-    private SelicReceitaFederalResult calcularSelicMensal(
-            java.util.List<TaxaSelic> taxas,
-            java.time.YearMonth mesInicio,
-            java.time.YearMonth mesFim,
-            LocalDate dataPagamento,
-            LocalDate dataAtualizacao) {
+    public Mono<Integer> sincronizarSelicMensalComBcb() {
+        log.info("Iniciando sincronização SELIC mensal (série 4390)...");
 
-        java.math.BigDecimal fatorAcumulado = java.math.BigDecimal.ONE;
-        java.util.List<SelicMensal> mesesDetalhados = new java.util.ArrayList<>();
-        int totalMeses = 0;
-
-        java.time.YearMonth mesAtual = mesInicio;
-        while (!mesAtual.isAfter(mesFim)) {
-            // Encontrar a taxa SELIC para este mês
-            java.math.BigDecimal taxaMes = calcularTaxaMes(taxas, mesAtual);
-
-            // Acumular fator: (1 + taxa/100)
-            java.math.BigDecimal fatorMes = java.math.BigDecimal.ONE.add(
-                    taxaMes.divide(new java.math.BigDecimal("100"), 10, java.math.RoundingMode.HALF_UP));
-            fatorAcumulado = fatorAcumulado.multiply(fatorMes);
-
-            mesesDetalhados.add(new SelicMensal(
-                    mesAtual.getYear(),
-                    mesAtual.getMonthValue(),
-                    taxaMes));
-
-            totalMeses++;
-            mesAtual = mesAtual.plusMonths(1);
-        }
-
-        // Taxa acumulada = (fator - 1) * 100
-        java.math.BigDecimal taxaAcumulada = fatorAcumulado.subtract(java.math.BigDecimal.ONE)
-                .multiply(new java.math.BigDecimal("100"))
-                .setScale(2, java.math.RoundingMode.HALF_UP);
-
-        log.info("SELIC Receita Federal: {} a {} = {}% ({} meses)",
-                mesInicio, mesFim, taxaAcumulada, totalMeses);
-
-        return new SelicReceitaFederalResult(
-                dataPagamento, dataAtualizacao,
-                taxaAcumulada,
-                fatorAcumulado.setScale(8, java.math.RoundingMode.HALF_UP),
-                totalMeses, mesesDetalhados);
+        return bcbSelicMensalClient.fetchSelicMensal()
+                .concatMap(this::salvarOuAtualizarMensal)
+                .count()
+                .map(Long::intValue)
+                .doOnSuccess(total -> log.info("SELIC mensal sincronizada: {} registros processados", total))
+                .onErrorResume(e -> {
+                    log.error("Erro na sincronização SELIC mensal: {}", e.getMessage(), e);
+                    return Mono.just(0);
+                });
     }
 
-    /**
-     * Calcula a taxa SELIC de um mês específico baseado nos períodos COPOM.
-     */
-    private java.math.BigDecimal calcularTaxaMes(java.util.List<TaxaSelic> taxas, java.time.YearMonth mes) {
-        LocalDate primeiroDiaMes = mes.atDay(1);
-        LocalDate ultimoDiaMes = mes.atEndOfMonth();
-
-        java.math.BigDecimal taxaTotal = java.math.BigDecimal.ZERO;
-        int diasContabilizados = 0;
-
-        for (TaxaSelic taxa : taxas) {
-            if (taxa.getDataInicioVigencia() == null || taxa.getTaxaSelicEfetivaVigencia() == null)
-                continue;
-
-            LocalDate vigenciaInicio = taxa.getDataInicioVigencia().atZone(ZoneId.of("America/Sao_Paulo"))
-                    .toLocalDate();
-            LocalDate vigenciaFim = taxa.getDataFimVigencia() != null
-                    ? taxa.getDataFimVigencia().atZone(ZoneId.of("America/Sao_Paulo")).toLocalDate()
-                    : LocalDate.now();
-
-            // Verificar sobreposição com o mês
-            if (vigenciaFim.isBefore(primeiroDiaMes) || vigenciaInicio.isAfter(ultimoDiaMes)) {
-                continue;
-            }
-
-            // Calcular dias de sobreposição
-            LocalDate inicioSobreposicao = vigenciaInicio.isBefore(primeiroDiaMes) ? primeiroDiaMes : vigenciaInicio;
-            LocalDate fimSobreposicao = vigenciaFim.isAfter(ultimoDiaMes) ? ultimoDiaMes : vigenciaFim;
-
-            long diasSobreposicao = java.time.temporal.ChronoUnit.DAYS.between(inicioSobreposicao, fimSobreposicao) + 1;
-            long diasVigenciaTotal = java.time.temporal.ChronoUnit.DAYS.between(vigenciaInicio, vigenciaFim) + 1;
-
-            if (diasVigenciaTotal <= 0)
-                diasVigenciaTotal = 1;
-
-            // Taxa proporcional aos dias
-            java.math.BigDecimal proporcao = new java.math.BigDecimal(diasSobreposicao)
-                    .divide(new java.math.BigDecimal(diasVigenciaTotal), 10, java.math.RoundingMode.HALF_UP);
-            java.math.BigDecimal taxaProporcional = taxa.getTaxaSelicEfetivaVigencia().multiply(proporcao);
-
-            taxaTotal = taxaTotal.add(taxaProporcional);
-            diasContabilizados += diasSobreposicao;
-        }
-
-        return taxaTotal.setScale(4, java.math.RoundingMode.HALF_UP);
-    }
-
-    // ========== DTOs para Receita Federal ==========
-
-    @lombok.Data
-    @lombok.AllArgsConstructor
-    @lombok.NoArgsConstructor
-    public static class SelicReceitaFederalResult {
-        private LocalDate dataPagamento;
-        private LocalDate dataAtualizacao;
-        private java.math.BigDecimal taxaAcumuladaPercentual;
-        private java.math.BigDecimal fatorAcumulado;
-        private int totalMeses;
-        private java.util.List<SelicMensal> meses;
-    }
-
-    @lombok.Data
-    @lombok.AllArgsConstructor
-    @lombok.NoArgsConstructor
-    public static class SelicMensal {
-        private int ano;
-        private int mes;
-        private java.math.BigDecimal taxa;
+    private Mono<SelicMensalEntity> salvarOuAtualizarMensal(SelicMensalEntity taxa) {
+        return selicMensalRepository.findByAnoAndMes(taxa.getAno(), taxa.getMes())
+                .flatMap(existing -> {
+                    taxa.setId(existing.getId());
+                    return selicMensalRepository.save(taxa);
+                })
+                .switchIfEmpty(Mono.defer(() -> {
+                    taxa.setId(UUID.randomUUID().toString());
+                    return selicMensalRepository.save(taxa);
+                }));
     }
 
     /**
@@ -484,11 +332,16 @@ public class TaxaSelicService {
     }
 
     /**
-     * Força sincronização completa (recarrega todos os dados).
+     * Força sincronização completa (COPOM + SELIC mensal série 4390).
      */
     public Mono<SyncResult> sincronizarCompleto() {
         log.info("Iniciando sincronização COMPLETA com BCB...");
-        return sincronizarComBcb();
+        return sincronizarComBcb()
+                .flatMap(copom -> sincronizarSelicMensalComBcb()
+                        .map(mensal -> new SyncResult(
+                                copom.getRegistrosProcessados(),
+                                copom.getErros(),
+                                mensal)));
     }
 
     // ========== Resultado de Sincronização ==========
@@ -498,5 +351,10 @@ public class TaxaSelicService {
     public static class SyncResult {
         private int registrosProcessados;
         private int erros;
+        private int registrosMensaisProcessados;
+
+        public SyncResult(int registrosProcessados, int erros) {
+            this(registrosProcessados, erros, 0);
+        }
     }
 }

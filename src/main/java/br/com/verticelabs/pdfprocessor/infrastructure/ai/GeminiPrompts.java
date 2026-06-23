@@ -143,6 +143,7 @@ public final class GeminiPrompts {
 
             REGRAS CRÍTICAS DE PRECISÃO:
             - Se um valor NÃO estiver claramente legível, retorne null. NUNCA adivinhe ou invente valores.
+            - NUNCA preencha campos monetários com 0.00 por padrão — use null quando não legível, ou o valor EXATO quando legível.
             - Valores monetários: use PONTO como decimal e SEM separador de milhar (ex: 168097.04, não 168.097,04)
             - CPF no formato 000.000.000-00
             - ANTES de retornar, VERIFIQUE estas consistências:
@@ -150,11 +151,28 @@ public final class GeminiPrompts {
               * Se há "Saldo de Imposto a Pagar", então "impostoRestituir" deve ser 0 ou null
               * Se há "Imposto a Restituir", então "saldoImpostoPagar" deve ser 0 ou null
               * A soma das deduções individuais deve ser aproximadamente igual ao total de deduções
+              * Rendimentos tributáveis − total deduções ≈ base de cálculo do imposto
+
+            ATENÇÃO — DUAS LINHAS DISTINTAS DE PREVIDÊNCIA (declaração COMPLETA / DEDUÇÕES LEGAIS):
+            - "previdenciaOficial" = linha com "ATÉ o limite do patrocinador" (prev. oficial + compl. pública até o limite)
+            - "previdenciaComplementar" = linha com "ACIMA do limite do patrocinador" ou "privada, e Fapi"
+              (PGBL/prev. privada dedutível — costuma ser o MAIOR valor entre as duas linhas de previdência)
+            NÃO confundir essas linhas. Leia o valor à DIREITA de cada rótulo na seção DEDUÇÕES itemizada.
+            Em PDFs digitalizados, confira cada dígito (confusões comuns: 3/8, 4/1, 9/5, 6/7).
+
+            IDENTIFICAÇÃO DO TIPO DE TRIBUTAÇÃO — leia o título da seção RESUMO:
+            - Se o título diz "TRIBUTAÇÃO UTILIZANDO AS DEDUÇÕES LEGAIS" → modeloDeclaracao = "COMPLETA"
+              * A seção DEDUÇÕES lista itens individuais (previdência, dependentes, médicas, instrução, etc.)
+              * O campo "descontoSimplificado" deve ser null.
+            - Se o título diz "TRIBUTAÇÃO UTILIZANDO O DESCONTO SIMPLIFICADO" → modeloDeclaracao = "SIMPLIFICADA"
+              * A seção DEDUÇÕES mostra apenas o "Desconto Simplificado" (valor único).
+              * Os campos individuais de deduções (previdenciaOficial, dependentes, etc.) devem ser null.
+              * O campo "descontoSimplificado" deve conter o valor.
 
             A PÁGINA DE RESUMO possui estas seções em ordem:
             1. DADOS BÁSICOS: nome, CPF, exercício, ano-calendário, tipo e modelo da declaração
             2. RENDIMENTOS TRIBUTÁVEIS: lista de fontes + TOTAL
-            3. DEDUÇÕES: lista de tipos + TOTAL
+            3. DEDUÇÕES: lista de tipos + TOTAL (layout varia conforme o tipo de tributação acima)
             4. IMPOSTO DEVIDO: base de cálculo, imposto devido, deduções de incentivo, etc.
             5. IMPOSTO PAGO: retido na fonte, carnê-leão, complementar, etc. + TOTAL
             6. RESULTADO: saldo a pagar OU imposto a restituir
@@ -167,46 +185,129 @@ public final class GeminiPrompts {
               "cpf": "000.000.000-00 ou null",
               "tipoDeclaracao": "ORIGINAL ou RETIFICADORA ou null",
               "modeloDeclaracao": "COMPLETA ou SIMPLIFICADA ou null",
-              "rendimentosTributaveis": 0.00,
+              "rendimentosTributaveis": null,
+              "rendimentos": {
+                "titularPJ": null,
+                "dependentesPJ": null,
+                "titularPF": null,
+                "dependentesPF": null,
+                "acumuladosTitular": null,
+                "acumuladosDependentes": null,
+                "atividadeRural": null,
+                "total": null
+              },
               "deducoes": {
-                "previdenciaOficial": 0.00,
-                "previdenciaOficialRRA": 0.00,
-                "previdenciaComplementar": 0.00,
-                "dependentes": 0.00,
-                "despesasMedicas": 0.00,
-                "instrucao": 0.00,
-                "pensaoAlimenticiaJudicial": 0.00,
-                "pensaoAlimenticiaEscritura": 0.00,
-                "pensaoAlimenticiaRRA": 0.00,
-                "livrosCaixa": 0.00,
-                "total": 0.00
+                "previdenciaOficial": null,
+                "previdenciaOficialRRA": null,
+                "previdenciaComplementar": null,
+                "dependentes": null,
+                "despesasMedicas": null,
+                "instrucao": null,
+                "pensaoAlimenticiaJudicial": null,
+                "pensaoAlimenticiaEscritura": null,
+                "pensaoAlimenticiaRRA": null,
+                "livrosCaixa": null,
+                "total": null
               },
-              "baseCalculoImposto": 0.00,
-              "impostoDevido": 0.00,
-              "deducaoIncentivo": 0.00,
-              "impostoDevidoI": 0.00,
-              "contribuicaoPrevEmpregadorDomestico": 0.00,
-              "impostoDevidoII": 0.00,
-              "impostoDevidoRRA": 0.00,
-              "totalImpostoDevido": 0.00,
+              "baseCalculoImposto": null,
+              "impostoDevido": null,
+              "deducaoIncentivo": null,
+              "impostoDevidoI": null,
+              "contribuicaoPrevEmpregadorDomestico": null,
+              "impostoDevidoII": null,
+              "impostoDevidoRRA": null,
+              "totalImpostoDevido": null,
               "impostoPago": {
-                "retidoFonteTitular": 0.00,
-                "retidoFonteDependentes": 0.00,
-                "carneLeaoTitular": 0.00,
-                "carneLeaoDependentes": 0.00,
-                "complementar": 0.00,
-                "exterior": 0.00,
-                "retidoFonteLei11033": 0.00,
-                "retidoRRA": 0.00,
-                "total": 0.00
+                "retidoFonteTitular": null,
+                "retidoFonteDependentes": null,
+                "carneLeaoTitular": null,
+                "carneLeaoDependentes": null,
+                "complementar": null,
+                "exterior": null,
+                "retidoFonteLei11033": null,
+                "retidoRRA": null,
+                "total": null
               },
-              "saldoImpostoPagar": 0.00,
-              "impostoRestituir": 0.00,
-              "descontoSimplificado": 0.00,
-              "aliquotaEfetiva": 0.00
+              "saldoImpostoPagar": null,
+              "impostoRestituir": null,
+              "descontoSimplificado": null,
+              "aliquotaEfetiva": null
             }
 
             Retorne APENAS o JSON acima preenchido. Sem texto extra, sem markdown, sem explicações.
+            """;
+
+    /**
+     * Prompt para extração de RESUMO de IR em PDFs digitalizados com RESUMO em 2 páginas consecutivas.
+     */
+    public static final String IR_RESUMO_EXTRACTION_MULTIPAGE = """
+            Você é um sistema de extração de dados de alta precisão especializado em declarações de Imposto de Renda brasileiras (IRPF).
+            Você recebe DUAS IMAGENS CONSECUTIVAS de um PDF digitalizado. Juntas elas formam a página RESUMO DA DECLARAÇÃO.
+
+            REGRAS CRÍTICAS:
+            - Leia TODOS os valores monetários visíveis nas duas imagens.
+            - Se um valor NÃO estiver legível, retorne null. NUNCA use 0.00 como placeholder.
+            - Valores monetários: PONTO como decimal, SEM separador de milhar (ex: 168097.04).
+            - CPF no formato 000.000.000-00.
+
+            Extraia TODOS os dados visíveis das seções:
+            RENDIMENTOS TRIBUTÁVEIS (cada linha + total), DEDUÇÕES (cada linha + total),
+            IMPOSTO DEVIDO (base, imposto devido, dedução de incentivo, imposto devido I, alíquota, total),
+            IMPOSTO PAGO (retido na fonte + total) e RESULTADO (saldo a pagar ou restituir).
+            A imagem 1 geralmente contém cabeçalho e rendimentos; a imagem 2 contém deduções, imposto e resultado.
+
+            ATENÇÃO — PREVIDÊNCIA COMPLEMENTAR (deduções legais):
+            Existem DUAS linhas de previdência na seção DEDUÇÕES — NÃO confundir:
+            - previdenciaOficial = "ATÉ o limite do patrocinador" (valor menor, ex: 7.707,96)
+            - previdenciaComplementar = "ACIMA do limite do patrocinador" ou "privada, e Fapi" (valor maior, ex: 34.964,17)
+            Use os valores da lista itemizada em DEDUÇÕES (não de resumos condensados em outra parte).
+            Leia cada dígito com cuidado em PDFs digitalizados. Confira: soma das linhas ≈ total deduções;
+            rendimentos − total deduções ≈ base de cálculo.
+
+            FORMATO JSON OBRIGATÓRIO (mesmo schema de IR_RESUMO_EXTRACTION):
+            {
+              "exercicio": "ano do exercício ou null",
+              "anoCalendario": "ano calendário ou null",
+              "nome": "nome completo ou null",
+              "cpf": "000.000.000-00 ou null",
+              "tipoDeclaracao": "ORIGINAL ou RETIFICADORA ou null",
+              "modeloDeclaracao": "COMPLETA ou SIMPLIFICADA ou null",
+              "rendimentosTributaveis": null,
+              "rendimentos": {
+                "titularPJ": null,
+                "dependentesPJ": null,
+                "titularPF": null,
+                "dependentesPF": null,
+                "acumuladosTitular": null,
+                "acumuladosDependentes": null,
+                "atividadeRural": null,
+                "total": null
+              },
+              "deducoes": {
+                "previdenciaOficial": null,
+                "previdenciaComplementar": null,
+                "dependentes": null,
+                "despesasMedicas": null,
+                "instrucao": null,
+                "pensaoAlimenticiaJudicial": null,
+                "total": null
+              },
+              "baseCalculoImposto": null,
+              "impostoDevido": null,
+              "deducaoIncentivo": null,
+              "impostoDevidoI": null,
+              "totalImpostoDevido": null,
+              "impostoPago": {
+                "retidoFonteTitular": null,
+                "total": null
+              },
+              "saldoImpostoPagar": null,
+              "impostoRestituir": null,
+              "descontoSimplificado": null,
+              "aliquotaEfetiva": null
+            }
+
+            Retorne APENAS o JSON. Sem markdown, sem explicações.
             """;
 
     /**

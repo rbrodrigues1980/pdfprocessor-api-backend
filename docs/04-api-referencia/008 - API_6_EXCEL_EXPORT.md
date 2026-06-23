@@ -191,4 +191,116 @@ totalRubricas * 12 meses
 
 ---
 
+# 11. Simulação IRPF na aba anual (dois blocos)
+
+Quando existe declaração IRPF importada para o ano-calendário da aba, `ConsolidationExcelServiceImpl` gera **dois blocos** distintos:
+
+| # | Quando | Título | Conteúdo |
+|---|--------|--------|----------|
+| 1 | `tipoTributacao = SIMPLIFICADO` | `CONFORME DECLARAÇÃO ENTREGUE…` | **Espelho exato** do RESUMO simplificado (desconto simplificado, imposto devido/pago/resultado) — **sem motor**, valores do PDF |
+| 1 | `tipoTributacao = COMPLETO` | `CONFORME DECLARAÇÃO ENTREGUE…` | **Espelho exato** do RESUMO com deduções legais (rendimentos, deduções, imposto devido/pago/resultado) — **sem motor**, valores do PDF |
+| 2 | **Sempre** | `SIMULAÇÃO IRPF… COM APROVEITAMENTO DAS CONTRIBUIÇÕES EXTRAS` | Modelo **Completo** via `IrSimuladorMotorService` com prev. complementar da **planilha de contracheques** (verde) |
+
+### Bloco 1 — Declaração Simplificada entregue
+
+- Rendimentos tributáveis (7 sub-linhas + total)
+- Desconto simplificado, base, imposto devido, RRA, alíquota, total devido
+- Imposto pago (8 linhas + total), restituição, saldo a pagar
+- Fonte: campos de `IrpfDeclaracaoData` extraídos do PDF (sem recálculo)
+
+### Bloco 1 — Declaração Completa entregue (deduções legais)
+
+- Rendimentos tributáveis (7 sub-linhas + total)
+- Deduções (10 linhas do RESUMO + nota 12% + **TOTAL**)
+- Imposto devido (base, imposto devido, dedução incentivo, imposto devido I/II, RRA, alíquota, total)
+- Imposto pago (8 linhas + total), restituição, saldo a pagar
+- Fonte: `ExcelIrpfDeducoesResumoHelper.montarConformeDeclaracao` + campos de `IrpfDeclaracaoData` (sem motor)
+
+### Bloco 2 — Simulação Completa + planilha
+
+- Seção **RENDIMENTOS TRIBUTÁVEIS** (igual ao bloco 1)
+- Seção **DEDUÇÕES** com rótulos do RESUMO IRPF (prev. oficial, prev. compl. limitada a 12%, médicas, etc.)
+- **INSS doméstico** não entra nas deduções — aplica-se como **crédito** (Imposto devido II = Imposto devido I − INSS). Sem INSS doméstico, Imposto devido II exibe **0,00** no bloco 2 e é omitido no bloco 1; total devido = Imposto devido I + RRA.
+- Imposto devido, pago (valores da declaração) e resultado (saldo = total devido − total pago)
+- Prev. complementar da planilha destacada em verde
+
+**Deduções:** `ExcelIrpfDeducoesResumoHelper` centraliza linhas do RESUMO; `ExcelIrpfSimulacaoMapper` com `preferirPrevidenciaPlanilha=true`; `IrpfPrevidenciaOficialResolver` soma prev. oficial das fontes pagadoras PJ.
+
+**Motor:** flag `inssDomesticoComoCreditoImposto` em `SimuladorIrpfRequest` para alinhar ao RESUMO da Receita.
+
+**Layout (colunas B:F):** título B:F; rótulos B:E, valor F; totais com fundo amarelo.
+
+Classes envolvidas:
+
+- `ConsolidationExcelServiceImpl` — `addBlocoConformeDeclaracaoSimplificada`, `addBlocoConformeDeclaracaoCompleta`, `addBlocoSimulacaoCompletaPlanilha`
+- `ExcelIrpfDeducoesResumoHelper` / `ExcelIrpfDeducoesResumoDTO` — `montarConformeDeclaracao` (espelho) e `montar` (simulação planilha)
+- `ExcelIrpfSimulacaoMapper` — mapeamento declaração → request
+- `ModoSimulacaoExcel` — `ESPELHO_ENTREGUE` | `SIMULACAO_COMPLETA_PLANILHA`
+- `IrSimuladorMotorService` — cálculo progressivo + crédito INSS doméstico
+
+Regressão: Elizete AC 2018 — `Elizete2018ExcelSimulacaoLayoutTest`; Elizete AC 2019 — `Elizete2019ExcelSimulacaoLayoutTest`; Elizabeth AC 2016 — `ExcelIrpfSimulacaoTest`; Resumo Geral — `ElizeteResumoGeralTest`.
+
+---
+
+# 12. Aba "Resumo Geral"
+
+Quando existem declarações IRPF importadas **cujo ano-calendário coincide com um ano de contracheque processado**, `ConsolidationExcelServiceImpl` gera a aba **"Resumo Geral"** (após as abas anuais, antes de **Consolidação**).
+
+**Regra de alinhamento:** apenas declarações cujo **ano-calendário** está presente na consolidação de contracheques entram no Excel. Ex.: contracheque de 2016 → usa declaração **exercício 2017 / ano-calendário 2016**; declaração **exercício 2016 / ano-calendário 2015** é ignorada se não houver contracheque de 2015.
+
+### Colunas por ano-calendário (somente anos com contracheque e declaração)
+
+| Coluna | Origem | Regra |
+|--------|--------|-------|
+| A — Calendário | ano da aba | Ano-calendário |
+| B — Valores Restituídos / Pagos | Bloco 1 (declaração entregue) | Valor positivo entre `IMPOSTO A RESTITUIR` e `SALDO IMPOSTO A PAGAR` |
+| C — Valor Devido e ou a Restituir | Bloco 2 (simulação planilha) | Valor positivo entre restituição e saldo (`total devido − total pago` via motor) |
+| D — Principal PGFN | derivado | `max(B − C, 0)` |
+| E — SELIC Acumulada RFB | `TaxaSelicService.calcularSelicReceitaFederal` | Taxa acumulada (%); só se `D > 0` |
+| F — Valor Correção R$ | SELIC | `valorCorrigido − D` |
+| G — Principal + Correção | derivado | `D + F` |
+| H — Observações | derivado | `"impacto financeiro"` se `D > 0`; senão `"sem impacto financeiro -sistema de tributação"` |
+
+### Totais e rodapé
+
+- **Total da diferença R$** — soma de D, F e G
+- **Honorários Advocatícios — {sigla ou Contratual} — {N}%** — percentual sobre total G (padrão **12%** quando o cliente não tem empresa/percentual vinculado)
+- **Valor a Receber** — total G − honorários
+
+### Percentual de honorários por cliente
+
+O percentual aplicado na linha de honorários é resolvido por `EmpresaHonorariosResolver` a partir do vínculo do cliente (`Person.empresaId` + `Person.percentualHonorarioId`):
+
+1. Se o cliente possui empresa e percentual vigente cadastrados → usa o percentual da empresa (ex.: APCEF 15%).
+2. Caso contrário → fallback **12%** (`ExcelResumoGeralHelper.PERCENTUAL_HONORARIOS_DEFAULT`).
+
+O rótulo da linha segue o padrão `Honorários Advocatícios - {SIGLA} - {N}%` (ex.: `Honorários Advocatícios - APCEF - 12%`); sem empresa vinculada, usa `Contratual` no lugar da sigla.
+
+Regressão: `ElizeteResumoGeralTest` (12% padrão e percentual customizado 15%).
+- Rodapé com responsável técnico (constantes em `ExcelResumoGeralHelper`)
+
+### SELIC
+
+- **dataVencimento** — mapa estático por ano-calendário (`ExcelResumoGeralHelper.DATAS_VENCIMENTO`), exibido no cabeçalho "Datas para atualização"
+- **dataPagamento (fim)** — `LocalDate.now()` na geração do Excel (colunas E/F/G variam com a data)
+
+### Layout visual
+
+- **Colunas A–G:** largura fixa ~105 px (15 caracteres); **coluna H:** ~280 px (40 caracteres)
+- **Borda externa espessa** (`MEDIUM`) em torno do bloco principal (A1:H até "Valor a Receber")
+- Bordas internas finas na tabela; linha dupla (`DOUBLE`) nas linhas de totais/honorários/valor a receber
+- Rodapé (Responsável / CORECON) em caixa separada abaixo, com borda espessa própria
+- Linha do economista: merge **B:F** com o texto CORECON; coluna **H** com data/hora de geração (`dd/MM/yyyy HH:mm`, fuso `America/Sao_Paulo`)
+- Cabeçalho da tabela com fundo cinza e altura ~64 pt
+- **Logo Origium** na área mesclada **G1:H8** (8 linhas × 2 colunas), recurso `excel/origium_logo.png`, ancorado com `MOVE_AND_RESIZE` para preencher a célula
+
+### Classes envolvidas
+
+- `ConsolidationExcelServiceImpl` — `addResumoGeralSheet`, orquestração reativa com `TaxaSelicService`
+- `ExcelResumoGeralHelper` — regras B–H, mapa de datas, totais e honorários
+- `ExcelResumoGeralLinhaDTO` — linha por ano + `enriquecerComSelic`
+- `ExcelResumoGeralLogoHelper` — merge G1:H8 e inserção do logo Origium
+
+---
+
 Fim da documentação da API 6 — Exportação de Excel.

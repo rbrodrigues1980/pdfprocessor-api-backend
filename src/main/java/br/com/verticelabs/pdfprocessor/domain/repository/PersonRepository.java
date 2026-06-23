@@ -1,6 +1,7 @@
 package br.com.verticelabs.pdfprocessor.domain.repository;
 
 import br.com.verticelabs.pdfprocessor.domain.model.Person;
+import br.com.verticelabs.pdfprocessor.interfaces.dashboard.dto.DashboardChartItem;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -24,7 +25,9 @@ public interface PersonRepository {
      * Conta todas as pessoas (sem filtrar por tenant) - para SUPER_ADMIN
      */
     Mono<Long> countAll();
-    
+
+    Flux<DashboardChartItem> countPessoasPorAno(String tenantId);
+
     /**
      * Busca pessoa por ID e tenantId (para validação de acesso)
      */
@@ -34,6 +37,17 @@ public interface PersonRepository {
      * Exclui definitivamente uma pessoa
      */
     Mono<Void> deleteById(String id);
+
+    Mono<Long> countByEmpresaId(String empresaId);
+
+    /**
+     * Lista clientes validados (todos os tenants)
+     */
+    Flux<Person> findByValidadoTrue();
+
+    Mono<Long> countByValidadoTrue();
+
+    Mono<Long> countByValidadoFalseOrNull();
     
     // Métodos legados (manter para compatibilidade)
     @Deprecated

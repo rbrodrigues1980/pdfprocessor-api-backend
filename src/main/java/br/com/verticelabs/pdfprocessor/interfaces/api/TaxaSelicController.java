@@ -1,6 +1,7 @@
 package br.com.verticelabs.pdfprocessor.interfaces.api;
 
 import br.com.verticelabs.pdfprocessor.application.selic.TaxaSelicService;
+import br.com.verticelabs.pdfprocessor.application.selic.dto.SelicReceitaCalculoResponse;
 import br.com.verticelabs.pdfprocessor.domain.model.TaxaSelic;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 /**
@@ -98,24 +100,43 @@ public class TaxaSelicController {
     }
 
     /**
-     * Calcula a SELIC para fins de Receita Federal (restituição/débitos).
-     * Usa cálculo MENSAL começando do mês seguinte ao pagamento.
-     * 
+     * Calcula a SELIC para Receita Federal (Lei nº 9.250/1995).
+     * Acumulação simples (série 4390) + 1% fixo no mês final.
+     *
      * Exemplo:
-     * /selic/receita-federal?dataPagamento=2017-04-30&dataAtualizacao=2025-08-31
+     * /selic/receita-federal?dataVencimento=2017-04-30&dataPagamento=2025-08-31&valorOriginal=346.13
      */
     @GetMapping("/receita-federal")
-    @Operation(summary = "SELIC para Receita Federal (restituição/débitos)")
-    public Mono<ResponseEntity<TaxaSelicService.SelicReceitaFederalResult>> getSelicReceitaFederal(
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataPagamento,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataAtualizacao) {
+    @Operation(summary = "SELIC Receita Federal — Lei 9.250/1995")
+    public Mono<ResponseEntity<SelicReceitaCalculoResponse>> getSelicReceitaFederal(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataVencimento,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataPagamento,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataAtualizacao,
+            @RequestParam(required = false, defaultValue = "0") BigDecimal valorOriginal) {
 
-        log.info("Solicitação de SELIC Receita Federal: pagamento={}, atualização={}",
-                dataPagamento, dataAtualizacao);
+        LocalDate vencimento;
+        LocalDate fim;
 
-        return taxaSelicService.calcularSelicReceitaFederal(dataPagamento, dataAtualizacao)
-                .map(ResponseEntity::ok)
-                .defaultIfEmpty(ResponseEntity.notFound().build());
+        if (dataVencimento != null) {
+            vencimento = dataVencimento;
+            fim = dataPagamento != null ? dataPagamento : dataAtualizacao;
+        } else if (dataPagamento != null && dataAtualizacao != null) {
+            // Compatibilidade: parâmetros legados (pagamento = vencimento, atualização = fim)
+            vencimento = dataPagamento;
+            fim = dataAtualizacao;
+        } else {
+            return Mono.error(new IllegalArgumentException(
+                    "Informe dataVencimento e dataPagamento (ou dataPagamento e dataAtualizacao no formato legado)"));
+        }
+
+        if (fim == null) {
+            return Mono.error(new IllegalArgumentException("Informe a data de pagamento/atualização"));
+        }
+
+        log.info("SELIC Receita Federal: vencimento={}, pagamento={}, valor={}", vencimento, fim, valorOriginal);
+
+        return taxaSelicService.calcularSelicReceitaFederal(vencimento, fim, valorOriginal)
+                .map(ResponseEntity::ok);
     }
 
     /**

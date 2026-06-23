@@ -5,17 +5,14 @@ import br.com.verticelabs.pdfprocessor.domain.repository.PayrollEntryRepository;
 import br.com.verticelabs.pdfprocessor.domain.repository.PersonRepository;
 import br.com.verticelabs.pdfprocessor.domain.repository.RubricaRepository;
 import br.com.verticelabs.pdfprocessor.infrastructure.security.ReactiveSecurityContextHelper;
+import br.com.verticelabs.pdfprocessor.interfaces.dashboard.dto.DashboardChartItem;
 import br.com.verticelabs.pdfprocessor.interfaces.dashboard.dto.DashboardMetric;
 import br.com.verticelabs.pdfprocessor.interfaces.dashboard.dto.DashboardResponse;
-import br.com.verticelabs.pdfprocessor.interfaces.dashboard.dto.TotalPorAno;
-import br.com.verticelabs.pdfprocessor.interfaces.dashboard.dto.TotalPorMes;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -24,202 +21,109 @@ import java.util.List;
 @RequiredArgsConstructor
 public class DashboardUseCase {
 
+    private static final int TOP_RUBRICAS_LIMIT = 10;
+
     private final PayrollDocumentRepository documentRepository;
     private final PayrollEntryRepository entryRepository;
     private final PersonRepository personRepository;
     private final RubricaRepository rubricaRepository;
 
-    /**
-     * Obtém todas as métricas do dashboard para o tenant do usuário autenticado
-     * Se for SUPER_ADMIN sem tenantId, retorna dados agregados de todos os tenants
-     */
     public Mono<DashboardResponse> getDashboardMetrics() {
         log.info("=== DashboardUseCase.getDashboardMetrics() INICIADO ===");
 
-        // Verificar se é SUPER_ADMIN
         return ReactiveSecurityContextHelper.isSuperAdmin()
                 .flatMap(isSuperAdmin -> {
                     if (Boolean.TRUE.equals(isSuperAdmin)) {
                         log.info("Usuário é SUPER_ADMIN - buscando métricas agregadas de todos os tenants");
-                        return getAggregatedMetrics();
-                    } else {
-                        // Usuário normal - buscar métricas do tenant específico
-                        return ReactiveSecurityContextHelper.getTenantId()
-                                .flatMap(tenantId -> {
-                                    log.info("Buscando métricas para tenant: {}", tenantId);
-                                    return getTenantMetrics(tenantId);
-                                });
+                        return getMetrics(null,
+                                "Documentos processados (todos os tenants)",
+                                "Total de lançamentos (todos os tenants)",
+                                "Pessoas cadastradas (todos os tenants)",
+                                "Rubricas ativas (todos os tenants)");
                     }
+                    return ReactiveSecurityContextHelper.getTenantId()
+                            .flatMap(tenantId -> {
+                                log.info("Buscando métricas para tenant: {}", tenantId);
+                                return getMetrics(tenantId,
+                                        "Documentos processados",
+                                        "Total de lançamentos",
+                                        "Pessoas cadastradas",
+                                        "Rubricas ativas");
+                            });
                 })
-                .doOnSuccess(response -> {
-                    log.info("✓ Dashboard metrics obtidas com sucesso");
-                })
-                .doOnError(error -> {
-                    log.error("Erro ao obter métricas do dashboard", error);
-                });
+                .doOnSuccess(response -> log.info("✓ Dashboard metrics obtidas com sucesso"))
+                .doOnError(error -> log.error("Erro ao obter métricas do dashboard", error));
     }
 
-    /**
-     * Obtém métricas agregadas de todos os tenants (para SUPER_ADMIN)
-     */
-    private Mono<DashboardResponse> getAggregatedMetrics() {
-        log.info("Buscando métricas agregadas de todos os tenants para SUPER_ADMIN");
+    private Mono<DashboardResponse> getMetrics(
+            String tenantId,
+            String descDocumentos,
+            String descLancamentos,
+            String descPessoas,
+            String descRubricas
+    ) {
+        Mono<Long> totalDocumentosMono = tenantId == null
+                ? documentRepository.countAll().defaultIfEmpty(0L)
+                : documentRepository.countByTenantId(tenantId).defaultIfEmpty(0L);
 
-        // Buscar todas as métricas em paralelo (sem filtrar por tenant)
-        Mono<Long> totalDocumentosMono = documentRepository.countAll()
-                .defaultIfEmpty(0L);
+        Mono<Long> totalLancamentosMono = tenantId == null
+                ? entryRepository.countAll().defaultIfEmpty(0L)
+                : entryRepository.countByTenantId(tenantId).defaultIfEmpty(0L);
 
-        Mono<Long> totalLancamentosMono = entryRepository.countAll()
-                .defaultIfEmpty(0L);
+        Mono<Long> totalPessoasMono = tenantId == null
+                ? personRepository.countAll().defaultIfEmpty(0L)
+                : personRepository.countByTenantId(tenantId).defaultIfEmpty(0L);
 
-        Mono<Long> totalPessoasMono = personRepository.countAll()
-                .defaultIfEmpty(0L);
+        Mono<Long> totalRubricasMono = rubricaRepository.countAllAtivoTrue().defaultIfEmpty(0L);
 
-        Mono<Long> totalRubricasMono = rubricaRepository.countAllAtivoTrue()
-                .defaultIfEmpty(0L);
-
-        // Buscar totais por ano e por mês
-        Mono<List<TotalPorAno>> totalPorAnoMono = entryRepository.getTotalPorAnoAll()
+        Mono<List<DashboardChartItem>> graficoRubricasMono = entryRepository
+                .countTopRubricas(tenantId, TOP_RUBRICAS_LIMIT)
                 .collectList()
                 .defaultIfEmpty(Collections.emptyList());
 
-        Mono<List<TotalPorMes>> totalPorMesMono = entryRepository.getTotalPorMesAll()
+        Mono<List<DashboardChartItem>> graficoPessoasMono = personRepository
+                .countPessoasPorAno(tenantId)
                 .collectList()
                 .defaultIfEmpty(Collections.emptyList());
 
-        // Combinar todas as métricas
+        Mono<List<DashboardChartItem>> graficoDocumentosMono = documentRepository
+                .countDocumentosPorAno(tenantId)
+                .collectList()
+                .defaultIfEmpty(Collections.emptyList());
+
+        Mono<List<DashboardChartItem>> graficoLancamentosMono = entryRepository
+                .countLancamentosPorAno(tenantId)
+                .collectList()
+                .defaultIfEmpty(Collections.emptyList());
+
         return Mono.zip(
                 totalDocumentosMono,
                 totalLancamentosMono,
                 totalPessoasMono,
                 totalRubricasMono,
-                totalPorAnoMono,
-                totalPorMesMono
-        ).map(tuple -> {
-            Long totalDocumentos = tuple.getT1();
-            Long totalLancamentos = tuple.getT2();
-            Long totalPessoas = tuple.getT3();
-            Long totalRubricas = tuple.getT4();
-            List<TotalPorAno> totalPorAno = tuple.getT5();
-            List<TotalPorMes> totalPorMes = tuple.getT6();
-
-            log.info("Métricas agregadas obtidas - Documentos: {}, Lançamentos: {}, Pessoas: {}, Rubricas: {}",
-                    totalDocumentos, totalLancamentos, totalPessoas, totalRubricas);
-            log.info("Totais por ano: {} registros, Totais por mês: {} registros", totalPorAno.size(), totalPorMes.size());
-
-            return DashboardResponse.builder()
-                    .totalDocumentos(DashboardMetric.builder()
-                            .titulo("Total de Documentos")
-                            .valor(totalDocumentos)
-                            .descricao("Documentos processados (todos os tenants)")
-                            .trend(null)
-                            .trendPositive(null)
-                            .build())
-                    .lancamentos(DashboardMetric.builder()
-                            .titulo("Lançamentos")
-                            .valor(totalLancamentos)
-                            .descricao("Total de lançamentos (todos os tenants)")
-                            .trend(null)
-                            .trendPositive(null)
-                            .build())
-                    .pessoas(DashboardMetric.builder()
-                            .titulo("Pessoas")
-                            .valor(totalPessoas)
-                            .descricao("Pessoas cadastradas (todos os tenants)")
-                            .trend(null)
-                            .trendPositive(null)
-                            .build())
-                    .rubricas(DashboardMetric.builder()
-                            .titulo("Rubricas")
-                            .valor(totalRubricas)
-                            .descricao("Rubricas ativas (todos os tenants)")
-                            .trend(null)
-                            .trendPositive(null)
-                            .build())
-                    .totalPorAno(totalPorAno)
-                    .totalPorMes(totalPorMes)
-                    .build();
-        });
+                graficoRubricasMono,
+                graficoPessoasMono,
+                graficoDocumentosMono,
+                graficoLancamentosMono
+        ).map(tuple -> DashboardResponse.builder()
+                .rubricas(buildMetric("Rubricas", tuple.getT4(), descRubricas))
+                .pessoas(buildMetric("Pessoas", tuple.getT3(), descPessoas))
+                .totalDocumentos(buildMetric("Total de Documentos", tuple.getT1(), descDocumentos))
+                .lancamentos(buildMetric("Lançamentos", tuple.getT2(), descLancamentos))
+                .graficoRubricas(tuple.getT5())
+                .graficoPessoas(tuple.getT6())
+                .graficoDocumentos(tuple.getT7())
+                .graficoLancamentos(tuple.getT8())
+                .build());
     }
 
-    /**
-     * Obtém métricas para um tenant específico
-     */
-    private Mono<DashboardResponse> getTenantMetrics(String tenantId) {
-        // Buscar todas as métricas em paralelo
-        Mono<Long> totalDocumentosMono = documentRepository.countByTenantId(tenantId)
-                .defaultIfEmpty(0L);
-
-        Mono<Long> totalLancamentosMono = entryRepository.countByTenantId(tenantId)
-                .defaultIfEmpty(0L);
-
-        Mono<Long> totalPessoasMono = personRepository.countByTenantId(tenantId)
-                .defaultIfEmpty(0L);
-
-        Mono<Long> totalRubricasMono = rubricaRepository.countAllAtivoTrue()
-                .defaultIfEmpty(0L);
-
-        // Buscar totais por ano e por mês
-        Mono<List<TotalPorAno>> totalPorAnoMono = entryRepository.getTotalPorAno(tenantId)
-                .collectList()
-                .defaultIfEmpty(Collections.emptyList());
-
-        Mono<List<TotalPorMes>> totalPorMesMono = entryRepository.getTotalPorMes(tenantId)
-                .collectList()
-                .defaultIfEmpty(Collections.emptyList());
-
-        // Combinar todas as métricas
-        return Mono.zip(
-                totalDocumentosMono,
-                totalLancamentosMono,
-                totalPessoasMono,
-                totalRubricasMono,
-                totalPorAnoMono,
-                totalPorMesMono
-        ).map(tuple -> {
-            Long totalDocumentos = tuple.getT1();
-            Long totalLancamentos = tuple.getT2();
-            Long totalPessoas = tuple.getT3();
-            Long totalRubricas = tuple.getT4();
-            List<TotalPorAno> totalPorAno = tuple.getT5();
-            List<TotalPorMes> totalPorMes = tuple.getT6();
-
-            log.info("Métricas obtidas - Documentos: {}, Lançamentos: {}, Pessoas: {}, Rubricas: {}",
-                    totalDocumentos, totalLancamentos, totalPessoas, totalRubricas);
-            log.info("Totais por ano: {} registros, Totais por mês: {} registros", totalPorAno.size(), totalPorMes.size());
-
-            return DashboardResponse.builder()
-                    .totalDocumentos(DashboardMetric.builder()
-                            .titulo("Total de Documentos")
-                            .valor(totalDocumentos)
-                            .descricao("Documentos processados")
-                            .trend(null)
-                            .trendPositive(null)
-                            .build())
-                    .lancamentos(DashboardMetric.builder()
-                            .titulo("Lançamentos")
-                            .valor(totalLancamentos)
-                            .descricao("Total de lançamentos")
-                            .trend(null)
-                            .trendPositive(null)
-                            .build())
-                    .pessoas(DashboardMetric.builder()
-                            .titulo("Pessoas")
-                            .valor(totalPessoas)
-                            .descricao("Pessoas cadastradas")
-                            .trend(null)
-                            .trendPositive(null)
-                            .build())
-                    .rubricas(DashboardMetric.builder()
-                            .titulo("Rubricas")
-                            .valor(totalRubricas)
-                            .descricao("Rubricas ativas")
-                            .trend(null)
-                            .trendPositive(null)
-                            .build())
-                    .totalPorAno(totalPorAno)
-                    .totalPorMes(totalPorMes)
-                    .build();
-        });
+    private DashboardMetric buildMetric(String titulo, Long valor, String descricao) {
+        return DashboardMetric.builder()
+                .titulo(titulo)
+                .valor(valor)
+                .descricao(descricao)
+                .trend(null)
+                .trendPositive(null)
+                .build();
     }
 }

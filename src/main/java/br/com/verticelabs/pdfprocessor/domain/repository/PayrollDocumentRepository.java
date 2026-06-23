@@ -3,6 +3,7 @@ package br.com.verticelabs.pdfprocessor.domain.repository;
 import br.com.verticelabs.pdfprocessor.domain.model.DocumentStatus;
 import br.com.verticelabs.pdfprocessor.domain.model.DocumentType;
 import br.com.verticelabs.pdfprocessor.domain.model.PayrollDocument;
+import br.com.verticelabs.pdfprocessor.interfaces.dashboard.dto.DashboardChartItem;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -30,7 +31,9 @@ public interface PayrollDocumentRepository {
      * Conta todos os documentos (sem filtrar por tenant) - para SUPER_ADMIN
      */
     Mono<Long> countAll();
-    
+
+    Flux<DashboardChartItem> countDocumentosPorAno(String tenantId);
+
     /**
      * Busca documentos com filtros dinâmicos (filtrado por tenant)
      */

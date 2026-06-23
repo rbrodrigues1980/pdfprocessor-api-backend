@@ -1,8 +1,7 @@
 package br.com.verticelabs.pdfprocessor.domain.repository;
 
 import br.com.verticelabs.pdfprocessor.domain.model.PayrollEntry;
-import br.com.verticelabs.pdfprocessor.interfaces.dashboard.dto.TotalPorAno;
-import br.com.verticelabs.pdfprocessor.interfaces.dashboard.dto.TotalPorMes;
+import br.com.verticelabs.pdfprocessor.interfaces.dashboard.dto.DashboardChartItem;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -26,27 +25,11 @@ public interface PayrollEntryRepository {
      * Conta todas as entries (sem filtrar por tenant) - para SUPER_ADMIN
      */
     Mono<Long> countAll();
-    
-    /**
-     * Agrega valores totais por ano para um tenant específico
-     */
-    Flux<TotalPorAno> getTotalPorAno(String tenantId);
-    
-    /**
-     * Agrega valores totais por ano para todos os tenants (SUPER_ADMIN)
-     */
-    Flux<TotalPorAno> getTotalPorAnoAll();
-    
-    /**
-     * Agrega valores totais por mês para um tenant específico
-     */
-    Flux<TotalPorMes> getTotalPorMes(String tenantId);
-    
-    /**
-     * Agrega valores totais por mês para todos os tenants (SUPER_ADMIN)
-     */
-    Flux<TotalPorMes> getTotalPorMesAll();
-    
+
+    Flux<DashboardChartItem> countTopRubricas(String tenantId, int limit);
+
+    Flux<DashboardChartItem> countLancamentosPorAno(String tenantId);
+
     Mono<Void> deleteByTenantIdAndDocumentoId(String tenantId, String documentoId);
     
     // Métodos legados (manter para compatibilidade)

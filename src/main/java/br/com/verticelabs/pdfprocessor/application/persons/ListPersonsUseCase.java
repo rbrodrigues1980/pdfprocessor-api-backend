@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.ReactiveMongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -23,28 +24,33 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class ListPersonsUseCase {
-    
+
+    private static final Sort DEFAULT_SORT = Sort.by(
+            Sort.Order.desc("updatedAt"),
+            Sort.Order.desc("createdAt")
+    );
+
     private final ReactiveMongoTemplate mongoTemplate;
     
-    public Mono<ListPersonsResult> execute(String nomeFilter, String cpfFilter, String matriculaFilter, int page, int size) {
+    public Mono<ListPersonsResult> execute(String nomeFilter, String cpfFilter, String matriculaFilter, Boolean validadoFilter, int page, int size) {
         return ReactiveSecurityContextHelper.isSuperAdmin()
                 .flatMap(isSuperAdmin -> {
                     if (isSuperAdmin) {
                         // SUPER_ADMIN pode ver todas as pessoas (sem filtrar por tenantId)
-                        return listAllPersons(nomeFilter, cpfFilter, matriculaFilter, page, size);
+                        return listAllPersons(nomeFilter, cpfFilter, matriculaFilter, validadoFilter, page, size);
                     } else {
                         // Outros usuários só veem pessoas do seu tenant
                         return ReactiveSecurityContextHelper.getTenantId()
-                                .flatMap(tenantId -> listPersonsByTenant(tenantId, nomeFilter, cpfFilter, matriculaFilter, page, size));
+                                .flatMap(tenantId -> listPersonsByTenant(tenantId, nomeFilter, cpfFilter, matriculaFilter, validadoFilter, page, size));
                     }
                 });
     }
     
-    private Mono<ListPersonsResult> listAllPersons(String nomeFilter, String cpfFilter, String matriculaFilter, int page, int size) {
-        Query countQuery = buildQuery(null, nomeFilter, cpfFilter, matriculaFilter);
-        Query findQuery = buildQuery(null, nomeFilter, cpfFilter, matriculaFilter);
+    private Mono<ListPersonsResult> listAllPersons(String nomeFilter, String cpfFilter, String matriculaFilter, Boolean validadoFilter, int page, int size) {
+        Query countQuery = buildQuery(null, nomeFilter, cpfFilter, matriculaFilter, validadoFilter);
+        Query findQuery = buildQuery(null, nomeFilter, cpfFilter, matriculaFilter, validadoFilter);
         
-        Pageable pageable = PageRequest.of(page, size);
+        Pageable pageable = PageRequest.of(page, size, DEFAULT_SORT);
         findQuery.with(pageable);
         
         Mono<Long> countMono = Mono.from(mongoTemplate.count(countQuery, Person.class));
@@ -61,11 +67,11 @@ public class ListPersonsUseCase {
                 });
     }
 
-    private Mono<ListPersonsResult> listPersonsByTenant(String tenantId, String nomeFilter, String cpfFilter, String matriculaFilter, int page, int size) {
-        Query countQuery = buildQuery(tenantId, nomeFilter, cpfFilter, matriculaFilter);
-        Query findQuery = buildQuery(tenantId, nomeFilter, cpfFilter, matriculaFilter);
+    private Mono<ListPersonsResult> listPersonsByTenant(String tenantId, String nomeFilter, String cpfFilter, String matriculaFilter, Boolean validadoFilter, int page, int size) {
+        Query countQuery = buildQuery(tenantId, nomeFilter, cpfFilter, matriculaFilter, validadoFilter);
+        Query findQuery = buildQuery(tenantId, nomeFilter, cpfFilter, matriculaFilter, validadoFilter);
         
-        Pageable pageable = PageRequest.of(page, size);
+        Pageable pageable = PageRequest.of(page, size, DEFAULT_SORT);
         findQuery.with(pageable);
         
         Mono<Long> countMono = Mono.from(mongoTemplate.count(countQuery, Person.class));
@@ -130,7 +136,7 @@ public class ListPersonsUseCase {
                 });
     }
 
-    private Query buildQuery(String tenantId, String nomeFilter, String cpfFilter, String matriculaFilter) {
+    private Query buildQuery(String tenantId, String nomeFilter, String cpfFilter, String matriculaFilter, Boolean validadoFilter) {
         Query query = new Query();
         
         // Filtrar por tenantId apenas se fornecido (null para SUPER_ADMIN ver todas)
@@ -148,6 +154,17 @@ public class ListPersonsUseCase {
         
         if (matriculaFilter != null && !matriculaFilter.isEmpty()) {
             query.addCriteria(Criteria.where("matricula").regex(matriculaFilter, "i"));
+        }
+
+        if (validadoFilter != null) {
+            if (Boolean.TRUE.equals(validadoFilter)) {
+                query.addCriteria(Criteria.where("validado").is(true));
+            } else {
+                query.addCriteria(new Criteria().orOperator(
+                        Criteria.where("validado").is(false),
+                        Criteria.where("validado").is(null),
+                        Criteria.where("validado").exists(false)));
+            }
         }
         
         return query;

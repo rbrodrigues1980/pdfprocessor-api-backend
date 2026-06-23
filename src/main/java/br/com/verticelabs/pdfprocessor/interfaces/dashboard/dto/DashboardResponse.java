@@ -12,11 +12,12 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class DashboardResponse {
+    private DashboardMetric rubricas;
+    private DashboardMetric pessoas;
     private DashboardMetric totalDocumentos;
     private DashboardMetric lancamentos;
-    private DashboardMetric pessoas;
-    private DashboardMetric rubricas;
-    private List<TotalPorAno> totalPorAno; // Total em reais agrupado por ano
-    private List<TotalPorMes> totalPorMes; // Total em reais agrupado por mês
+    private List<DashboardChartItem> graficoRubricas;
+    private List<DashboardChartItem> graficoPessoas;
+    private List<DashboardChartItem> graficoDocumentos;
+    private List<DashboardChartItem> graficoLancamentos;
 }
-

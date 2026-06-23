@@ -2,18 +2,18 @@ package br.com.verticelabs.pdfprocessor.infrastructure.mongodb;
 
 import br.com.verticelabs.pdfprocessor.domain.model.PayrollEntry;
 import br.com.verticelabs.pdfprocessor.domain.repository.PayrollEntryRepository;
-import br.com.verticelabs.pdfprocessor.interfaces.dashboard.dto.TotalPorAno;
-import br.com.verticelabs.pdfprocessor.interfaces.dashboard.dto.TotalPorMes;
+import br.com.verticelabs.pdfprocessor.interfaces.dashboard.dto.DashboardChartItem;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.ReactiveMongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
-import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Component
@@ -79,125 +79,64 @@ public class MongoPayrollEntryRepositoryAdapter implements PayrollEntryRepositor
     }
 
     @Override
-    public Flux<TotalPorAno> getTotalPorAno(String tenantId) {
-        // Agregação MongoDB para somar valores agrupados por referencia primeiro
-        // Depois processamos em Java para extrair o ano e agrupar
+    public Flux<DashboardChartItem> countTopRubricas(String tenantId, int limit) {
+        Criteria criteria = Criteria.where("rubricaCodigo").ne(null);
+        if (tenantId != null) {
+            criteria = criteria.and("tenantId").is(tenantId);
+        }
+
         Aggregation aggregation = Aggregation.newAggregation(
-                Aggregation.match(Criteria.where("tenantId").is(tenantId).and("valor").ne(null).and("referencia").ne(null)),
-                Aggregation.group("referencia")
-                        .sum("valor").as("valorTotal"),
-                Aggregation.project("valorTotal")
-                        .and("_id").as("referencia")
-                        .andExclude("_id")
+                Aggregation.match(criteria),
+                Aggregation.group("rubricaCodigo").count().as("valor"),
+                Aggregation.sort(Sort.Direction.DESC, "valor"),
+                Aggregation.limit(limit),
+                Aggregation.project("valor").and("_id").as("label")
+        );
+
+        return mongoTemplate.aggregate(aggregation, "payroll_entries", Map.class)
+                .map(doc -> DashboardChartItem.builder()
+                        .label(doc.get("label").toString())
+                        .valor(((Number) doc.get("valor")).longValue())
+                        .build());
+    }
+
+    @Override
+    public Flux<DashboardChartItem> countLancamentosPorAno(String tenantId) {
+        Criteria criteria = Criteria.where("referencia").ne(null);
+        if (tenantId != null) {
+            criteria = criteria.and("tenantId").is(tenantId);
+        }
+
+        Aggregation aggregation = Aggregation.newAggregation(
+                Aggregation.match(criteria),
+                Aggregation.group("referencia").count().as("valor"),
+                Aggregation.project("valor").and("_id").as("referencia")
         );
 
         return mongoTemplate.aggregate(aggregation, "payroll_entries", Map.class)
                 .collectList()
                 .flatMapMany(list -> {
-                    // Agrupar por ano em Java
-                    Map<Integer, Double> porAno = new HashMap<>();
+                    Map<Integer, Long> porAno = new HashMap<>();
                     for (Map<String, Object> doc : list) {
                         String referencia = doc.get("referencia").toString();
-                        if (referencia != null && referencia.length() >= 4) {
+                        if (referencia.length() >= 4) {
                             try {
-                                Integer ano = Integer.parseInt(referencia.substring(0, 4));
-                                Double valorTotal = ((Number) doc.get("valorTotal")).doubleValue();
-                                porAno.merge(ano, valorTotal, Double::sum);
-                            } catch (NumberFormatException e) {
-                                // Ignorar referencias inválidas
+                                int ano = Integer.parseInt(referencia.substring(0, 4));
+                                long valor = ((Number) doc.get("valor")).longValue();
+                                porAno.merge(ano, valor, Long::sum);
+                            } catch (NumberFormatException ignored) {
+                                // Ignorar referências inválidas
                             }
                         }
                     }
-                    // Converter para lista ordenada
                     return Flux.fromIterable(porAno.entrySet().stream()
                             .sorted(Map.Entry.comparingByKey())
-                            .map(entry -> TotalPorAno.builder()
-                                    .ano(entry.getKey())
-                                    .valorTotal(entry.getValue())
+                            .map(entry -> DashboardChartItem.builder()
+                                    .label(String.valueOf(entry.getKey()))
+                                    .valor(entry.getValue())
                                     .build())
                             .collect(Collectors.toList()));
                 });
-    }
-
-    @Override
-    public Flux<TotalPorAno> getTotalPorAnoAll() {
-        // Agregação MongoDB para somar valores agrupados por referencia primeiro
-        // Depois processamos em Java para extrair o ano e agrupar
-        Aggregation aggregation = Aggregation.newAggregation(
-                Aggregation.match(Criteria.where("valor").ne(null).and("referencia").ne(null)),
-                Aggregation.group("referencia")
-                        .sum("valor").as("valorTotal"),
-                Aggregation.project("valorTotal")
-                        .and("_id").as("referencia")
-                        .andExclude("_id")
-        );
-
-        return mongoTemplate.aggregate(aggregation, "payroll_entries", Map.class)
-                .collectList()
-                .flatMapMany(list -> {
-                    // Agrupar por ano em Java
-                    Map<Integer, Double> porAno = new HashMap<>();
-                    for (Map<String, Object> doc : list) {
-                        String referencia = doc.get("referencia").toString();
-                        if (referencia != null && referencia.length() >= 4) {
-                            try {
-                                Integer ano = Integer.parseInt(referencia.substring(0, 4));
-                                Double valorTotal = ((Number) doc.get("valorTotal")).doubleValue();
-                                porAno.merge(ano, valorTotal, Double::sum);
-                            } catch (NumberFormatException e) {
-                                // Ignorar referencias inválidas
-                            }
-                        }
-                    }
-                    // Converter para lista ordenada
-                    return Flux.fromIterable(porAno.entrySet().stream()
-                            .sorted(Map.Entry.comparingByKey())
-                            .map(entry -> TotalPorAno.builder()
-                                    .ano(entry.getKey())
-                                    .valorTotal(entry.getValue())
-                                    .build())
-                            .collect(Collectors.toList()));
-                });
-    }
-
-    @Override
-    public Flux<TotalPorMes> getTotalPorMes(String tenantId) {
-        // Agregação MongoDB para somar valores agrupados por mês/ano
-        Aggregation aggregation = Aggregation.newAggregation(
-                Aggregation.match(Criteria.where("tenantId").is(tenantId).and("valor").ne(null).and("referencia").ne(null)),
-                Aggregation.group("referencia")
-                        .sum("valor").as("valorTotal"),
-                Aggregation.project("valorTotal")
-                        .and("_id").as("mesAno")
-                        .andExclude("_id"),
-                Aggregation.sort(org.springframework.data.domain.Sort.Direction.ASC, "mesAno")
-        );
-
-        return mongoTemplate.aggregate(aggregation, "payroll_entries", Map.class)
-                .map(doc -> TotalPorMes.builder()
-                        .mesAno(doc.get("mesAno").toString())
-                        .valorTotal(((Number) doc.get("valorTotal")).doubleValue())
-                        .build());
-    }
-
-    @Override
-    public Flux<TotalPorMes> getTotalPorMesAll() {
-        // Agregação MongoDB para somar valores agrupados por mês/ano (todos os tenants)
-        Aggregation aggregation = Aggregation.newAggregation(
-                Aggregation.match(Criteria.where("valor").ne(null).and("referencia").ne(null)),
-                Aggregation.group("referencia")
-                        .sum("valor").as("valorTotal"),
-                Aggregation.project("valorTotal")
-                        .and("_id").as("mesAno")
-                        .andExclude("_id"),
-                Aggregation.sort(org.springframework.data.domain.Sort.Direction.ASC, "mesAno")
-        );
-
-        return mongoTemplate.aggregate(aggregation, "payroll_entries", Map.class)
-                .map(doc -> TotalPorMes.builder()
-                        .mesAno(doc.get("mesAno").toString())
-                        .valorTotal(((Number) doc.get("valorTotal")).doubleValue())
-                        .build());
     }
 
     @Override
@@ -210,11 +149,8 @@ public class MongoPayrollEntryRepositoryAdapter implements PayrollEntryRepositor
     @Override
     @Deprecated
     public Mono<Void> deleteByDocumentoId(String documentoId) {
-        // Spring Data MongoDB pode não suportar deleteByDocumentoId automaticamente
-        // Então buscamos todas as entries e deletamos uma por uma
         return repository.findByDocumentoId(documentoId)
                 .flatMap(repository::delete)
                 .then();
     }
 }
-

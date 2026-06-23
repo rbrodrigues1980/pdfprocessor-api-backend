@@ -12,6 +12,8 @@ Documentação para integração frontend.
 | GET | `/tributacao/{ano}?tipo=ANUAL` | Busca faixas de um ano |
 | POST | `/tributacao/{ano}?tipo=ANUAL` | Criar/atualizar tributação |
 | DELETE | `/tributacao/{ano}?tipo=ANUAL` | Remover tributação de um ano |
+| POST | `/tributacao/calcular` | Cálculo progressivo simples (base informada) |
+| POST | `/tributacao/simular` | **Motor completo** — Completo vs Simplificado, itens 7–10 ([ver doc 005](./005%20-%20MOTOR_CALCULO_SIMULADOR_IRPF.md)) |
 
 ### Parâmetro `tipo`
 - `ANUAL` - Incidência anual (declaração de IR)
@@ -104,7 +106,7 @@ GET /tributacao/anos?tipo=ANUAL
 
 **Response:**
 ```json
-[2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025]
+[2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026]
 ```
 
 ### Buscar tributação de um ano

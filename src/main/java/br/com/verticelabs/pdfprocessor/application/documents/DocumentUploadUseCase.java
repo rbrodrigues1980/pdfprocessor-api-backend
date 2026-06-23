@@ -269,7 +269,8 @@ public class DocumentUploadUseCase {
                                                                     // Nome, CPF e matrícula já foram salvos no ensurePersonExists()
                                                                     if (!person.getDocumentos().contains(savedDoc.getId())) {
                                                                         person.getDocumentos().add(savedDoc.getId());
-                                                                        log.info("Adicionando documento {} à lista de documentos da Person (CPF: {})", 
+                                                                        person.setUpdatedAt(Instant.now());
+                                                                        log.info("Adicionando documento {} à lista de documentos da Person (CPF: {})",
                                                                                 savedDoc.getId(), person.getCpf());
                                                                         log.info("Person atual - Nome: {}, Matrícula: {}", 
                                                                                 person.getNome(), person.getMatricula());
@@ -429,6 +430,7 @@ public class DocumentUploadUseCase {
                                     .matricula(normalizedMatricula != null && normalizedMatricula.length() == 7 
                                             ? normalizedMatricula : null)
                                     .createdAt(Instant.now())
+                                    .updatedAt(Instant.now())
                                     .build();
                             
                             log.info("Person criada (antes de salvar): Nome: {}, Matrícula: {}", 
