@@ -12,8 +12,8 @@
 
 substitutions:
   _REGION: us-central1
-  _REPO: pdfprocessor-repo
-  _IMAGE_NAME: pdfprocessor-api
+  _REPO: cloud-run-source-deploy
+  _IMAGE_NAME: pdfprocessor-api-backend
 
 steps:
   # Build com kaniko (cache automático de layers)
