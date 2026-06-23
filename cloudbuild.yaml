@@ -26,7 +26,7 @@ steps:
       - '--dockerfile=Dockerfile'
       - '--context=.'
 
-  # Deploy no Cloud Run
+  # Deploy no Cloud Run (infra versionada — performance otimizada para PDF/Excel)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
@@ -37,10 +37,14 @@ steps:
       - '--region=${_REGION}'
       - '--platform=managed'
       - '--memory=2Gi'
-      - '--cpu=1'
-      - '--concurrency=10'
+      - '--cpu=2'
+      - '--concurrency=4'
       - '--timeout=900'
-      - '--max-instances=3'
+      - '--min-instances=1'
+      - '--max-instances=8'
+      - '--cpu-boost'
+      - '--execution-environment=gen2'
+      - '--no-cpu-throttling'
       - '--update-env-vars=GOOGLE_CLOUD_PROJECT=$PROJECT_ID'
 
 options:
