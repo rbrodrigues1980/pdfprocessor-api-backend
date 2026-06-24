@@ -479,7 +479,7 @@ Arquivo: `ConsolidationExcelServiceImpl` + `ExcelIrpfSimulacaoMapper`
 Por aba anual com declaração importada, a planilha gera **duas simulações** via o **mesmo** `IrSimuladorMotorService`:
 
 1. **Declaração** — previdência complementar declarada (2.7.1)
-2. **Contracheques** — previdência complementar = total das rubricas ativas na matriz (`calcularTotalContracheques`); linha 2.7.1 com destaque verde
+2. **Contracheques** — previdência complementar = contracheques + extras da DIRPF (`PrevComplPlanilhaHelper`): soma das rubricas ativas na matriz **mais** pagamentos cód. 36/37 com CNPJ externo (exc. FUNCEF `00.436.923/0001-90` e CAIXA patronal `00.360.305/0001-04`); linha 2.7.1 com destaque verde
 
 Cada simulação exibe **Completo e Simplificado** (comparativo + seções 3–7 de cada modelo), espelhando o simulador web. Após cada bloco, repetem-se as seções **8–10** da declaração entregue. Regressão: Elizabeth AC 2016 — devido R$ 17.058,95 (sim 1 Completo) e R$ 16.861,97 (sim 2 Completo) em `ExcelIrpfSimulacaoTest`.
 

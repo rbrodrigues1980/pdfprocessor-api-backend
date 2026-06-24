@@ -7,7 +7,7 @@ import br.com.verticelabs.pdfprocessor.domain.model.IrParametrosAnuais;
 import br.com.verticelabs.pdfprocessor.domain.model.IrTabelaTributacao;
 import br.com.verticelabs.pdfprocessor.domain.model.IrpfDeclaracaoData;
 import br.com.verticelabs.pdfprocessor.domain.model.Person;
-import br.com.verticelabs.pdfprocessor.infrastructure.excel.ConsolidationAnoTotalsHelper;
+import br.com.verticelabs.pdfprocessor.infrastructure.excel.PrevComplPlanilhaHelper;
 import br.com.verticelabs.pdfprocessor.infrastructure.excel.ExcelResumoGeralHelper;
 import br.com.verticelabs.pdfprocessor.infrastructure.excel.ExcelResumoGeralLinhaDTO;
 import br.com.verticelabs.pdfprocessor.interfaces.consolidation.dto.ConsolidatedResponse;
@@ -63,8 +63,9 @@ public class ResumoGeralAssemblyService {
                     TreeSet<String> anosOrdenados = new TreeSet<>(consolidatedResponse.getAnos());
                     Map<String, BigDecimal> prevComplPorAno = new HashMap<>();
                     for (String ano : anosOrdenados) {
-                        prevComplPorAno.put(ano,
-                                ConsolidationAnoTotalsHelper.calcularTotalContracheques(consolidatedResponse, ano));
+                        IrpfDeclaracaoData decl = irpfDeclaracoesAlinhadas.get(ano);
+                        prevComplPorAno.put(ano, PrevComplPlanilhaHelper.calcularPrevComplSimulacao(
+                                consolidatedResponse, ano, decl));
                     }
 
                     if (irpfDeclaracoesAlinhadas.isEmpty()) {

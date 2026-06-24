@@ -224,6 +224,8 @@ Quando existe declaração IRPF importada para o ano-calendário da aba, `Consol
 - Imposto devido, pago (valores da declaração) e resultado (saldo = total devido − total pago)
 - Prev. complementar da planilha destacada em verde
 
+**Prev. complementar (Simulação 2):** `PrevComplPlanilhaHelper.calcularPrevComplSimulacao` = total dos contracheques **+** pagamentos cód. **36/37** da declaração (`pagamentosEfetuados[]`) cujo CNPJ **não** seja patronal (`00.436.923/0001-90` FUNCEF ou `00.360.305/0001-04` CAIXA). Ex.: Margarida AC 2016 — planilha 22.238,28 + CAIXA E VIDA 1.724,48 = **23.962,76** na linha verde. CNPJs patronais já constam nos contracheques e são ignorados na soma extra.
+
 **Deduções:** `ExcelIrpfDeducoesResumoHelper` centraliza linhas do RESUMO; `ExcelIrpfSimulacaoMapper` com `preferirPrevidenciaPlanilha=true`; `IrpfPrevidenciaOficialResolver` soma prev. oficial das fontes pagadoras PJ.
 
 **Motor:** flag `inssDomesticoComoCreditoImposto` em `SimuladorIrpfRequest` para alinhar ao RESUMO da Receita.
@@ -235,10 +237,11 @@ Classes envolvidas:
 - `ConsolidationExcelServiceImpl` — `addBlocoConformeDeclaracaoSimplificada`, `addBlocoConformeDeclaracaoCompleta`, `addBlocoSimulacaoCompletaPlanilha`
 - `ExcelIrpfDeducoesResumoHelper` / `ExcelIrpfDeducoesResumoDTO` — `montarConformeDeclaracao` (espelho) e `montar` (simulação planilha)
 - `ExcelIrpfSimulacaoMapper` — mapeamento declaração → request
+- `PrevComplPlanilhaHelper` — contracheques + pagamentos cód. 36/37 externos (Simulação 2 / `prevComplPorAno`)
 - `ModoSimulacaoExcel` — `ESPELHO_ENTREGUE` | `SIMULACAO_COMPLETA_PLANILHA`
 - `IrSimuladorMotorService` — cálculo progressivo + crédito INSS doméstico
 
-Regressão: Elizete AC 2018 — `Elizete2018ExcelSimulacaoLayoutTest`; Elizete AC 2019 — `Elizete2019ExcelSimulacaoLayoutTest`; Elizabeth AC 2016 — `ExcelIrpfSimulacaoTest`; Resumo Geral — `ElizeteResumoGeralTest`.
+Regressão: Elizete AC 2018 — `Elizete2018ExcelSimulacaoLayoutTest`; Elizete AC 2019 — `Elizete2019ExcelSimulacaoLayoutTest`; Elizabeth AC 2016 — `ExcelIrpfSimulacaoTest`; Resumo Geral — `ElizeteResumoGeralTest`; prev. compl. extras — `PrevComplPlanilhaHelperTest` (Margarida AC 2016).
 
 ---
 

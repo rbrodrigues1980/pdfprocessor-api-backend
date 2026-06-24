@@ -342,6 +342,7 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
     private int addIncomeTaxSummaryTable(Sheet sheet, String ano,
             Map<String, Map<String, BigDecimal>> incomeTaxEntries,
             ConsolidatedResponse consolidatedResponse,
+            IrpfDeclaracaoData irpfDeclaracaoAno,
             Map<String, java.util.List<br.com.verticelabs.pdfprocessor.domain.model.IrTabelaTributacao>> tabelasTributacao,
             Map<String, IrParametrosAnuais> parametrosTributacao,
             int startRow, CellStyle totalStyle, CellStyle numberStyle) {
@@ -360,9 +361,9 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
         BigDecimal deducoesContribPrevCompl = irAno.getOrDefault("IR_DEDUCOES_CONTRIB_PREV_COMPL", BigDecimal.ZERO);
         BigDecimal deducoesTotal = irAno.getOrDefault("IR_DEDUCOES", BigDecimal.ZERO);
 
-        // Calcular total dos contracheques (novo cálculo) = soma de todas as rubricas
-        // do ano
-        BigDecimal totalContracheques = calcularTotalContracheques(consolidatedResponse, ano);
+        // Novo cálculo = contracheques + pagamentos cód. 36/37 externos (mesma regra da Simulação 2)
+        BigDecimal totalContracheques = PrevComplPlanilhaHelper.calcularPrevComplSimulacao(
+                consolidatedResponse, ano, irpfDeclaracaoAno);
 
         // Calcular DEDUÇÕES Total - novo cálculo = deducoesTotal -
         // deducoesContribPrevCompl + totalContracheques
@@ -401,7 +402,7 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
         // Linha 3: DEDUÇÕES (Contrib. prev. compl. - Novo cálculo)
         rowNum = addSummaryRow(sheet, rowNum, "DEDUÇÕES (Contribuição à previdência complementar - Novo calculo)",
                 totalContracheques, totalStyle, numberStyle,
-                "Soma das contribuições extraordinárias extraídas dos contracheques no ano");
+                "Contracheques + pagamentos cód. 36/37 da declaração (exc. CNPJs patronais FUNCEF/CAIXA)");
 
         // Linha 4: DEDUÇÕES (Total)
         rowNum = addSummaryRow(sheet, rowNum, "DEDUÇÕES (Total)",
