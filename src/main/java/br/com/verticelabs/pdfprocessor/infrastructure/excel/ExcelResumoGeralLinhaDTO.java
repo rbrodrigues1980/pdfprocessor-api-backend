@@ -19,7 +19,9 @@ public class ExcelResumoGeralLinhaDTO {
 
     String anoCalendario;
     BigDecimal valorDeclaracao;
+    String origemValorDeclaracao;
     BigDecimal valorSimulacao;
+    String origemValorSimulacao;
     BigDecimal principal;
     BigDecimal selicAcumulada;
     BigDecimal valorCorrecao;
@@ -37,7 +39,9 @@ public class ExcelResumoGeralLinhaDTO {
         return ExcelResumoGeralLinhaDTO.builder()
                 .anoCalendario(anoCalendario)
                 .valorDeclaracao(valorDeclaracao)
+                .origemValorDeclaracao(origemValorDeclaracao)
                 .valorSimulacao(valorSimulacao)
+                .origemValorSimulacao(origemValorSimulacao)
                 .principal(principal)
                 .selicAcumulada(taxa)
                 .valorCorrecao(correcao)

@@ -1,6 +1,8 @@
 package br.com.verticelabs.pdfprocessor.interfaces.excel;
 
 import br.com.verticelabs.pdfprocessor.application.excel.ExcelExportUseCase;
+import br.com.verticelabs.pdfprocessor.application.excel.ResumoGeralUseCase;
+import br.com.verticelabs.pdfprocessor.interfaces.excel.dto.ResumoGeralResponse;
 import br.com.verticelabs.pdfprocessor.domain.exceptions.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,6 +20,7 @@ import reactor.core.publisher.Mono;
 public class ExcelController {
 
     private final ExcelExportUseCase excelExportUseCase;
+    private final ResumoGeralUseCase resumoGeralUseCase;
 
     /**
      * GET /api/v1/persons/{cpf}/excel
@@ -257,6 +260,34 @@ public class ExcelController {
                     log.error("Ano: {}, Origem: {}", ano, origem);
                     log.error("Mensagem de erro: {}", e.getMessage());
                     log.error("Status: 500 INTERNAL_SERVER_ERROR");
+                    return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build());
+                });
+    }
+
+    /**
+     * GET /api/v1/persons/{personId}/resumo-geral
+     * Retorna o Resumo Geral IRPF em JSON (preview antes da exportação Excel).
+     */
+    @GetMapping(value = "/{personId}/resumo-geral", produces = MediaType.APPLICATION_JSON_VALUE)
+    public Mono<ResponseEntity<ResumoGeralResponse>> getResumoGeral(@PathVariable String personId) {
+        log.debug("=== INÍCIO: GET /api/v1/persons/{}/resumo-geral ===", personId);
+
+        return resumoGeralUseCase.getByPersonId(personId)
+                .map(ResponseEntity::ok)
+                .switchIfEmpty(Mono.defer(() -> {
+                    log.warn("Resumo Geral indisponível para personId: {} — 204 NO_CONTENT", personId);
+                    return Mono.just(ResponseEntity.status(HttpStatus.NO_CONTENT).build());
+                }))
+                .onErrorResume(PersonNotFoundException.class, e -> {
+                    log.warn("Pessoa não encontrada para resumo geral: {}", personId);
+                    return Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND).build());
+                })
+                .onErrorResume(NoEntriesFoundException.class, e -> {
+                    log.warn("Sem dados para resumo geral: {}", personId);
+                    return Mono.just(ResponseEntity.status(HttpStatus.NO_CONTENT).build());
+                })
+                .onErrorResume(Exception.class, e -> {
+                    log.error("Erro ao obter resumo geral para personId: {}", personId, e);
                     return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build());
                 });
     }
