@@ -2,7 +2,6 @@ package br.com.verticelabs.pdfprocessor.infrastructure.excel;
 
 import br.com.verticelabs.pdfprocessor.application.excel.ExcelExportService;
 import br.com.verticelabs.pdfprocessor.application.incometax.IrpfPrevidenciaOficialResolver;
-import br.com.verticelabs.pdfprocessor.application.selic.TaxaSelicService;
 import br.com.verticelabs.pdfprocessor.application.tributacao.IrCalculoProgressivoService;
 import br.com.verticelabs.pdfprocessor.application.tributacao.IrDoacoesDeducaoCalculator;
 import br.com.verticelabs.pdfprocessor.application.tributacao.IrSimuladorMotorService;
@@ -55,9 +54,9 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
     private final ExcelIrpfSimulacaoMapper excelIrpfSimulacaoMapper;
     private final ExcelIrpfDeducoesResumoHelper deducoesResumoHelper;
     private final ExcelResumoGeralHelper resumoGeralHelper;
-    private final TaxaSelicService taxaSelicService;
         private final ExcelResumoGeralLogoHelper resumoGeralLogoHelper;
         private final br.com.verticelabs.pdfprocessor.application.empresas.EmpresaHonorariosResolver empresaHonorariosResolver;
+    private final br.com.verticelabs.pdfprocessor.application.excel.ResumoGeralAssemblyService resumoGeralAssemblyService;
 
     @Override
     public Mono<byte[]> generateConsolidationExcel(Person person, ConsolidatedResponse consolidatedResponse,
@@ -69,50 +68,19 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
         ).flatMap(tuple -> {
                     Map<String, Map<String, BigDecimal>> incomeTaxEntries = tuple.getT1();
                     Map<String, IrpfDeclaracaoData> irpfDeclaracoes = tuple.getT2();
-                    java.util.Set<String> anosContracheque = new java.util.HashSet<>(consolidatedResponse.getAnos());
-                    Map<String, IrpfDeclaracaoData> irpfDeclaracoesAlinhadas =
-                            resumoGeralHelper.filtrarDeclaracoesPorAnosContracheque(
-                                    irpfDeclaracoes, anosContracheque);
-                    java.util.Set<String> anosTributacao = new java.util.HashSet<>(anosContracheque);
-                    log.info("Anos com contracheque: {}; declarações IR alinhadas: {}",
-                            anosContracheque, irpfDeclaracoesAlinhadas.keySet());
-                    return Mono.zip(buscarTabelasTributacao(anosTributacao), buscarParametrosTributacao(anosTributacao))
-                            .flatMap(zip -> {
-                                Map<String, java.util.List<br.com.verticelabs.pdfprocessor.domain.model.IrTabelaTributacao>> tabelasTributacao = zip.getT1();
-                                Map<String, IrParametrosAnuais> parametrosTributacao = zip.getT2();
-
+                    return resumoGeralAssemblyService.montar(person, consolidatedResponse, irpfDeclaracoes)
+                            .flatMap(montagem -> {
+                                List<ExcelResumoGeralLinhaDTO> linhasResumo = montagem.linhas();
+                                var honorariosConfig = montagem.honorariosConfig();
+                                Map<String, IrpfDeclaracaoData> irpfDeclaracoesAlinhadas =
+                                        montagem.irpfDeclaracoesAlinhadas();
+                                Map<String, BigDecimal> prevComplPorAno = montagem.prevComplPorAno();
+                                Map<String, java.util.List<br.com.verticelabs.pdfprocessor.domain.model.IrTabelaTributacao>> tabelasTributacao =
+                                        montagem.tabelasTributacao();
+                                Map<String, IrParametrosAnuais> parametrosTributacao = montagem.parametrosTributacao();
                                 TreeSet<String> anosOrdenados = new TreeSet<>(consolidatedResponse.getAnos());
-                                Map<String, BigDecimal> prevComplPorAno = new HashMap<>();
-                                for (String ano : anosOrdenados) {
-                                    prevComplPorAno.put(ano, calcularTotalContracheques(consolidatedResponse, ano));
-                                }
 
-                                List<ExcelResumoGeralLinhaDTO> linhasResumoBase = resumoGeralHelper.montarLinhas(
-                                        irpfDeclaracoesAlinhadas, prevComplPorAno, tabelasTributacao, parametrosTributacao);
-                                LocalDate dataPagamentoSelic = LocalDate.now(ZoneId.of("America/Sao_Paulo"));
-
-                                Mono<List<ExcelResumoGeralLinhaDTO>> linhasResumoComSelic = Flux.fromIterable(linhasResumoBase)
-                                        .concatMap(linha -> {
-                                            if (linha.getPrincipal().compareTo(BigDecimal.ZERO) > 0
-                                                    && linha.getDataVencimento() != null) {
-                                                return taxaSelicService.calcularSelicReceitaFederal(
-                                                                linha.getDataVencimento(),
-                                                                dataPagamentoSelic,
-                                                                linha.getPrincipal())
-                                                        .map(linha::enriquecerComSelic)
-                                                        .onErrorResume(e -> {
-                                                            log.warn("SELIC Resumo Geral ano {}: {}", linha.getAnoCalendario(), e.getMessage());
-                                                            return Mono.just(linha);
-                                                        });
-                                            }
-                                            return Mono.just(linha);
-                                        })
-                                        .collectList()
-                                        .map(resumoGeralHelper::ordenarPorAnoCalendario);
-
-                                return linhasResumoComSelic.flatMap(linhasResumo ->
-                                        empresaHonorariosResolver.resolve(person).flatMap(honorariosConfig ->
-                                                Mono.fromCallable(() -> {
+                                return Mono.fromCallable(() -> {
                                     try (Workbook workbook = new XSSFWorkbook();
                                             ByteArrayOutputStream out = new ByteArrayOutputStream()) {
                                         log.debug("Criando workbook Excel...");
@@ -238,9 +206,7 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
                                         throw new ExcelGenerationException(
                                                 "Erro ao gerar arquivo Excel: " + e.getMessage(), e);
                                     }
-                                }).subscribeOn(Schedulers.boundedElastic())
-                                        )
-                                );
+                                }).subscribeOn(Schedulers.boundedElastic());
                             });
                 });
     }
@@ -571,22 +537,7 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
      * específico.
      */
     private BigDecimal calcularTotalContracheques(ConsolidatedResponse consolidatedResponse, String ano) {
-        BigDecimal total = BigDecimal.ZERO;
-
-        for (ConsolidationRow rubrica : consolidatedResponse.getRubricas()) {
-            // Soma simples para o ano
-            BigDecimal somaAno = BigDecimal.ZERO;
-            for (int mes = 1; mes <= 12; mes++) {
-                String mesStr = String.format("%02d", mes);
-                String referencia = ano + "-" + mesStr;
-                somaAno = somaAno.add(rubrica.getValores().getOrDefault(referencia, BigDecimal.ZERO));
-            }
-            // Aplicar a regra NOV - FEV se necessário
-            total = total.add(calcularTotalRubricaAno(rubrica, ano, somaAno));
-        }
-
-        log.debug("Total contracheques para ano {}: {}", ano, total);
-        return total;
+        return ConsolidationAnoTotalsHelper.calcularTotalContracheques(consolidatedResponse, ano);
     }
 
     /**
@@ -746,43 +697,7 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
      * Para rubricas normais (com valores em outros meses), retorna a soma simples.
      */
     private BigDecimal calcularTotalRubricaAno(ConsolidationRow rubrica, String ano, BigDecimal somaSimples) {
-        String refFev = ano + "-02";
-        String refNov = ano + "-11";
-
-        BigDecimal valorFev = rubrica.getValores().getOrDefault(refFev, BigDecimal.ZERO);
-        BigDecimal valorNov = rubrica.getValores().getOrDefault(refNov, BigDecimal.ZERO);
-
-        // Verificar se tem valores em outros meses além de FEV e NOV
-        boolean temValorOutrosMeses = false;
-        for (int mes = 1; mes <= 12; mes++) {
-            if (mes == 2 || mes == 11) {
-                continue; // Pular FEV e NOV
-            }
-            String mesStr = String.format("%02d", mes);
-            String referencia = ano + "-" + mesStr;
-            BigDecimal valor = rubrica.getValores().getOrDefault(referencia, BigDecimal.ZERO);
-            if (valor.compareTo(BigDecimal.ZERO) > 0) {
-                temValorOutrosMeses = true;
-                break;
-            }
-        }
-
-        // Se tiver valores em outros meses, usar soma simples (rubrica normal)
-        if (temValorOutrosMeses) {
-            return somaSimples;
-        }
-
-        // Se tiver valores APENAS em FEV e NOV (rubrica com referência YYYY-13)
-        // O total deve ser NOV - FEV
-        if (valorFev.compareTo(BigDecimal.ZERO) > 0 && valorNov.compareTo(BigDecimal.ZERO) > 0) {
-            log.info("Rubrica {} ano {}: Total = NOV ({}) (regra YYYY-13 - último valor)",
-                    rubrica.getCodigo(), ano, valorNov);
-            return valorNov;
-        }
-
-        // Caso contrário (só tem valor em FEV ou só em NOV, ou zeros), retorna a soma
-        // simples
-        return somaSimples;
+        return ConsolidationAnoTotalsHelper.calcularTotalRubricaAno(rubrica, ano, somaSimples);
     }
 
     /**

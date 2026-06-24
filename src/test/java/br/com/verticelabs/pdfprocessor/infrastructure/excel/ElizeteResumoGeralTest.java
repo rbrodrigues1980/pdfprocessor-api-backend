@@ -27,6 +27,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -78,6 +79,17 @@ class ElizeteResumoGeralTest {
     }
 
     @Test
+    void extrairTipoResultadoPositivo_priorizaRestituirOuSaldo() {
+        assertEquals(
+                ExcelResumoGeralHelper.ORIGEM_IMPOSTO_A_RESTITUIR,
+                resumoHelper.extrairTipoResultadoPositivo(new BigDecimal("100"), new BigDecimal("50")));
+        assertEquals(
+                ExcelResumoGeralHelper.ORIGEM_SALDO_IMPOSTO_A_PAGAR,
+                resumoHelper.extrairTipoResultadoPositivo(BigDecimal.ZERO, new BigDecimal("50")));
+        assertNull(resumoHelper.extrairTipoResultadoPositivo(BigDecimal.ZERO, BigDecimal.ZERO));
+    }
+
+    @Test
     void resumo2016_valoresBloco1e2Referencia() throws Exception {
         IrpfDeclaracaoData data = carregarElizete2016();
         Assumptions.assumeTrue("SIMPLIFICADO".equalsIgnoreCase(data.getTipoTributacao()));
@@ -86,7 +98,9 @@ class ElizeteResumoGeralTest {
                 "2016", data, BigDecimal.ZERO, faixas2016, params2016);
 
         assertEquals(new BigDecimal("1872.48"), linha.getValorDeclaracao());
-        assertEquals(new BigDecimal("1872.48"), linha.getValorSimulacao());
+        assertEquals(ExcelResumoGeralHelper.ORIGEM_IMPOSTO_A_RESTITUIR, linha.getOrigemValorDeclaracao());
+        assertEquals(new BigDecimal("3605.63"), linha.getValorSimulacao());
+        assertEquals(ExcelResumoGeralHelper.ORIGEM_SALDO_IMPOSTO_A_PAGAR, linha.getOrigemValorSimulacao());
         assertEquals(BigDecimal.ZERO.setScale(2), linha.getPrincipal());
         assertEquals(ExcelResumoGeralHelper.OBS_SEM_IMPACTO, linha.getObservacao());
         assertEquals(LocalDate.of(2017, 4, 30), linha.getDataVencimento());
@@ -100,7 +114,9 @@ class ElizeteResumoGeralTest {
                 "2018", data, PREV_PLANILHA_2018, faixas2018, params2018);
 
         assertEquals(new BigDecimal("22884.35"), linha.getValorDeclaracao());
+        assertEquals(ExcelResumoGeralHelper.ORIGEM_SALDO_IMPOSTO_A_PAGAR, linha.getOrigemValorDeclaracao());
         assertEquals(new BigDecimal("21905.40"), linha.getValorSimulacao());
+        assertEquals(ExcelResumoGeralHelper.ORIGEM_SALDO_IMPOSTO_A_PAGAR, linha.getOrigemValorSimulacao());
         assertEquals(new BigDecimal("978.95"), linha.getPrincipal());
         assertEquals(ExcelResumoGeralHelper.OBS_IMPACTO, linha.getObservacao());
     }
@@ -273,28 +289,105 @@ class ElizeteResumoGeralTest {
     }
 
     @Test
-    void ajustarValorSimulacao_igualaColunaBQuandoSaldoDeclaracaoMaiorECSuperiorB() {
+    void calcularValorColunaC_saldoSimulado_retornaSaldo() {
         IrpfDeclaracaoData data = IrpfDeclaracaoData.builder()
-                .impostoRestituir(new BigDecimal("1872.48"))
-                .saldoImpostoPagar(new BigDecimal("3605.63"))
+                .saldoImpostoPagar(new BigDecimal("2575.94"))
                 .build();
-        BigDecimal colB = new BigDecimal("1872.48");
-        BigDecimal colC = new BigDecimal("3605.63");
+        var bloco2 = new ExcelResumoGeralHelper.ResultadoBloco2Simulacao(
+                ZERO.setScale(2), new BigDecimal("36.06"), new BigDecimal("36.06"));
 
-        assertEquals(colB, resumoHelper.ajustarValorSimulacaoQuandoSaldoDeclaracaoMaior(colB, colC, data));
+        assertEquals(new BigDecimal("36.06"), resumoHelper.calcularValorColunaC(data, bloco2));
     }
 
     @Test
-    void ajustarValorSimulacao_mantemColunaCQuandoSaldoNaoSuperaRestituir() {
+    void calcularValorColunaC_restituirSimComSaldoDecl_retornaSoValorDaAba() {
         IrpfDeclaracaoData data = IrpfDeclaracaoData.builder()
-                .impostoRestituir(new BigDecimal("1872.48"))
-                .saldoImpostoPagar(BigDecimal.ZERO)
+                .saldoImpostoPagar(new BigDecimal("1503.80"))
+                .impostoRestituir(BigDecimal.ZERO)
                 .build();
-        BigDecimal colB = new BigDecimal("1872.48");
-        BigDecimal colC = new BigDecimal("3605.63");
+        var bloco2 = new ExcelResumoGeralHelper.ResultadoBloco2Simulacao(
+                new BigDecimal("4044.88"), ZERO.setScale(2), new BigDecimal("4044.88"));
 
-        assertEquals(colC, resumoHelper.ajustarValorSimulacaoQuandoSaldoDeclaracaoMaior(colB, colC, data));
+        assertEquals(new BigDecimal("4044.88"), resumoHelper.calcularValorColunaC(data, bloco2));
     }
+
+    @Test
+    void calcularValorColunaC_restituirSimComRestituirDecl_naoSoma() {
+        IrpfDeclaracaoData data = IrpfDeclaracaoData.builder()
+                .impostoRestituir(new BigDecimal("1000.00"))
+                .build();
+        var bloco2 = new ExcelResumoGeralHelper.ResultadoBloco2Simulacao(
+                new BigDecimal("1500.00"), ZERO.setScale(2), new BigDecimal("1500.00"));
+
+        assertEquals(new BigDecimal("1500.00"), resumoHelper.calcularValorColunaC(data, bloco2));
+    }
+
+    @Test
+    void calcularPrincipal_situacao1_saldoMenorNaSimulacao() {
+        IrpfDeclaracaoData data = IrpfDeclaracaoData.builder()
+                .saldoImpostoPagar(new BigDecimal("2575.94"))
+                .build();
+        var bloco2 = new ExcelResumoGeralHelper.ResultadoBloco2Simulacao(
+                ZERO.setScale(2), new BigDecimal("36.06"), new BigDecimal("36.06"));
+        BigDecimal b = new BigDecimal("2575.94");
+        BigDecimal c = new BigDecimal("36.06");
+
+        assertEquals(new BigDecimal("2539.88"),
+                resumoHelper.calcularPrincipal(b, c, data, bloco2));
+    }
+
+    @Test
+    void calcularPrincipal_situacao2_saldoMaiorNaSimulacao_semImpacto() {
+        IrpfDeclaracaoData data = IrpfDeclaracaoData.builder()
+                .saldoImpostoPagar(new BigDecimal("1000.00"))
+                .build();
+        var bloco2 = new ExcelResumoGeralHelper.ResultadoBloco2Simulacao(
+                ZERO.setScale(2), new BigDecimal("1500.00"), new BigDecimal("1500.00"));
+
+        assertEquals(BigDecimal.ZERO.setScale(2),
+                resumoHelper.calcularPrincipal(new BigDecimal("1000.00"), new BigDecimal("1500.00"), data, bloco2));
+    }
+
+    @Test
+    void calcularPrincipal_situacao3_restituirSimComSaldoDecl_somaBC() {
+        IrpfDeclaracaoData data = IrpfDeclaracaoData.builder()
+                .saldoImpostoPagar(new BigDecimal("1503.80"))
+                .build();
+        var bloco2 = new ExcelResumoGeralHelper.ResultadoBloco2Simulacao(
+                new BigDecimal("4044.88"), ZERO.setScale(2), new BigDecimal("4044.88"));
+        BigDecimal b = new BigDecimal("1503.80");
+        BigDecimal c = new BigDecimal("4044.88");
+
+        assertEquals(new BigDecimal("5548.68"), resumoHelper.calcularPrincipal(b, c, data, bloco2));
+    }
+
+    @Test
+    void calcularPrincipal_situacao4_restituirSimComRestituirDecl_diferenca() {
+        IrpfDeclaracaoData data = IrpfDeclaracaoData.builder()
+                .impostoRestituir(new BigDecimal("1000.00"))
+                .build();
+        var bloco2 = new ExcelResumoGeralHelper.ResultadoBloco2Simulacao(
+                new BigDecimal("1500.00"), ZERO.setScale(2), new BigDecimal("1500.00"));
+
+        assertEquals(new BigDecimal("500.00"),
+                resumoHelper.calcularPrincipal(new BigDecimal("1000.00"), new BigDecimal("1500.00"), data, bloco2));
+    }
+
+    @Test
+    void calcularValorColunaC_marcia2016_saldoSimulado() {
+        IrpfDeclaracaoData data = IrpfDeclaracaoData.builder()
+                .saldoImpostoPagar(new BigDecimal("356.98"))
+                .build();
+        var bloco2 = new ExcelResumoGeralHelper.ResultadoBloco2Simulacao(
+                ZERO.setScale(2), new BigDecimal("89.87"), new BigDecimal("89.87"));
+
+        assertEquals(new BigDecimal("89.87"), resumoHelper.calcularValorColunaC(data, bloco2));
+        assertEquals(new BigDecimal("267.11"),
+                resumoHelper.calcularPrincipal(
+                        new BigDecimal("356.98"), new BigDecimal("89.87"), data, bloco2));
+    }
+
+    private static final BigDecimal ZERO = BigDecimal.ZERO;
 
     private IrpfDeclaracaoData carregarElizete2016() throws Exception {
         Assumptions.assumeTrue(Files.exists(ELIZETE_PDF_2016),

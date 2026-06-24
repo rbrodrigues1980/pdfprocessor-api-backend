@@ -253,13 +253,24 @@ Quando existem declarações IRPF importadas **cujo ano-calendário coincide com
 | Coluna | Origem | Regra |
 |--------|--------|-------|
 | A — Calendário | ano da aba | Ano-calendário |
-| B — Valores Restituídos / Pagos | Bloco 1 (declaração entregue) | Valor positivo entre `IMPOSTO A RESTITUIR` e `SALDO IMPOSTO A PAGAR` |
-| C — Valor Devido e ou a Restituir | Bloco 2 (simulação planilha) | Valor positivo entre restituição e saldo (`total devido − total pago` via motor) |
-| D — Principal PGFN | derivado | `max(B − C, 0)` |
+| B — Valores Restituídos / Pagos | Bloco 1 (declaração entregue) | Valor positivo entre `IMPOSTO A RESTITUIR` e `SALDO IMPOSTO A PAGAR` (ignora `0,00`) |
+| C — Valor Devido e ou a Restituir | Bloco 2 (simulação planilha) | `IMPOSTO A RESTITUIR` ou `SALDO DE IMPOSTO A PAGAR` da aba anual (ignora `0,00`) — mesmo valor exibido no bloco 2 |
+| D — Principal PGFN | derivado | Sim restituir + decl saldo pagar → `D = B + C`; sim restituir + decl restituir → `D = C − B`; demais → `max(B − C, 0)` |
 | E — SELIC Acumulada RFB | `TaxaSelicService.calcularSelicReceitaFederal` | Taxa acumulada (%); só se `D > 0` |
 | F — Valor Correção R$ | SELIC | `valorCorrigido − D` |
 | G — Principal + Correção | derivado | `D + F` |
-| H — Observações | derivado | `"impacto financeiro"` se `D > 0`; senão `"sem impacto financeiro -sistema de tributação"` |
+| H — Observações | derivado | `"Impacto financeiro"` se `D > 0`; senão `"Sem impacto financeiro - Sistema de tributação"` |
+
+#### Situações de impacto financeiro (colunas C e D)
+
+| # | Declaração (B) | Simulação (bloco 2) | C | D |
+|---|----------------|---------------------|---|---|
+| 1 | Saldo a pagar R$ 1.000 | Saldo a pagar R$ 500 | 500 | 500 |
+| 2 | Saldo a pagar R$ 1.000 | Saldo a pagar R$ 1.500 | 1.500 | 0 |
+| 3 | Saldo a pagar R$ 1.503,80 | Restituir R$ 4.044,88 | 4.044,88 | 5.548,68 |
+| 4 | Restituir R$ 1.000 | Restituir R$ 1.500 | 1.500 | 500 |
+
+Implementação: `ExcelResumoGeralHelper.calcularValorColunaC` e `calcularPrincipal`.
 
 ### Totais e rodapé
 
@@ -297,9 +308,42 @@ Regressão: `ElizeteResumoGeralTest` (12% padrão e percentual customizado 15%).
 ### Classes envolvidas
 
 - `ConsolidationExcelServiceImpl` — `addResumoGeralSheet`, orquestração reativa com `TaxaSelicService`
+- `ResumoGeralAssemblyService` — montagem compartilhada (linhas + SELIC + honorários) usada pelo Excel e pelo endpoint JSON
+- `ResumoGeralUseCase` — orquestra pessoa + consolidação + montagem para preview
 - `ExcelResumoGeralHelper` — regras B–H, mapa de datas, totais e honorários
 - `ExcelResumoGeralLinhaDTO` — linha por ano + `enriquecerComSelic`
 - `ExcelResumoGeralLogoHelper` — merge G1:H8 e inserção do logo Origium
+
+---
+
+# 13. Preview JSON — Resumo Geral (modal web)
+
+Endpoint para exibir o Resumo Geral no frontend **sem baixar o Excel**.
+
+```
+GET /api/v1/persons/{personId}/resumo-geral
+Accept: application/json
+```
+
+| Status | Significado |
+|--------|-------------|
+| **200** | Payload completo (`ResumoGeralResponse`) |
+| **204** | Pessoa existe, mas não há declarações IR alinhadas com contracheque |
+| **404** | Pessoa não encontrada / sem permissão de tenant |
+
+### Estrutura da resposta
+
+- `nome`, `cpf`, `atualizacao` (`SELIC RECEITA FEDERAL`)
+- `dataGeracao`, `dataPagamentoSelic`
+- `datasVencimento` — mapa ano-calendário → data (mesmo de `ExcelResumoGeralHelper.DATAS_VENCIMENTO`)
+- `linhas[]` — colunas B–H por ano (`ResumoGeralLinhaResponse`)
+- `totais` — somas D/F/G, honorários e valor a receber
+- `honorarios` — rótulo formatado (ex.: `Honorários Advocatícios - APCEF/SC - 12%`)
+- `rodape` — responsável técnico CORECON
+
+Regressão: `ExcelControllerResumoGeralTest`, `ResumoGeralUseCaseTest`.
+
+Frontend: botão **Resumo Geral** na lista de clientes (`persons-page.tsx`) abre modal full-screen (`ResumoGeralModal`) com botão **Exportar Excel**.
 
 ---
 

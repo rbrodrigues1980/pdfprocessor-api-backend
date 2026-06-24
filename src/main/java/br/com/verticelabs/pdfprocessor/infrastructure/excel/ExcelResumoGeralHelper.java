@@ -41,6 +41,8 @@ public class ExcelResumoGeralHelper {
     public static final BigDecimal PERCENTUAL_HONORARIOS = PERCENTUAL_HONORARIOS_DEFAULT;
     public static final String OBS_SEM_IMPACTO = "Sem impacto financeiro - Sistema de tributação";
     public static final String OBS_IMPACTO = "Impacto financeiro";
+    public static final String ORIGEM_IMPOSTO_A_RESTITUIR = "IMPOSTO A RESTITUIR";
+    public static final String ORIGEM_SALDO_IMPOSTO_A_PAGAR = "SALDO DE IMPOSTO A PAGAR";
     public static final String RODAPE_LABEL = "Responsável:";
     public static final String RODAPE_NOME = "Vanderson Luiz Burracini";
     public static final String RODAPE_ECONOMISTA = "Economista - CORECON SP 2ª Região Reg. 36.432";
@@ -179,17 +181,21 @@ public class ExcelResumoGeralHelper {
             IrParametrosAnuais paramsAno) {
 
         BigDecimal valorDeclaracao = extrairResultadoPositivoDeclaracao(data);
-        BigDecimal valorSimulacao = calcularResultadoSimulacaoPlanilhaSeguro(
-                ano, data, prevComplPlanilha, faixasTabela, paramsAno, valorDeclaracao);
-        valorSimulacao = ajustarValorSimulacaoQuandoSaldoDeclaracaoMaior(
-                valorDeclaracao, valorSimulacao, data);
-        BigDecimal principal = calcularPrincipal(valorDeclaracao, valorSimulacao);
+        ResultadoBloco2Simulacao bloco2 = calcularResultadoBloco2SimulacaoSeguro(
+                ano, data, prevComplPlanilha, faixasTabela, paramsAno);
+        BigDecimal valorSimulacao = calcularValorColunaC(data, bloco2);
+        String origemValorDeclaracao = extrairTipoResultadoPositivo(
+                data.getImpostoRestituir(), data.getSaldoImpostoPagar());
+        String origemValorSimulacao = extrairTipoResultadoPositivo(bloco2.restituir(), bloco2.saldoPagar());
+        BigDecimal principal = calcularPrincipal(valorDeclaracao, valorSimulacao, data, bloco2);
         String observacao = principal.compareTo(ZERO) > 0 ? OBS_IMPACTO : OBS_SEM_IMPACTO;
 
         return ExcelResumoGeralLinhaDTO.builder()
                 .anoCalendario(ano)
                 .valorDeclaracao(valorDeclaracao)
+                .origemValorDeclaracao(origemValorDeclaracao)
                 .valorSimulacao(valorSimulacao)
+                .origemValorSimulacao(origemValorSimulacao)
                 .principal(principal)
                 .selicAcumulada(ZERO)
                 .valorCorrecao(ZERO)
@@ -204,22 +210,11 @@ public class ExcelResumoGeralHelper {
     }
 
     /**
-     * Quando a simulação (col. C) supera a declaração (col. B) mas a declaração entregue
-     * tinha saldo a pagar maior que restituição, usa o valor da col. B na col. C.
+     * Coluna C — valor da simulação (bloco 2): IMPOSTO A RESTITUIR ou SALDO DE IMPOSTO A PAGAR.
+     * Espelha o valor exibido na aba anual; ignora campos zerados.
      */
-    public BigDecimal ajustarValorSimulacaoQuandoSaldoDeclaracaoMaior(
-            BigDecimal valorDeclaracao,
-            BigDecimal valorSimulacao,
-            IrpfDeclaracaoData data) {
-        if (nvl(valorSimulacao).compareTo(nvl(valorDeclaracao)) <= 0) {
-            return valorSimulacao;
-        }
-        BigDecimal saldoDeclaracao = nvl(data.getSaldoImpostoPagar());
-        BigDecimal restituirDeclaracao = nvl(data.getImpostoRestituir());
-        if (saldoDeclaracao.compareTo(restituirDeclaracao) > 0) {
-            return nvl(valorDeclaracao).setScale(2, RM);
-        }
-        return valorSimulacao;
+    public BigDecimal calcularValorColunaC(IrpfDeclaracaoData data, ResultadoBloco2Simulacao bloco2) {
+        return extrairResultadoPositivo(bloco2.restituir(), bloco2.saldoPagar());
     }
 
     public BigDecimal extrairResultadoPositivo(BigDecimal restituir, BigDecimal saldoPagar) {
@@ -234,8 +229,42 @@ public class ExcelResumoGeralHelper {
         return ZERO.setScale(2, RM);
     }
 
-    public BigDecimal calcularPrincipal(BigDecimal valorDeclaracao, BigDecimal valorSimulacao) {
-        return nvl(valorDeclaracao).subtract(nvl(valorSimulacao)).max(ZERO).setScale(2, RM);
+    /**
+     * Origem do valor positivo exibido (colunas B/C): restituição ou saldo a pagar.
+     * Retorna {@code null} quando ambos são zero.
+     */
+    public String extrairTipoResultadoPositivo(BigDecimal restituir, BigDecimal saldoPagar) {
+        BigDecimal r = nvl(restituir);
+        BigDecimal s = nvl(saldoPagar);
+        if (r.compareTo(ZERO) > 0) {
+            return ORIGEM_IMPOSTO_A_RESTITUIR;
+        }
+        if (s.compareTo(ZERO) > 0) {
+            return ORIGEM_SALDO_IMPOSTO_A_PAGAR;
+        }
+        return null;
+    }
+
+    /**
+     * Coluna D — principal a ser restituído pela PGFN.
+     * Sim restituir + decl saldo pagar → D = B + C; sim restituir + decl restituir → D = C − B; demais → max(B − C, 0).
+     */
+    public BigDecimal calcularPrincipal(
+            BigDecimal valorDeclaracao,
+            BigDecimal valorColunaC,
+            IrpfDeclaracaoData data,
+            ResultadoBloco2Simulacao bloco2) {
+        BigDecimal restSim = valorPositivoOuZero(bloco2.restituir());
+        BigDecimal saldoDecl = valorPositivoOuZero(data.getSaldoImpostoPagar());
+        BigDecimal restDecl = valorPositivoOuZero(data.getImpostoRestituir());
+
+        if (restSim.compareTo(ZERO) > 0 && saldoDecl.compareTo(ZERO) > 0) {
+            return nvl(valorDeclaracao).add(nvl(valorColunaC)).setScale(2, RM);
+        }
+        if (restSim.compareTo(ZERO) > 0 && restDecl.compareTo(ZERO) > 0) {
+            return nvl(valorColunaC).subtract(nvl(valorDeclaracao)).max(ZERO).setScale(2, RM);
+        }
+        return nvl(valorDeclaracao).subtract(nvl(valorColunaC)).max(ZERO).setScale(2, RM);
     }
 
     public ResultadoBloco2Simulacao calcularResultadoBloco2Simulacao(
@@ -270,20 +299,34 @@ public class ExcelResumoGeralHelper {
         return calcularResultadoBloco2Simulacao(data, prevComplPlanilha, faixasTabela, paramsAno).valorPositivo();
     }
 
-    private BigDecimal calcularResultadoSimulacaoPlanilhaSeguro(
+    private ResultadoBloco2Simulacao calcularResultadoBloco2SimulacaoSeguro(
             String ano,
             IrpfDeclaracaoData data,
             BigDecimal prevComplPlanilha,
             List<IrTabelaTributacao> faixasTabela,
-            IrParametrosAnuais paramsAno,
-            BigDecimal valorDeclaracaoFallback) {
+            IrParametrosAnuais paramsAno) {
         if (paramsAno == null || faixasTabela == null || faixasTabela.isEmpty()) {
             log.warn(
-                    "Resumo Geral ano {}: parâmetros ou tabela de tributação ausentes — usando valor da declaração",
+                    "Resumo Geral ano {}: parâmetros ou tabela de tributação ausentes — usando valores da declaração",
                     ano);
-            return valorDeclaracaoFallback;
+            return resultadoFallbackDeclaracao(data);
         }
-        return calcularResultadoSimulacaoPlanilha(data, prevComplPlanilha, faixasTabela, paramsAno);
+        return calcularResultadoBloco2Simulacao(data, prevComplPlanilha, faixasTabela, paramsAno);
+    }
+
+    private ResultadoBloco2Simulacao resultadoFallbackDeclaracao(IrpfDeclaracaoData data) {
+        BigDecimal rest = valorPositivoOuZero(data.getImpostoRestituir());
+        BigDecimal saldo = valorPositivoOuZero(data.getSaldoImpostoPagar());
+        BigDecimal positivo = extrairResultadoPositivo(data.getImpostoRestituir(), data.getSaldoImpostoPagar());
+        return new ResultadoBloco2Simulacao(
+                rest.compareTo(ZERO) > 0 ? rest.setScale(2, RM) : ZERO.setScale(2, RM),
+                saldo.compareTo(ZERO) > 0 ? saldo.setScale(2, RM) : ZERO.setScale(2, RM),
+                positivo);
+    }
+
+    private BigDecimal valorPositivoOuZero(BigDecimal valor) {
+        BigDecimal n = nvl(valor);
+        return n.compareTo(ZERO) > 0 ? n : ZERO;
     }
 
     public ResultadoBloco2Simulacao calcularResultadoPositivoDeTotais(
