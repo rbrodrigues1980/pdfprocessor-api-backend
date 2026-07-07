@@ -1,5 +1,6 @@
 package br.com.verticelabs.pdfprocessor.application.persons;
 
+import br.com.verticelabs.pdfprocessor.application.security.EvaluatorAccessService;
 import br.com.verticelabs.pdfprocessor.domain.exceptions.PersonNotFoundException;
 import br.com.verticelabs.pdfprocessor.domain.model.Person;
 import br.com.verticelabs.pdfprocessor.domain.repository.PersonRepository;
@@ -15,22 +16,32 @@ import reactor.core.publisher.Mono;
 public class GetPersonByIdUseCase {
 
     private final PersonRepository personRepository;
+    private final EvaluatorAccessService evaluatorAccessService;
 
     public Mono<Person> execute(String personId) {
         log.info("Buscando pessoa por ID: {}", personId);
         
-        return ReactiveSecurityContextHelper.isSuperAdmin()
-                .flatMap(isSuperAdmin -> {
-                    if (Boolean.TRUE.equals(isSuperAdmin)) {
-                        // SUPER_ADMIN pode buscar qualquer pessoa
-                        return personRepository.findById(personId)
-                                .switchIfEmpty(Mono.error(new PersonNotFoundException("ID: " + personId)));
-                    } else {
-                        // Outros usuários só podem buscar pessoas do seu tenant
-                        return ReactiveSecurityContextHelper.getTenantId()
-                                .flatMap(tenantId -> personRepository.findByTenantIdAndId(tenantId, personId)
+        return evaluatorAccessService.isEvaluator()
+                .flatMap(isEvaluator -> {
+                    if (Boolean.TRUE.equals(isEvaluator)) {
+                        // EVALUATOR: só pode acessar clientes da allowlist (ignora tenant)
+                        return evaluatorAccessService.assertPersonAccessible(personId)
+                                .then(personRepository.findById(personId)
                                         .switchIfEmpty(Mono.error(new PersonNotFoundException("ID: " + personId))));
                     }
+                    return ReactiveSecurityContextHelper.isSuperAdmin()
+                            .flatMap(isSuperAdmin -> {
+                                if (Boolean.TRUE.equals(isSuperAdmin)) {
+                                    // SUPER_ADMIN pode buscar qualquer pessoa
+                                    return personRepository.findById(personId)
+                                            .switchIfEmpty(Mono.error(new PersonNotFoundException("ID: " + personId)));
+                                } else {
+                                    // Outros usuários só podem buscar pessoas do seu tenant
+                                    return ReactiveSecurityContextHelper.getTenantId()
+                                            .flatMap(tenantId -> personRepository.findByTenantIdAndId(tenantId, personId)
+                                                    .switchIfEmpty(Mono.error(new PersonNotFoundException("ID: " + personId))));
+                                }
+                            });
                 });
     }
 }

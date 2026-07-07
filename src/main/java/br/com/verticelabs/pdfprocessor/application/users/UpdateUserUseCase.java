@@ -20,11 +20,11 @@ public class UpdateUserUseCase {
     
     private final UserRepository userRepository;
     
-    public Mono<User> execute(String userId, String nome, String email, Set<String> roles, String telefone, Boolean ativo) {
+    public Mono<User> execute(String userId, String nome, String email, Set<String> roles, String telefone, Boolean ativo, Set<String> allowedPersonIds) {
         return ReactiveSecurityContextHelper.isSuperAdmin()
                 .flatMap(isSuperAdmin -> {
                     if (isSuperAdmin) {
-                        return updateAsSuperAdmin(userId, nome, email, roles, telefone, ativo);
+                        return updateAsSuperAdmin(userId, nome, email, roles, telefone, ativo, allowedPersonIds);
                     } else {
                         return ReactiveSecurityContextHelper.getTenantId()
                                 .flatMap(tenantId -> updateAsTenantAdmin(tenantId, userId, nome, email, roles, telefone, ativo));
@@ -32,7 +32,7 @@ public class UpdateUserUseCase {
                 });
     }
     
-    private Mono<User> updateAsSuperAdmin(String userId, String nome, String email, Set<String> roles, String telefone, Boolean ativo) {
+    private Mono<User> updateAsSuperAdmin(String userId, String nome, String email, Set<String> roles, String telefone, Boolean ativo, Set<String> allowedPersonIds) {
         return userRepository.findById(userId)
                 .switchIfEmpty(Mono.error(new UserNotFoundException("Usuário não encontrado: " + userId)))
                 .flatMap(user -> {
@@ -43,10 +43,10 @@ public class UpdateUserUseCase {
                                     if (exists) {
                                         return Mono.error(new RuntimeException("Email já está em uso"));
                                     }
-                                    return updateUser(user, nome, email, roles, telefone, ativo);
+                                    return updateUser(user, nome, email, roles, telefone, ativo, allowedPersonIds);
                                 });
                     }
-                    return updateUser(user, nome, email, roles, telefone, ativo);
+                    return updateUser(user, nome, email, roles, telefone, ativo, allowedPersonIds);
                 });
     }
     
@@ -58,6 +58,9 @@ public class UpdateUserUseCase {
                     if (roles.contains("SUPER_ADMIN")) {
                         return Mono.error(new RuntimeException("TENANT_ADMIN não pode alterar roles para SUPER_ADMIN"));
                     }
+                    if (roles.contains("EVALUATOR")) {
+                        return Mono.error(new RuntimeException("Apenas SUPER_ADMIN pode gerenciar usuários avaliadores (EVALUATOR)"));
+                    }
                     
                     // Verificar se email já existe em outro usuário
                     if (!user.getEmail().equals(email)) {
@@ -66,18 +69,26 @@ public class UpdateUserUseCase {
                                     if (exists) {
                                         return Mono.error(new RuntimeException("Email já está em uso"));
                                     }
-                                    return updateUser(user, nome, email, roles, telefone, ativo);
+                                    return updateUser(user, nome, email, roles, telefone, ativo, null);
                                 });
                     }
-                    return updateUser(user, nome, email, roles, telefone, ativo);
+                    return updateUser(user, nome, email, roles, telefone, ativo, null);
                 });
     }
     
-    private Mono<User> updateUser(User user, String nome, String email, Set<String> roles, String telefone, Boolean ativo) {
+    private Mono<User> updateUser(User user, String nome, String email, Set<String> roles, String telefone, Boolean ativo, Set<String> allowedPersonIds) {
         user.setNome(nome);
         user.setEmail(email);
         // Garantir que roles seja um HashSet mutável
         user.setRoles(roles != null ? new HashSet<>(roles) : new HashSet<>());
+        // Allowlist de clientes: aplicável a EVALUATOR; limpa quando deixa de ser avaliador
+        if (roles != null && roles.contains("EVALUATOR")) {
+            if (allowedPersonIds != null) {
+                user.setAllowedPersonIds(new HashSet<>(allowedPersonIds));
+            }
+        } else {
+            user.setAllowedPersonIds(new HashSet<>());
+        }
         if (telefone != null) {
             user.setTelefone(telefone);
         }

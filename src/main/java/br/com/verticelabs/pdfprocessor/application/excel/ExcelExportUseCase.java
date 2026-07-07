@@ -1,6 +1,7 @@
 package br.com.verticelabs.pdfprocessor.application.excel;
 
 import br.com.verticelabs.pdfprocessor.application.consolidation.ConsolidationUseCase;
+import br.com.verticelabs.pdfprocessor.application.security.EvaluatorAccessService;
 import br.com.verticelabs.pdfprocessor.domain.exceptions.*;
 import br.com.verticelabs.pdfprocessor.domain.model.Person;
 import br.com.verticelabs.pdfprocessor.domain.repository.PersonRepository;
@@ -21,6 +22,24 @@ public class ExcelExportUseCase {
     private final ConsolidationUseCase consolidationUseCase;
     private final PersonRepository personRepository;
     private final ExcelExportService excelExportService;
+    private final EvaluatorAccessService evaluatorAccessService;
+
+    /**
+     * Gera o Excel a partir de uma pessoa já resolvida e com acesso validado.
+     * Usado pelo perfil EVALUATOR (escopo pela allowlist, sem restrição de tenant).
+     */
+    private Mono<ExcelExportResult> generateFromPerson(Person person, String ano, String origem) {
+        return consolidationUseCase.consolidate(person.getCpf(), person.getTenantId(), ano, origem)
+                .flatMap(consolidatedResponse -> {
+                    if (consolidatedResponse.getRubricas() == null
+                            || consolidatedResponse.getRubricas().isEmpty()) {
+                        return Mono.error(new NoEntriesFoundException(person.getCpf()));
+                    }
+                    String filename = generateFilename(person);
+                    return excelExportService.generateConsolidationExcel(person, consolidatedResponse, filename)
+                            .map(bytes -> new ExcelExportResult(bytes, filename));
+                });
+    }
 
     /**
      * Gera arquivo Excel com consolidação de uma pessoa (por CPF).
@@ -31,6 +50,18 @@ public class ExcelExportUseCase {
      * @return Mono com resultado contendo bytes e nome do arquivo
      */
     public Mono<ExcelExportResult> generateExcel(String cpf, String ano, String origem) {
+        return evaluatorAccessService.isEvaluator().flatMap(isEvaluator -> {
+            if (Boolean.TRUE.equals(isEvaluator)) {
+                return personRepository.findByCpf(cpf)
+                        .switchIfEmpty(Mono.error(new PersonNotFoundException(cpf)))
+                        .flatMap(person -> evaluatorAccessService.assertPersonAccessible(person.getId())
+                                .then(generateFromPerson(person, ano, origem)));
+            }
+            return generateExcelInternal(cpf, ano, origem);
+        });
+    }
+
+    private Mono<ExcelExportResult> generateExcelInternal(String cpf, String ano, String origem) {
         log.info("=== ExcelExportUseCase.generateExcel() INICIADO ===");
         log.info("CPF: {}, Ano: {}, Origem: {}", cpf, ano, origem);
 
@@ -107,6 +138,18 @@ public class ExcelExportUseCase {
      * @return Mono com resultado contendo bytes e nome do arquivo
      */
     public Mono<ExcelExportResult> generateExcelById(String personId, String ano, String origem) {
+        return evaluatorAccessService.isEvaluator().flatMap(isEvaluator -> {
+            if (Boolean.TRUE.equals(isEvaluator)) {
+                return evaluatorAccessService.assertPersonAccessible(personId)
+                        .then(personRepository.findById(personId))
+                        .switchIfEmpty(Mono.error(new PersonNotFoundException(personId)))
+                        .flatMap(person -> generateFromPerson(person, ano, origem));
+            }
+            return generateExcelByIdInternal(personId, ano, origem);
+        });
+    }
+
+    private Mono<ExcelExportResult> generateExcelByIdInternal(String personId, String ano, String origem) {
         log.info("=== ExcelExportUseCase.generateExcelById() INICIADO ===");
         log.info("PersonId: {}, Ano: {}, Origem: {}", personId, ano, origem);
 
@@ -192,6 +235,18 @@ public class ExcelExportUseCase {
      * @return Mono com resultado contendo bytes e nome do arquivo
      */
     public Mono<ExcelExportResult> generateExcelByCpfAndTenant(String cpf, String tenantId, String ano, String origem) {
+        return evaluatorAccessService.isEvaluator().flatMap(isEvaluator -> {
+            if (Boolean.TRUE.equals(isEvaluator)) {
+                return personRepository.findByTenantIdAndCpf(tenantId, cpf)
+                        .switchIfEmpty(Mono.error(new PersonNotFoundException(cpf)))
+                        .flatMap(person -> evaluatorAccessService.assertPersonAccessible(person.getId())
+                                .then(generateFromPerson(person, ano, origem)));
+            }
+            return generateExcelByCpfAndTenantInternal(cpf, tenantId, ano, origem);
+        });
+    }
+
+    private Mono<ExcelExportResult> generateExcelByCpfAndTenantInternal(String cpf, String tenantId, String ano, String origem) {
         log.info("=== ExcelExportUseCase.generateExcelByCpfAndTenant() INICIADO ===");
         log.info("CPF: {}, TenantId: {}, Ano: {}, Origem: {}", cpf, tenantId, ano, origem);
 

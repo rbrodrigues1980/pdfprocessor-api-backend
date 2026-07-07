@@ -1,5 +1,6 @@
 package br.com.verticelabs.pdfprocessor.application.documents;
 
+import br.com.verticelabs.pdfprocessor.application.security.EvaluatorAccessService;
 import br.com.verticelabs.pdfprocessor.domain.exceptions.DocumentNotFoundException;
 import br.com.verticelabs.pdfprocessor.domain.exceptions.PersonNotFoundException;
 import br.com.verticelabs.pdfprocessor.domain.model.DocumentStatus;
@@ -33,6 +34,24 @@ public class DocumentQueryUseCase {
 
     private final PayrollDocumentRepository documentRepository;
     private final PersonRepository personRepository;
+    private final EvaluatorAccessService evaluatorAccessService;
+
+    /**
+     * Para o perfil EVALUATOR, garante que o documento pertence a um cliente da allowlist.
+     * No-op para as demais roles.
+     */
+    private Mono<Void> assertDocumentAccessibleForEvaluator(PayrollDocument doc) {
+        return evaluatorAccessService.isEvaluator()
+                .flatMap(isEvaluator -> {
+                    if (!Boolean.TRUE.equals(isEvaluator)) {
+                        return Mono.empty();
+                    }
+                    return personRepository.findByTenantIdAndCpf(doc.getTenantId(), doc.getCpf())
+                            .flatMap(person -> evaluatorAccessService.assertPersonAccessible(person.getId()))
+                            .switchIfEmpty(evaluatorAccessService.assertPersonAccessible(null));
+                })
+                .then();
+    }
 
     /**
      * Busca um documento por ID
@@ -46,6 +65,7 @@ public class DocumentQueryUseCase {
                     log.warn("Documento não encontrado: {}", id);
                     return Mono.error(new DocumentNotFoundException("Documento não encontrado: " + id));
                 }))
+                .flatMap(doc -> assertDocumentAccessibleForEvaluator(doc).thenReturn(doc))
                 .map(doc -> {
                     DocumentResponse response = toDocumentResponse(doc);
                     // Incluir processingLog apenas no detalhe (não em listagens)
@@ -98,16 +118,24 @@ public class DocumentQueryUseCase {
         log.info("=== DocumentQueryUseCase.findByPersonId() INICIADO ===");
         log.info("PersonId: {}", personId);
 
-        return ReactiveSecurityContextHelper.isSuperAdmin()
-                .flatMap(isSuperAdmin -> {
-                    if (isSuperAdmin) {
-                        // SUPER_ADMIN: buscar pessoa diretamente pelo ID
-                        return findDocumentsByPersonIdForSuperAdmin(personId);
-                    } else {
-                        // Outros usuários: validar que a pessoa pertence ao seu tenant
-                        return ReactiveSecurityContextHelper.getTenantId()
-                                .flatMap(tenantId -> findDocumentsByPersonIdForTenant(tenantId, personId));
+        return evaluatorAccessService.isEvaluator()
+                .flatMap(isEvaluator -> {
+                    if (Boolean.TRUE.equals(isEvaluator)) {
+                        // EVALUATOR: só clientes da allowlist (sem restrição de tenant)
+                        return evaluatorAccessService.assertPersonAccessible(personId)
+                                .then(findDocumentsByPersonIdForSuperAdmin(personId));
                     }
+                    return ReactiveSecurityContextHelper.isSuperAdmin()
+                            .flatMap(isSuperAdmin -> {
+                                if (isSuperAdmin) {
+                                    // SUPER_ADMIN: buscar pessoa diretamente pelo ID
+                                    return findDocumentsByPersonIdForSuperAdmin(personId);
+                                } else {
+                                    // Outros usuários: validar que a pessoa pertence ao seu tenant
+                                    return ReactiveSecurityContextHelper.getTenantId()
+                                            .flatMap(tenantId -> findDocumentsByPersonIdForTenant(tenantId, personId));
+                                }
+                            });
                 })
                 .doOnError(error -> {
                     log.error("Erro ao buscar documentos do personId: {}", personId, error);
@@ -173,16 +201,26 @@ public class DocumentQueryUseCase {
         log.info("=== DocumentQueryUseCase.findByCpf() INICIADO ===");
         log.info("CPF: {}", cpf);
 
-        return ReactiveSecurityContextHelper.isSuperAdmin()
-                .flatMap(isSuperAdmin -> {
-                    if (isSuperAdmin) {
-                        // SUPER_ADMIN pode ver documentos de qualquer tenant
-                        return findDocumentsByCpfForSuperAdmin(cpf);
-                    } else {
-                        // Outros usuários só veem documentos do seu tenant
-                        return ReactiveSecurityContextHelper.getTenantId()
-                                .flatMap(tenantId -> findDocumentsByCpfForTenant(tenantId, cpf));
+        return evaluatorAccessService.isEvaluator()
+                .flatMap(isEvaluator -> {
+                    if (Boolean.TRUE.equals(isEvaluator)) {
+                        // EVALUATOR: resolve a pessoa do CPF e valida contra a allowlist
+                        return personRepository.findByCpf(cpf)
+                                .switchIfEmpty(Mono.error(new PersonNotFoundException("Pessoa não encontrada: " + cpf)))
+                                .flatMap(person -> evaluatorAccessService.assertPersonAccessible(person.getId()))
+                                .then(findDocumentsByCpfForSuperAdmin(cpf));
                     }
+                    return ReactiveSecurityContextHelper.isSuperAdmin()
+                            .flatMap(isSuperAdmin -> {
+                                if (isSuperAdmin) {
+                                    // SUPER_ADMIN pode ver documentos de qualquer tenant
+                                    return findDocumentsByCpfForSuperAdmin(cpf);
+                                } else {
+                                    // Outros usuários só veem documentos do seu tenant
+                                    return ReactiveSecurityContextHelper.getTenantId()
+                                            .flatMap(tenantId -> findDocumentsByCpfForTenant(tenantId, cpf));
+                                }
+                            });
                 })
                 .doOnError(error -> {
                     log.error("Erro ao buscar documentos do CPF: {}", cpf, error);

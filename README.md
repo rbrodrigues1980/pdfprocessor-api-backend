@@ -54,6 +54,200 @@ O código está organizado para separar responsabilidades e isolar o domínio:
 ### 1. Banco de Dados (MongoDB)
 O projeto conecta ao MongoDB Atlas. A URI de conexão está em `src/main/resources/application.yml`.
 
+| Ambiente | Banco | Uso |
+|----------|-------|-----|
+| **Produção** | `pdfprocessor` | Cloud Run / dados reais |
+| **Desenvolvimento** | `pdfprocessor-hml` | Cópia para testes locais |
+
+#### Clonar produção → desenvolvimento (Atlas)
+
+Use este script no **mongosh** (Atlas → *Browse Collections* → *Open MongoDB Shell*, ou terminal local conectado ao cluster) para copiar todas as collections e índices de `pdfprocessor` para `pdfprocessor-hml`.
+
+**Antes de executar:**
+- O banco de destino será **apagado e recriado** do zero.
+- Altere `CONFIRMAR_EXECUCAO` para `true` somente quando tiver certeza.
+- Após o clone, aponte o `.env` local para `pdfprocessor-hml` (veja `.env.example`).
+
+```javascript
+// ======================================================
+// CLONE PROFISSIONAL: pdfprocessor -> pdfprocessor-hml
+// ======================================================
+
+const origem = "pdfprocessor";
+const destino = "pdfprocessor-hml";
+const CONFIRMAR_EXECUCAO = true;
+
+if (!CONFIRMAR_EXECUCAO) {
+  throw new Error("Execução cancelada. Altere CONFIRMAR_EXECUCAO para true.");
+}
+
+const src = db.getSiblingDB(origem);
+const dst = db.getSiblingDB(destino);
+
+const resultado = {
+  origem,
+  destino,
+  inicio: new Date(),
+  colecoesCopiadas: [],
+  colecoesComErro: [],
+  indicesCriados: [],
+  contagens: []
+};
+
+print("==============================================");
+print(`INICIANDO CLONE: ${origem} -> ${destino}`);
+print("ATENÇÃO: o destino será limpo antes da cópia.");
+print("==============================================");
+
+// 1) Valida origem
+const colecoesOrigem = src.getCollectionNames()
+  .filter(c => !c.startsWith("system."));
+
+if (!colecoesOrigem.length) {
+  throw new Error(`A base de origem '${origem}' não possui collections para copiar.`);
+}
+
+print(`Collections encontradas na origem: ${colecoesOrigem.length}`);
+
+// 2) Limpa destino
+print("\nLIMPANDO DESTINO...");
+dst.getCollectionNames().forEach(c => {
+  if (!c.startsWith("system.")) {
+    try {
+      dst.getCollection(c).drop();
+      print(`  DROP OK: ${destino}.${c}`);
+    } catch (e) {
+      print(`  ERRO AO DROPAR ${destino}.${c}: ${e.message}`);
+      resultado.colecoesComErro.push({
+        etapa: "drop",
+        collection: c,
+        erro: e.message
+      });
+    }
+  }
+});
+
+// 3) Copia dados
+print("\nCOPIANDO DADOS...");
+colecoesOrigem.forEach(col => {
+  try {
+    const totalOrigem = src.getCollection(col).countDocuments();
+
+    print(`  Copiando ${origem}.${col} (${totalOrigem} docs)...`);
+
+    src.getCollection(col).aggregate([
+      { $match: {} },
+      { $out: { db: destino, coll: col } }
+    ]);
+
+    const totalDestino = dst.getCollection(col).countDocuments();
+
+    resultado.colecoesCopiadas.push(col);
+    resultado.contagens.push({
+      collection: col,
+      origem: totalOrigem,
+      destino: totalDestino,
+      ok: totalOrigem === totalDestino
+    });
+
+    const status = totalOrigem === totalDestino ? "OK" : "DIVERGENTE";
+    print(`    ${status}: origem=${totalOrigem}, destino=${totalDestino}`);
+
+  } catch (e) {
+    print(`    ERRO ao copiar ${col}: ${e.message}`);
+    resultado.colecoesComErro.push({
+      etapa: "copy",
+      collection: col,
+      erro: e.message
+    });
+  }
+});
+
+// 4) Recria índices
+print("\nRECRIANDO ÍNDICES...");
+colecoesOrigem.forEach(col => {
+  try {
+    const indices = src.getCollection(col)
+      .getIndexes()
+      .filter(i => i.name !== "_id_");
+
+    if (!indices.length) {
+      print(`  Sem índices extras: ${col}`);
+      return;
+    }
+
+    indices.forEach(i => {
+      const options = { name: i.name };
+
+      if (i.unique !== undefined) options.unique = i.unique;
+      if (i.sparse !== undefined) options.sparse = i.sparse;
+      if (i.expireAfterSeconds !== undefined) options.expireAfterSeconds = i.expireAfterSeconds;
+      if (i.partialFilterExpression !== undefined) options.partialFilterExpression = i.partialFilterExpression;
+      if (i.collation !== undefined) options.collation = i.collation;
+      if (i.hidden !== undefined) options.hidden = i.hidden;
+
+      dst.getCollection(col).createIndex(i.key, options);
+
+      resultado.indicesCriados.push({
+        collection: col,
+        index: i.name
+      });
+
+      print(`  Índice criado: ${destino}.${col} -> ${i.name}`);
+    });
+
+  } catch (e) {
+    print(`  ERRO ao criar índices de ${col}: ${e.message}`);
+    resultado.colecoesComErro.push({
+      etapa: "index",
+      collection: col,
+      erro: e.message
+    });
+  }
+});
+
+// 5) Resumo final
+resultado.fim = new Date();
+resultado.duracaoMs = resultado.fim - resultado.inicio;
+
+print("\n==============================================");
+print("RESUMO FINAL");
+print("==============================================");
+print(`Origem: ${resultado.origem}`);
+print(`Destino: ${resultado.destino}`);
+print(`Início: ${resultado.inicio.toISOString()}`);
+print(`Fim: ${resultado.fim.toISOString()}`);
+print(`Duração(ms): ${resultado.duracaoMs}`);
+print(`Collections copiadas: ${resultado.colecoesCopiadas.length}`);
+print(`Índices criados: ${resultado.indicesCriados.length}`);
+print(`Erros: ${resultado.colecoesComErro.length}`);
+
+print("\nVALIDAÇÃO DE CONTAGENS:");
+resultado.contagens.forEach(c => {
+  print(`  ${c.ok ? "OK" : "DIVERGENTE"} ${c.collection}: origem=${c.origem}, destino=${c.destino}`);
+});
+
+if (resultado.colecoesComErro.length) {
+  print("\nERROS ENCONTRADOS:");
+  resultado.colecoesComErro.forEach(e => {
+    print(`  [${e.etapa}] ${e.collection}: ${e.erro}`);
+  });
+  print("\nCLONE FINALIZADO COM ERROS.");
+} else {
+  print("\nCLONE FINALIZADO COM SUCESSO.");
+}
+
+print("==============================================");
+```
+
+**Após o clone**, configure o `.env` local:
+
+```env
+SPRING_DATA_MONGODB_URI=mongodb+srv://usuario:senha@origium.nopq61.mongodb.net/pdfprocessor-hml?retryWrites=true&w=majority
+```
+
+👉 Detalhes adicionais: **[docs/03-banco-de-dados/003 - BANCO_DADOS_HML.md](./docs/03-banco-de-dados/003%20-%20BANCO_DADOS_HML.md)**
+
 ### 2. Segurança (JWT)
 As chaves de segurança devem vir de **variáveis de ambiente** (nunca fixas no código em produção). O `application.yml` já está preparado para usar placeholders:
 

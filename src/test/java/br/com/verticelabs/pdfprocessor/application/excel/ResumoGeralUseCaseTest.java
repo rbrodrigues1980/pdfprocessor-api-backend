@@ -2,6 +2,7 @@ package br.com.verticelabs.pdfprocessor.application.excel;
 
 import br.com.verticelabs.pdfprocessor.application.consolidation.ConsolidationUseCase;
 import br.com.verticelabs.pdfprocessor.application.empresas.EmpresaHonorariosResolver;
+import br.com.verticelabs.pdfprocessor.application.security.EvaluatorAccessService;
 import br.com.verticelabs.pdfprocessor.domain.exceptions.NoEntriesFoundException;
 import br.com.verticelabs.pdfprocessor.domain.model.DocumentType;
 import br.com.verticelabs.pdfprocessor.domain.model.IrpfDeclaracaoData;
@@ -51,6 +52,8 @@ class ResumoGeralUseCaseTest {
     private ResumoGeralAssemblyService resumoGeralAssemblyService;
     @Mock
     private ResumoGeralResponseMapper resumoGeralResponseMapper;
+    @Mock
+    private EvaluatorAccessService evaluatorAccessService;
 
     @InjectMocks
     private ResumoGeralUseCase resumoGeralUseCase;
@@ -65,6 +68,10 @@ class ResumoGeralUseCaseTest {
                 .cpf("44274378934")
                 .nome("MARCIA REGINA")
                 .build();
+        org.mockito.Mockito.lenient().when(evaluatorAccessService.assertPersonAccessible(any()))
+                .thenReturn(Mono.empty());
+        org.mockito.Mockito.lenient().when(evaluatorAccessService.isEvaluator())
+                .thenReturn(Mono.just(false));
     }
 
     private MockedStatic<ReactiveSecurityContextHelper> mockSuperAdmin() {
@@ -111,7 +118,7 @@ class ResumoGeralUseCaseTest {
                 .build();
 
         when(personRepository.findById("p1")).thenReturn(Mono.just(person));
-        when(consolidationUseCase.consolidate(eq(person.getCpf()), eq(null), eq(null)))
+        when(consolidationUseCase.consolidate(eq(person.getCpf()), eq("t1"), eq(null), eq(null)))
                 .thenReturn(Mono.just(consolidated));
         when(documentRepository.findByTenantIdAndCpf("t1", person.getCpf()))
                 .thenReturn(Flux.just(PayrollDocument.builder()
@@ -146,7 +153,7 @@ class ResumoGeralUseCaseTest {
                 LocalDate.now(), LocalDateTime.now());
 
         when(personRepository.findById("p1")).thenReturn(Mono.just(person));
-        when(consolidationUseCase.consolidate(eq(person.getCpf()), eq(null), eq(null)))
+        when(consolidationUseCase.consolidate(eq(person.getCpf()), eq("t1"), eq(null), eq(null)))
                 .thenReturn(Mono.just(consolidated));
         when(documentRepository.findByTenantIdAndCpf("t1", person.getCpf())).thenReturn(Flux.empty());
         when(resumoGeralAssemblyService.montar(eq(person), eq(consolidated), any()))
@@ -161,7 +168,7 @@ class ResumoGeralUseCaseTest {
     @Test
     void getByPersonId_erroQuandoSemRubricas() {
         when(personRepository.findById("p1")).thenReturn(Mono.just(person));
-        when(consolidationUseCase.consolidate(eq(person.getCpf()), eq(null), eq(null)))
+        when(consolidationUseCase.consolidate(eq(person.getCpf()), eq("t1"), eq(null), eq(null)))
                 .thenReturn(Mono.just(ConsolidatedResponse.builder()
                         .cpf(person.getCpf())
                         .rubricas(List.of())

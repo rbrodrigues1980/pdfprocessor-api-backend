@@ -27,6 +27,9 @@ public class UserResponse {
     @Builder.Default
     private Set<String> roles = new HashSet<>();
 
+    @Builder.Default
+    private Set<String> allowedPersonIds = new HashSet<>();
+
     private Boolean ativo;
     private Boolean twoFactorEnabled;
     private Instant createdAt;

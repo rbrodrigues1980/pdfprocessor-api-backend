@@ -26,12 +26,12 @@ public class CreateUserUseCase {
     private final TenantRepository tenantRepository;
     private final PasswordEncoder passwordEncoder;
     
-    public Mono<User> execute(String nome, String email, String senha, Set<String> roles, String tenantId, String telefone) {
+    public Mono<User> execute(String nome, String email, String senha, Set<String> roles, String tenantId, String telefone, Set<String> allowedPersonIds) {
         return ReactiveSecurityContextHelper.getUserId()
                 .flatMap(currentUserId -> ReactiveSecurityContextHelper.isSuperAdmin()
                         .flatMap(isSuperAdmin -> {
                             if (isSuperAdmin) {
-                                return createAsSuperAdmin(nome, email, senha, roles, tenantId, telefone);
+                                return createAsSuperAdmin(nome, email, senha, roles, tenantId, telefone, allowedPersonIds);
                             } else {
                                 return ReactiveSecurityContextHelper.isTenantAdmin()
                                         .flatMap(isTenantAdmin -> {
@@ -47,21 +47,23 @@ public class CreateUserUseCase {
                         }));
     }
     
-    private Mono<User> createAsSuperAdmin(String nome, String email, String senha, Set<String> roles, String tenantId, String telefone) {
+    private Mono<User> createAsSuperAdmin(String nome, String email, String senha, Set<String> roles, String tenantId, String telefone, Set<String> allowedPersonIds) {
         // SUPER_ADMIN pode criar qualquer tipo de usuário
-        // Se roles contém SUPER_ADMIN, tenantId deve ser null
         boolean isCreatingSuperAdmin = roles.contains("SUPER_ADMIN");
+        boolean isCreatingEvaluator = roles.contains("EVALUATOR");
+        // SUPER_ADMIN e EVALUATOR não pertencem a tenant
+        boolean tenantless = isCreatingSuperAdmin || isCreatingEvaluator;
         
-        if (isCreatingSuperAdmin && tenantId != null) {
-            return Mono.error(new RuntimeException("SUPER_ADMIN não pode ter tenantId"));
+        if (tenantless && tenantId != null) {
+            return Mono.error(new RuntimeException("SUPER_ADMIN/EVALUATOR não pode ter tenantId"));
         }
         
-        if (!isCreatingSuperAdmin && tenantId == null) {
-            return Mono.error(new RuntimeException("Usuários que não são SUPER_ADMIN devem ter tenantId"));
+        if (!tenantless && tenantId == null) {
+            return Mono.error(new RuntimeException("Usuários que não são SUPER_ADMIN/EVALUATOR devem ter tenantId"));
         }
         
-        if (isCreatingSuperAdmin) {
-            // Para SUPER_ADMIN, tenantId é null
+        if (tenantless) {
+            // Para SUPER_ADMIN/EVALUATOR, tenantId é null
             return userRepository.existsByEmail(email)
                     .flatMap(exists -> {
                         if (exists) {
@@ -70,18 +72,20 @@ public class CreateUserUseCase {
                         
                         User user = User.builder()
                                 .id(UUID.randomUUID().toString())
-                                .tenantId(null) // SUPER_ADMIN não tem tenantId
+                                .tenantId(null) // SUPER_ADMIN/EVALUATOR não têm tenantId
                                 .nome(nome)
                                 .email(email)
                                 .senhaHash(passwordEncoder.encode(senha))
                                 .roles(roles != null ? new HashSet<>(roles) : new HashSet<>())
+                                .allowedPersonIds(isCreatingEvaluator && allowedPersonIds != null
+                                        ? new HashSet<>(allowedPersonIds) : new HashSet<>())
                                 .telefone(telefone)
                                 .ativo(true)
                                 .createdAt(Instant.now())
                                 .build();
                         
                         return userRepository.save(user)
-                                .doOnSuccess(u -> log.info("✅ Usuário criado: {} ({})", u.getEmail(), u.getId()));
+                                .doOnSuccess(u -> log.info("✅ Usuário criado: {} ({}) - roles={}", u.getEmail(), u.getId(), u.getRoles()));
                     });
         } else {
             // Para outros usuários, validar tenant
@@ -114,6 +118,9 @@ public class CreateUserUseCase {
         // TENANT_ADMIN só pode criar TENANT_ADMIN ou TENANT_USER do seu tenant
         if (roles.contains("SUPER_ADMIN")) {
             return Mono.error(new RuntimeException("TENANT_ADMIN não pode criar SUPER_ADMIN"));
+        }
+        if (roles.contains("EVALUATOR")) {
+            return Mono.error(new RuntimeException("Apenas SUPER_ADMIN pode criar usuários avaliadores (EVALUATOR)"));
         }
         
         return validateTenant(tenantId)

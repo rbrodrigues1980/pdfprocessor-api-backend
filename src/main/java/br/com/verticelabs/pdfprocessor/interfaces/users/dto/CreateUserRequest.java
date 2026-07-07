@@ -22,10 +22,13 @@ public class CreateUserRequest {
     private String senha;
     
     @NotEmpty(message = "Roles são obrigatórias")
-    private Set<String> roles; // SUPER_ADMIN, TENANT_ADMIN, TENANT_USER
+    private Set<String> roles; // SUPER_ADMIN, TENANT_ADMIN, TENANT_USER, EVALUATOR
     
-    private String tenantId; // Opcional para SUPER_ADMIN
+    private String tenantId; // Opcional para SUPER_ADMIN / EVALUATOR
     
     private String telefone; // Opcional
+
+    /** Clientes (person IDs) que o EVALUATOR pode acessar. Ignorado para outras roles. */
+    private Set<String> allowedPersonIds;
 }
 

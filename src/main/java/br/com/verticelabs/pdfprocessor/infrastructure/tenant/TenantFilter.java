@@ -69,6 +69,9 @@ public class TenantFilter implements WebFilter {
                     // Verificar se é SUPER_ADMIN
                     boolean isSuperAdmin = auth.getAuthorities().stream()
                             .anyMatch(a -> a.getAuthority().equals("ROLE_SUPER_ADMIN"));
+                    // EVALUATOR não pertence a tenant: seu escopo é a allowlist de clientes
+                    boolean isEvaluator = auth.getAuthorities().stream()
+                            .anyMatch(a -> a.getAuthority().equals("ROLE_EVALUATOR"));
                     
                     // 2. Extrair tenantId do JWT (details do authentication)
                     Object tenantIdObj = auth.getDetails();
@@ -94,6 +97,12 @@ public class TenantFilter implements WebFilter {
                     if (isSuperAdmin) {
                         log.debug("🔑 SUPER_ADMIN sem tenantId - permitindo acesso global");
                         return Mono.just("GLOBAL"); // Valor especial para SUPER_ADMIN
+                    }
+
+                    // 3b. EVALUATOR não tem tenant: escopo é a allowlist de clientes (contexto GLOBAL)
+                    if (isEvaluator) {
+                        log.debug("🔎 EVALUATOR sem tenantId - contexto GLOBAL (escopo pela allowlist)");
+                        return Mono.just("GLOBAL");
                     }
                     
                     // 4. Se não for SUPER_ADMIN e não tem tenantId, usar "GLOBAL" como fallback

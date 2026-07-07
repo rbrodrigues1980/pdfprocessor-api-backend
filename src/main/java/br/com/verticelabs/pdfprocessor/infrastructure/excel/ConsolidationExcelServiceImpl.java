@@ -985,6 +985,18 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
         return style;
     }
 
+    /** Clona um estilo aplicando fonte Arial 10 em negrito (destaque de linhas de restituição). */
+    private CellStyle createBoldVariant(Workbook workbook, CellStyle base) {
+        CellStyle style = workbook.createCellStyle();
+        style.cloneStyleFrom(base);
+        Font font = workbook.createFont();
+        font.setBold(true);
+        font.setFontName("Arial");
+        font.setFontHeightInPoints((short) 10);
+        style.setFont(font);
+        return style;
+    }
+
     /**
      * Cria estilo padrão.
      */
@@ -1321,6 +1333,12 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
         CellStyle resumoEmptyStyle = createResumoEmptyStyle(workbook);
         CellStyle resumoFooterDateTimeStyle = createResumoFooterDateTimeStyle(workbook);
 
+        // Variantes em negrito para linhas em que a declaração entregue e a simulação
+        // resultam em restituição (destaque dos valores).
+        CellStyle numberStyleBold = createBoldVariant(workbook, numberStyle);
+        CellStyle resumoPercentStyleBold = createBoldVariant(workbook, resumoPercentStyle);
+        CellStyle resumoZeroDashStyleBold = createBoldVariant(workbook, resumoZeroDashStyle);
+
         int row = 0;
         final int topRow = 0;
 
@@ -1377,13 +1395,23 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
         int firstDataRow = row;
         for (ExcelResumoGeralLinhaDTO linha : linhas) {
             Row dataRow = sheet.createRow(row++);
+
+            // Negrito quando a declaração entregue E a simulação resultam em restituição.
+            boolean restituicaoDeclESim = ExcelResumoGeralHelper.ORIGEM_IMPOSTO_A_RESTITUIR
+                    .equals(linha.getOrigemValorDeclaracao())
+                    && ExcelResumoGeralHelper.ORIGEM_IMPOSTO_A_RESTITUIR
+                            .equals(linha.getOrigemValorSimulacao());
+            CellStyle money = restituicaoDeclESim ? numberStyleBold : numberStyle;
+            CellStyle percent = restituicaoDeclESim ? resumoPercentStyleBold : resumoPercentStyle;
+            CellStyle dash = restituicaoDeclESim ? resumoZeroDashStyleBold : resumoZeroDashStyle;
+
             setResumoAnoCell(dataRow, 0, linha.getAnoCalendario(), defaultStyle);
-            setResumoMoneyCell(dataRow, 1, linha.getValorDeclaracao(), numberStyle);
-            setResumoMoneyCell(dataRow, 2, linha.getValorSimulacao(), numberStyle);
-            setResumoPrincipalCell(dataRow, 3, linha.getPrincipal(), numberStyle, resumoZeroDashStyle);
-            setResumoPercentCell(dataRow, 4, linha.getPrincipal(), linha.getSelicAcumulada(), resumoPercentStyle);
-            setResumoCorrecaoCell(dataRow, 5, linha.getPrincipal(), linha.getValorCorrecao(), numberStyle, resumoZeroDashStyle);
-            setResumoCorrecaoCell(dataRow, 6, linha.getPrincipal(), linha.getPrincipalMaisCorrecao(), numberStyle, resumoZeroDashStyle);
+            setResumoMoneyCell(dataRow, 1, linha.getValorDeclaracao(), money);
+            setResumoMoneyCell(dataRow, 2, linha.getValorSimulacao(), money);
+            setResumoPrincipalCell(dataRow, 3, linha.getPrincipal(), money, dash);
+            setResumoPercentCell(dataRow, 4, linha.getPrincipal(), linha.getSelicAcumulada(), percent);
+            setResumoCorrecaoCell(dataRow, 5, linha.getPrincipal(), linha.getValorCorrecao(), money, dash);
+            setResumoCorrecaoCell(dataRow, 6, linha.getPrincipal(), linha.getPrincipalMaisCorrecao(), money, dash);
             Cell obsCell = dataRow.createCell(7);
             obsCell.setCellValue(linha.getObservacao() != null ? linha.getObservacao() : "");
             obsCell.setCellStyle(defaultStyle);

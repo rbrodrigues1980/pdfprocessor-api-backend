@@ -1,5 +1,7 @@
 package br.com.verticelabs.pdfprocessor.interfaces.excel;
 
+import br.com.verticelabs.pdfprocessor.application.excel.ResumoGeralPdfResult;
+import br.com.verticelabs.pdfprocessor.application.excel.ResumoGeralPdfUseCase;
 import br.com.verticelabs.pdfprocessor.application.excel.ResumoGeralUseCase;
 import br.com.verticelabs.pdfprocessor.domain.exceptions.PersonNotFoundException;
 import br.com.verticelabs.pdfprocessor.interfaces.excel.dto.ResumoGeralHonorariosResponse;
@@ -31,6 +33,9 @@ class ExcelControllerResumoGeralTest {
 
     @Mock
     private ResumoGeralUseCase resumoGeralUseCase;
+
+    @Mock
+    private ResumoGeralPdfUseCase resumoGeralPdfUseCase;
 
     @InjectMocks
     private ExcelController excelController;
@@ -99,5 +104,32 @@ class ExcelControllerResumoGeralTest {
                 .accept(MediaType.APPLICATION_JSON)
                 .exchange()
                 .expectStatus().isNotFound();
+    }
+
+    @Test
+    void getResumoGeralPdf_retorna200ComPdf() {
+        byte[] pdfBytes = new byte[]{'%', 'P', 'D', 'F', '-', '1', '.', '4'};
+        when(resumoGeralPdfUseCase.exportByPersonId("person-1"))
+                .thenReturn(Mono.just(new ResumoGeralPdfResult(pdfBytes, "202606241200_44274378934_MARCIA.pdf")));
+
+        webTestClient.get()
+                .uri("/persons/person-1/resumo-geral/pdf")
+                .accept(MediaType.APPLICATION_PDF)
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().contentType(MediaType.APPLICATION_PDF)
+                .expectHeader().valueEquals("Content-Disposition", "form-data; name=\"attachment\"; filename=\"202606241200_44274378934_MARCIA.pdf\"")
+                .expectBody(byte[].class).isEqualTo(pdfBytes);
+    }
+
+    @Test
+    void getResumoGeralPdf_semDados_retorna204() {
+        when(resumoGeralPdfUseCase.exportByPersonId("person-2")).thenReturn(Mono.empty());
+
+        webTestClient.get()
+                .uri("/persons/person-2/resumo-geral/pdf")
+                .accept(MediaType.APPLICATION_PDF)
+                .exchange()
+                .expectStatus().isEqualTo(HttpStatus.NO_CONTENT);
     }
 }

@@ -22,5 +22,8 @@ public class UpdateUserRequest {
     private String telefone;
     
     private Boolean ativo;
+
+    /** Clientes (person IDs) que o EVALUATOR pode acessar. Ignorado para outras roles. */
+    private Set<String> allowedPersonIds;
 }
 

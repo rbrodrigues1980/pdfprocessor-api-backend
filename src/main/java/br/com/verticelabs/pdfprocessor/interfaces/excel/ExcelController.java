@@ -1,6 +1,7 @@
 package br.com.verticelabs.pdfprocessor.interfaces.excel;
 
 import br.com.verticelabs.pdfprocessor.application.excel.ExcelExportUseCase;
+import br.com.verticelabs.pdfprocessor.application.excel.ResumoGeralPdfUseCase;
 import br.com.verticelabs.pdfprocessor.application.excel.ResumoGeralUseCase;
 import br.com.verticelabs.pdfprocessor.interfaces.excel.dto.ResumoGeralResponse;
 import br.com.verticelabs.pdfprocessor.domain.exceptions.*;
@@ -21,6 +22,7 @@ public class ExcelController {
 
     private final ExcelExportUseCase excelExportUseCase;
     private final ResumoGeralUseCase resumoGeralUseCase;
+    private final ResumoGeralPdfUseCase resumoGeralPdfUseCase;
 
     /**
      * GET /api/v1/persons/{cpf}/excel
@@ -288,6 +290,40 @@ public class ExcelController {
                 })
                 .onErrorResume(Exception.class, e -> {
                     log.error("Erro ao obter resumo geral para personId: {}", personId, e);
+                    return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build());
+                });
+    }
+
+    /**
+     * GET /api/v1/persons/{personId}/resumo-geral/pdf
+     * Gera PDF landscape do Resumo Geral IRPF (mesmo conteúdo da aba Excel).
+     */
+    @GetMapping(value = "/{personId}/resumo-geral/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
+    public Mono<ResponseEntity<byte[]>> getResumoGeralPdf(@PathVariable String personId) {
+        log.debug("=== INÍCIO: GET /api/v1/persons/{}/resumo-geral/pdf ===", personId);
+
+        return resumoGeralPdfUseCase.exportByPersonId(personId)
+                .map(result -> {
+                    HttpHeaders headers = new HttpHeaders();
+                    headers.setContentType(MediaType.APPLICATION_PDF);
+                    headers.setContentDispositionFormData("attachment", result.getFilename());
+                    headers.setContentLength(result.getBytes().length);
+                    return ResponseEntity.ok().headers(headers).body(result.getBytes());
+                })
+                .switchIfEmpty(Mono.defer(() -> {
+                    log.warn("Resumo Geral PDF indisponível para personId: {} — 204 NO_CONTENT", personId);
+                    return Mono.just(ResponseEntity.status(HttpStatus.NO_CONTENT).build());
+                }))
+                .onErrorResume(PersonNotFoundException.class, e -> {
+                    log.warn("Pessoa não encontrada para resumo geral PDF: {}", personId);
+                    return Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND).build());
+                })
+                .onErrorResume(NoEntriesFoundException.class, e -> {
+                    log.warn("Sem dados para resumo geral PDF: {}", personId);
+                    return Mono.just(ResponseEntity.status(HttpStatus.NO_CONTENT).build());
+                })
+                .onErrorResume(Exception.class, e -> {
+                    log.error("Erro ao gerar PDF resumo geral para personId: {}", personId, e);
                     return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build());
                 });
     }
