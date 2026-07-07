@@ -37,6 +37,9 @@ public class UserMapper {
         
         // Usar setter para garantir HashSet mutável (o setter sempre cria novo HashSet)
         response.setRoles(roles);
+        response.setAllowedPersonIds(user.getAllowedPersonIds() != null
+                ? new HashSet<>(user.getAllowedPersonIds())
+                : new HashSet<>());
         
         return response;
     }

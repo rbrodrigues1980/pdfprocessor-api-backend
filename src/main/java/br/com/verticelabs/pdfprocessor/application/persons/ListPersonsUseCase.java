@@ -1,5 +1,6 @@
 package br.com.verticelabs.pdfprocessor.application.persons;
 
+import br.com.verticelabs.pdfprocessor.application.security.EvaluatorAccessService;
 import br.com.verticelabs.pdfprocessor.domain.model.Person;
 import br.com.verticelabs.pdfprocessor.infrastructure.security.ReactiveSecurityContextHelper;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +19,7 @@ import br.com.verticelabs.pdfprocessor.domain.model.PayrollDocument;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -31,18 +33,54 @@ public class ListPersonsUseCase {
     );
 
     private final ReactiveMongoTemplate mongoTemplate;
+    private final EvaluatorAccessService evaluatorAccessService;
     
     public Mono<ListPersonsResult> execute(String nomeFilter, String cpfFilter, String matriculaFilter, Boolean validadoFilter, int page, int size) {
-        return ReactiveSecurityContextHelper.isSuperAdmin()
-                .flatMap(isSuperAdmin -> {
-                    if (isSuperAdmin) {
-                        // SUPER_ADMIN pode ver todas as pessoas (sem filtrar por tenantId)
-                        return listAllPersons(nomeFilter, cpfFilter, matriculaFilter, validadoFilter, page, size);
-                    } else {
-                        // Outros usuários só veem pessoas do seu tenant
-                        return ReactiveSecurityContextHelper.getTenantId()
-                                .flatMap(tenantId -> listPersonsByTenant(tenantId, nomeFilter, cpfFilter, matriculaFilter, validadoFilter, page, size));
+        return evaluatorAccessService.isEvaluator()
+                .flatMap(isEvaluator -> {
+                    if (Boolean.TRUE.equals(isEvaluator)) {
+                        // EVALUATOR vê apenas os clientes atribuídos (allowlist), ignorando tenant
+                        return evaluatorAccessService.currentAllowedPersonIds()
+                                .flatMap(allowed -> listAllowlistedPersons(allowed, nomeFilter, cpfFilter, matriculaFilter, validadoFilter, page, size));
                     }
+                    return ReactiveSecurityContextHelper.isSuperAdmin()
+                            .flatMap(isSuperAdmin -> {
+                                if (isSuperAdmin) {
+                                    // SUPER_ADMIN pode ver todas as pessoas (sem filtrar por tenantId)
+                                    return listAllPersons(nomeFilter, cpfFilter, matriculaFilter, validadoFilter, page, size);
+                                } else {
+                                    // Outros usuários só veem pessoas do seu tenant
+                                    return ReactiveSecurityContextHelper.getTenantId()
+                                            .flatMap(tenantId -> listPersonsByTenant(tenantId, nomeFilter, cpfFilter, matriculaFilter, validadoFilter, page, size));
+                                }
+                            });
+                });
+    }
+
+    private Mono<ListPersonsResult> listAllowlistedPersons(Set<String> allowedPersonIds, String nomeFilter, String cpfFilter, String matriculaFilter, Boolean validadoFilter, int page, int size) {
+        if (allowedPersonIds == null || allowedPersonIds.isEmpty()) {
+            return Mono.just(new ListPersonsResult(new ArrayList<>(), 0L, 0, page, size));
+        }
+
+        List<String> allowedIdsList = new ArrayList<>(allowedPersonIds);
+        Query countQuery = buildQuery(null, nomeFilter, cpfFilter, matriculaFilter, validadoFilter)
+                .addCriteria(Criteria.where("_id").in(allowedIdsList));
+        Query findQuery = buildQuery(null, nomeFilter, cpfFilter, matriculaFilter, validadoFilter)
+                .addCriteria(Criteria.where("_id").in(allowedIdsList));
+
+        Pageable pageable = PageRequest.of(page, size, DEFAULT_SORT);
+        findQuery.with(pageable);
+
+        Mono<Long> countMono = Mono.from(mongoTemplate.count(countQuery, Person.class));
+        Mono<List<Person>> personsMono = mongoTemplate.find(findQuery, Person.class).collectList();
+
+        return Mono.zip(personsMono, countMono)
+                .flatMap(tuple -> {
+                    List<Person> persons = tuple.getT1();
+                    Long total = tuple.getT2();
+                    int totalPages = (int) Math.ceil((double) total / size);
+                    return reconcileDocumentos(persons, null)
+                            .map(reconciled -> new ListPersonsResult(reconciled, total, totalPages, page, size));
                 });
     }
     

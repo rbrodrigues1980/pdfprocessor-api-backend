@@ -76,5 +76,12 @@ public class ReactiveSecurityContextHelper {
     public static Mono<Boolean> isTenantAdmin() {
         return hasRole("TENANT_ADMIN");
     }
+
+    /**
+     * Verifica se o usuário é EVALUATOR (perfil de avaliação com allowlist de clientes)
+     */
+    public static Mono<Boolean> isEvaluator() {
+        return hasRole("EVALUATOR");
+    }
 }
 

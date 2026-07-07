@@ -188,7 +188,17 @@ public class ExcelResumoGeralHelper {
                 data.getImpostoRestituir(), data.getSaldoImpostoPagar());
         String origemValorSimulacao = extrairTipoResultadoPositivo(bloco2.restituir(), bloco2.saldoPagar());
         BigDecimal principal = calcularPrincipal(valorDeclaracao, valorSimulacao, data, bloco2);
-        String observacao = principal.compareTo(ZERO) > 0 ? OBS_IMPACTO : OBS_SEM_IMPACTO;
+
+        // Sem impacto financeiro (principal = 0): a mudança de sistema de tributação não
+        // beneficia o contribuinte (simulação igual ou pior), então a coluna
+        // "Valor Devido e ou a Restituir" repete o valor da declaração (regime entregue),
+        // e não o valor simulado. Regra simétrica para imposto a pagar e a restituir.
+        boolean semImpacto = principal.compareTo(ZERO) == 0;
+        if (semImpacto && valorDeclaracao.compareTo(ZERO) > 0) {
+            valorSimulacao = valorDeclaracao;
+            origemValorSimulacao = origemValorDeclaracao;
+        }
+        String observacao = semImpacto ? OBS_SEM_IMPACTO : OBS_IMPACTO;
 
         return ExcelResumoGeralLinhaDTO.builder()
                 .anoCalendario(ano)
@@ -247,24 +257,25 @@ public class ExcelResumoGeralHelper {
 
     /**
      * Coluna D — principal a ser restituído pela PGFN.
-     * Sim restituir + decl saldo pagar → D = B + C; sim restituir + decl restituir → D = C − B; demais → max(B − C, 0).
+     *
+     * <p>Usa o resultado líquido com sinal (restituir = {@code +}, saldo a pagar = {@code −})
+     * da declaração e da simulação. O impacto é o benefício obtido com o aproveitamento das
+     * contribuições ({@code simNet − declNet}); só há impacto quando esse benefício é positivo.
+     * Quando a simulação é igual ou pior, o principal é {@code 0} (sem impacto).</p>
+     *
+     * <p>Exemplos: decl restituir 1000 + sim saldo a pagar 194,77 → benefício negativo → 0;
+     * decl saldo 1000 + sim restituir 2000 → 3000; decl saldo 1000 + sim saldo 500 → 500.</p>
      */
     public BigDecimal calcularPrincipal(
             BigDecimal valorDeclaracao,
             BigDecimal valorColunaC,
             IrpfDeclaracaoData data,
             ResultadoBloco2Simulacao bloco2) {
-        BigDecimal restSim = valorPositivoOuZero(bloco2.restituir());
-        BigDecimal saldoDecl = valorPositivoOuZero(data.getSaldoImpostoPagar());
-        BigDecimal restDecl = valorPositivoOuZero(data.getImpostoRestituir());
-
-        if (restSim.compareTo(ZERO) > 0 && saldoDecl.compareTo(ZERO) > 0) {
-            return nvl(valorDeclaracao).add(nvl(valorColunaC)).setScale(2, RM);
-        }
-        if (restSim.compareTo(ZERO) > 0 && restDecl.compareTo(ZERO) > 0) {
-            return nvl(valorColunaC).subtract(nvl(valorDeclaracao)).max(ZERO).setScale(2, RM);
-        }
-        return nvl(valorDeclaracao).subtract(nvl(valorColunaC)).max(ZERO).setScale(2, RM);
+        BigDecimal declNet = valorPositivoOuZero(data.getImpostoRestituir())
+                .subtract(valorPositivoOuZero(data.getSaldoImpostoPagar()));
+        BigDecimal simNet = valorPositivoOuZero(bloco2.restituir())
+                .subtract(valorPositivoOuZero(bloco2.saldoPagar()));
+        return simNet.subtract(declNet).max(ZERO).setScale(2, RM);
     }
 
     public ResultadoBloco2Simulacao calcularResultadoBloco2Simulacao(

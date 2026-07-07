@@ -43,7 +43,8 @@ public class UserController {
                 request.getSenha(),
                 request.getRoles(),
                 request.getTenantId(),
-                request.getTelefone())
+                request.getTelefone(),
+                request.getAllowedPersonIds())
                 .flatMap(user -> {
                     // Buscar tenant se houver tenantId
                     if (user.getTenantId() != null) {
@@ -154,7 +155,8 @@ public class UserController {
                 request.getEmail(),
                 request.getRoles(),
                 request.getTelefone(),
-                request.getAtivo())
+                request.getAtivo(),
+                request.getAllowedPersonIds())
                 .flatMap(user -> {
                     // Buscar tenant se houver tenantId
                     if (user.getTenantId() != null) {

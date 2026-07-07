@@ -97,9 +97,13 @@ class ElizeteResumoGeralTest {
         ExcelResumoGeralLinhaDTO linha = resumoHelper.montarLinha(
                 "2016", data, BigDecimal.ZERO, faixas2016, params2016);
 
+        // A declaração 2016 da Elizete tem SALDO A PAGAR 1.872,48 (imposto devido
+        // 8.539,02 − pago 6.666,54), não restituição.
         assertEquals(new BigDecimal("1872.48"), linha.getValorDeclaracao());
-        assertEquals(ExcelResumoGeralHelper.ORIGEM_IMPOSTO_A_RESTITUIR, linha.getOrigemValorDeclaracao());
-        assertEquals(new BigDecimal("3605.63"), linha.getValorSimulacao());
+        assertEquals(ExcelResumoGeralHelper.ORIGEM_SALDO_IMPOSTO_A_PAGAR, linha.getOrigemValorDeclaracao());
+        // Sem impacto financeiro (imposto a pagar): a simulação completa não reduz o
+        // saldo devido, então a coluna C repete o valor da declaração.
+        assertEquals(new BigDecimal("1872.48"), linha.getValorSimulacao());
         assertEquals(ExcelResumoGeralHelper.ORIGEM_SALDO_IMPOSTO_A_PAGAR, linha.getOrigemValorSimulacao());
         assertEquals(BigDecimal.ZERO.setScale(2), linha.getPrincipal());
         assertEquals(ExcelResumoGeralHelper.OBS_SEM_IMPACTO, linha.getObservacao());
@@ -373,6 +377,41 @@ class ElizeteResumoGeralTest {
                 resumoHelper.calcularPrincipal(new BigDecimal("1000.00"), new BigDecimal("1500.00"), data, bloco2));
     }
 
+    /**
+     * Célia AC 2017: declaração restitui 1.121,56; simulação completa passaria a PAGAR 194,77.
+     * A simulação piora a situação → sem impacto financeiro (principal = 0).
+     */
+    @Test
+    void calcularPrincipal_declRestituirSimSaldoPagar_semImpacto() {
+        IrpfDeclaracaoData data = IrpfDeclaracaoData.builder()
+                .impostoRestituir(new BigDecimal("1121.56"))
+                .saldoImpostoPagar(ZERO)
+                .build();
+        var bloco2 = new ExcelResumoGeralHelper.ResultadoBloco2Simulacao(
+                ZERO.setScale(2), new BigDecimal("194.77"), new BigDecimal("194.77"));
+
+        assertEquals(BigDecimal.ZERO.setScale(2),
+                resumoHelper.calcularPrincipal(
+                        new BigDecimal("1121.56"), new BigDecimal("194.77"), data, bloco2));
+    }
+
+    /**
+     * Declaração restitui 1.000; simulação restitui menos (900). Sem impacto: o
+     * contribuinte não ganha nada com o aproveitamento (principal = 0).
+     */
+    @Test
+    void calcularPrincipal_declRestituirSimRestituirMenor_semImpacto() {
+        IrpfDeclaracaoData data = IrpfDeclaracaoData.builder()
+                .impostoRestituir(new BigDecimal("1000.00"))
+                .build();
+        var bloco2 = new ExcelResumoGeralHelper.ResultadoBloco2Simulacao(
+                new BigDecimal("900.00"), ZERO.setScale(2), new BigDecimal("900.00"));
+
+        assertEquals(BigDecimal.ZERO.setScale(2),
+                resumoHelper.calcularPrincipal(
+                        new BigDecimal("1000.00"), new BigDecimal("900.00"), data, bloco2));
+    }
+
     @Test
     void calcularValorColunaC_marcia2016_saldoSimulado() {
         IrpfDeclaracaoData data = IrpfDeclaracaoData.builder()
@@ -385,6 +424,37 @@ class ElizeteResumoGeralTest {
         assertEquals(new BigDecimal("267.11"),
                 resumoHelper.calcularPrincipal(
                         new BigDecimal("356.98"), new BigDecimal("89.87"), data, bloco2));
+    }
+
+    /**
+     * Regra Célia: quando não há impacto financeiro (imposto a restituir), a coluna
+     * "Valor Devido e ou a Restituir" deve repetir o valor da declaração, não o valor
+     * simulado (menor). Cenário: restituição integral do imposto pago — a simulação
+     * completa jamais supera isso, então principal = 0 (sem impacto).
+     */
+    @Test
+    void montarLinha_semImpactoRestituir_repeteValorDaDeclaracao() {
+        IrpfDeclaracaoData data = IrpfDeclaracaoData.builder()
+                .anoCalendario("2016")
+                .tipoTributacao("SIMPLIFICADO")
+                .rendimentosTributaveisTotal(new BigDecimal("30000.00"))
+                .descontoSimplificado(new BigDecimal("6000.00"))
+                .impostoRetidoFonteTitular(new BigDecimal("50000.00"))
+                .impostoPagoTotal(new BigDecimal("50000.00"))
+                .impostoRestituir(new BigDecimal("50000.00"))
+                .saldoImpostoPagar(ZERO)
+                .build();
+
+        ExcelResumoGeralLinhaDTO linha = resumoHelper.montarLinha(
+                "2016", data, BigDecimal.ZERO, faixas2016, params2016);
+
+        assertEquals(new BigDecimal("50000.00"), linha.getValorDeclaracao());
+        assertEquals(ExcelResumoGeralHelper.ORIGEM_IMPOSTO_A_RESTITUIR, linha.getOrigemValorDeclaracao());
+        assertEquals(BigDecimal.ZERO.setScale(2), linha.getPrincipal());
+        assertEquals(ExcelResumoGeralHelper.OBS_SEM_IMPACTO, linha.getObservacao());
+        // Coluna C repete a declaração (e não o valor simulado menor).
+        assertEquals(linha.getValorDeclaracao(), linha.getValorSimulacao());
+        assertEquals(ExcelResumoGeralHelper.ORIGEM_IMPOSTO_A_RESTITUIR, linha.getOrigemValorSimulacao());
     }
 
     private static final BigDecimal ZERO = BigDecimal.ZERO;

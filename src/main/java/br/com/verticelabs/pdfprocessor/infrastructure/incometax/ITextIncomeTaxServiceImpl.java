@@ -1439,11 +1439,46 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
         String upper = resumoPageText.toUpperCase();
         int start = upper.indexOf("RENDIMENTOS TRIBUT");
         if (start < 0) return null;
-        // Fim da seção: início de DEDUÇÕES (próximo bloco do RESUMO).
+
+        Pattern valPattern = Pattern.compile("([\\d]{1,3}(?:[.]\\d{3})*,\\d{2})");
+
+        // ==========================================
+        // ESTRATÉGIA 1 — layout LINHA-A-LINHA (ex.: declaração simplificada)
+        //
+        // Cada sub-linha é seguida do seu valor e, no fim, o rótulo
+        // "TOTAL DE RENDIMENTOS TRIBUTÁVEIS" precede o total. Usamos esse rótulo
+        // como separador: valores ANTES dele são as sub-linhas; o primeiro valor
+        // DEPOIS dele é o total. Só aceitamos quando a soma confere com o total.
+        // ==========================================
+        Matcher totalLabel = Pattern.compile("(?i)TOTAL\\s+DE\\s+RENDIMENTOS\\s+TRIBUT").matcher(resumoPageText);
+        if (totalLabel.find(start)) {
+            List<BigDecimal> subs = new ArrayList<>();
+            Matcher ms = valPattern.matcher(resumoPageText.substring(start, totalLabel.start()));
+            while (ms.find()) {
+                BigDecimal v = parseMonetaryString(ms.group(1));
+                if (v != null) subs.add(v);
+            }
+
+            String afterLabel = resumoPageText.substring(totalLabel.end(),
+                    Math.min(resumoPageText.length(), totalLabel.end() + 200));
+            Matcher mt = valPattern.matcher(afterLabel);
+            BigDecimal total = mt.find() ? parseMonetaryString(mt.group(1)) : null;
+
+            if (!subs.isEmpty() && total != null && somaConfere(subs, total)) {
+                log.info("✅ Breakdown de rendimentos tributáveis por RÓTULO TOTAL (layout linha-a-linha) - total {}", total);
+                return buildBreakdown(subs, total);
+            }
+        }
+
+        // ==========================================
+        // ESTRATÉGIA 2 — layout AGRUPADO (rótulos juntos, valores em sequência)
+        //
+        // O iText emite todos os rótulos e depois todos os valores; o último
+        // valor da seção é o TOTAL e os anteriores são as sub-linhas.
+        // ==========================================
         int end = upper.indexOf("DEDU", start + "RENDIMENTOS TRIBUT".length());
         String section = (end > start) ? resumoPageText.substring(start, end) : resumoPageText.substring(start);
 
-        Pattern valPattern = Pattern.compile("([\\d]{1,3}(?:[.]\\d{3})*,\\d{2})");
         Matcher m = valPattern.matcher(section);
         List<BigDecimal> vals = new ArrayList<>();
         while (m.find()) {
@@ -1454,17 +1489,25 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
 
         BigDecimal total = vals.get(vals.size() - 1);
         List<BigDecimal> subs = vals.subList(0, vals.size() - 1);
+        if (!somaConfere(subs, total)) {
+            log.warn("⚠️ Breakdown posicional de rendimentos tributáveis descartado (soma != total {}); valores: {}",
+                    total, vals);
+            return null;
+        }
+        return buildBreakdown(subs, total);
+    }
 
+    /** {@code true} quando a soma das sub-linhas é exatamente igual ao total. */
+    private boolean somaConfere(List<BigDecimal> subs, BigDecimal total) {
         BigDecimal soma = BigDecimal.ZERO;
         for (BigDecimal s : subs) {
             soma = soma.add(s);
         }
-        if (soma.compareTo(total) != 0) {
-            log.warn("⚠️ Breakdown posicional de rendimentos tributáveis descartado (soma {} != total {}); valores: {}",
-                    soma, total, vals);
-            return null;
-        }
+        return soma.compareTo(total) == 0;
+    }
 
+    /** Mapeia as sub-linhas (na ordem do RESUMO) e o total para o breakdown. */
+    private RendimentosTributaveisBreakdown buildBreakdown(List<BigDecimal> subs, BigDecimal total) {
         RendimentosTributaveisBreakdown b = new RendimentosTributaveisBreakdown();
         b.total = total;
         b.titularPJ = subAt(subs, 0);
@@ -1704,6 +1747,24 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
         impostoDevidoI = sanitizarImpostoDevidoI(
                 impostoDevidoI, impostoDevido, deducaoIncentivo, impostoDevidoRRA,
                 contribuicaoPrevEmpregadorDomestico, impostoDevidoII, totalImpostoDevido);
+
+        // Reconstrução aritmética para layouts com colunas embaralhadas: quando a dedução
+        // de incentivo não foi capturada (0) mas o imposto devido bruto supera o total,
+        // deriva deducaoIncentivo = impostoDevido − (total − RRA) e impostoDevidoI = total − RRA.
+        // Ex.: doações ECA/Idoso que abatem o "Total do imposto devido".
+        if (impostoDevido != null && totalImpostoDevido != null
+                && (impostoDevidoII == null || impostoDevidoII.compareTo(BigDecimal.ZERO) == 0)) {
+            BigDecimal rra = nvlBigDecimal(impostoDevidoRRA);
+            BigDecimal impostoIDerivado = totalImpostoDevido.subtract(rra);
+            BigDecimal incentivoDerivado = impostoDevido.subtract(impostoIDerivado);
+            boolean plausivel = incentivoDerivado.compareTo(BigDecimal.ZERO) > 0
+                    && incentivoDerivado.compareTo(impostoDevido) < 0;
+            if (plausivel && nvlBigDecimal(deducaoIncentivo).compareTo(BigDecimal.ZERO) == 0) {
+                deducaoIncentivo = incentivoDerivado.setScale(2, java.math.RoundingMode.HALF_UP);
+                impostoDevidoI = impostoIDerivado.setScale(2, java.math.RoundingMode.HALF_UP);
+                log.info("✅ Dedução de incentivo derivada (impostoDevido − impostoDevidoI): {}", deducaoIncentivo);
+            }
+        }
 
         BigDecimal saldoInline = extractValorMonetario(resumoPageText, SALDO_IMPOSTO_PAGAR_PATTERN);
         if (saldoInline != null) {

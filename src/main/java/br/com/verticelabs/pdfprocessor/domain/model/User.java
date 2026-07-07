@@ -36,7 +36,7 @@ public class User {
     
     @Builder.Default
     @Setter(lombok.AccessLevel.NONE) // Excluir do setter gerado pelo Lombok
-    private Set<String> roles = new HashSet<>(Set.of("TENANT_USER")); // SUPER_ADMIN, TENANT_ADMIN, TENANT_USER
+    private Set<String> roles = new HashSet<>(Set.of("TENANT_USER")); // SUPER_ADMIN, TENANT_ADMIN, TENANT_USER, EVALUATOR
     
     /**
      * Setter customizado para garantir que roles seja sempre um HashSet mutável.
@@ -45,6 +45,18 @@ public class User {
      */
     public void setRoles(Set<String> roles) {
         this.roles = roles != null ? new HashSet<>(roles) : new HashSet<>();
+    }
+
+    /**
+     * Clientes (person IDs) que um usuário EVALUATOR pode acessar.
+     * Vazio/ignorado para as demais roles. Definido pelo SUPER_ADMIN.
+     */
+    @Builder.Default
+    @Setter(lombok.AccessLevel.NONE)
+    private Set<String> allowedPersonIds = new HashSet<>();
+
+    public void setAllowedPersonIds(Set<String> allowedPersonIds) {
+        this.allowedPersonIds = allowedPersonIds != null ? new HashSet<>(allowedPersonIds) : new HashSet<>();
     }
     
     @Builder.Default
@@ -82,5 +94,9 @@ public class User {
     
     public boolean isSuperAdmin() {
         return roles != null && roles.contains("SUPER_ADMIN");
+    }
+
+    public boolean isEvaluator() {
+        return roles != null && roles.contains("EVALUATOR");
     }
 }
