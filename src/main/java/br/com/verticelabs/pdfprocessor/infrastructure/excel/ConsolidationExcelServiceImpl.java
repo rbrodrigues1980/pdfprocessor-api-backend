@@ -678,9 +678,8 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
                 somaTotal = somaTotal.add(valor);
             }
 
-            // Calcular Total: se tiver valor em FEV (02) e NOV (11), faz NOV - FEV
-            // Caso contrário, soma simples
-            BigDecimal totalRubrica = calcularTotalRubricaAno(rubrica, ano, somaTotal);
+            // Calcular Total: Funcef (FEV+NOV → NOV); Caixa → soma dos meses
+            BigDecimal totalRubrica = calcularTotalRubricaAno(rubrica, ano, somaTotal, consolidatedResponse.getOrigem());
 
             Cell totalCell = row.createCell(colNum);
             totalCell.setCellValue(totalRubrica.doubleValue());
@@ -692,13 +691,11 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
 
     /**
      * Calcula o total de uma rubrica para um ano específico.
-     * Para rubricas com referência YYYY-13 (identificadas por terem valores APENAS
-     * em FEV e NOV, sem valores nos outros meses), o total é calculado como NOV -
-     * FEV.
-     * Para rubricas normais (com valores em outros meses), retorna a soma simples.
+     * Em Funcef, rubricas só com FEV+NOV usam o valor de NOV (13º); em Caixa, soma simples.
      */
-    private BigDecimal calcularTotalRubricaAno(ConsolidationRow rubrica, String ano, BigDecimal somaSimples) {
-        return ConsolidationAnoTotalsHelper.calcularTotalRubricaAno(rubrica, ano, somaSimples);
+    private BigDecimal calcularTotalRubricaAno(
+            ConsolidationRow rubrica, String ano, BigDecimal somaSimples, String origem) {
+        return ConsolidationAnoTotalsHelper.calcularTotalRubricaAno(rubrica, ano, somaSimples, origem);
     }
 
     /**
@@ -741,8 +738,9 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
                 String referencia = ano + "-" + mesStr;
                 somaAno = somaAno.add(rubrica.getValores().getOrDefault(referencia, BigDecimal.ZERO));
             }
-            // Aplicar a regra NOV - FEV se necessário
-            totalGeralAno = totalGeralAno.add(calcularTotalRubricaAno(rubrica, ano, somaAno));
+            // Aplicar regra Funcef (FEV+NOV → NOV) se origem for FUNCEF
+            totalGeralAno = totalGeralAno.add(
+                    calcularTotalRubricaAno(rubrica, ano, somaAno, consolidatedResponse.getOrigem()));
         }
 
         Cell totalGeralCell = totalRow.createCell(colNum);
@@ -859,8 +857,9 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
                     somaAno = somaAno.add(valor);
                 }
 
-                // Calcular total do ano: se tiver valor em FEV e NOV, faz NOV - FEV
-                BigDecimal totalAno = calcularTotalRubricaAno(rubrica, ano, somaAno);
+                // Calcular total do ano (Funcef: FEV+NOV → NOV; Caixa: soma)
+                BigDecimal totalAno = calcularTotalRubricaAno(
+                        rubrica, ano, somaAno, consolidatedResponse.getOrigem());
                 totalGeralRubrica = totalGeralRubrica.add(totalAno);
             }
 
@@ -920,8 +919,9 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
                     String referencia = ano + "-" + mesStr;
                     somaAno = somaAno.add(rubrica.getValores().getOrDefault(referencia, BigDecimal.ZERO));
                 }
-                // Aplicar a regra NOV - FEV se necessário
-                totalRubrica = totalRubrica.add(calcularTotalRubricaAno(rubrica, ano, somaAno));
+                // Aplicar regra Funcef (FEV+NOV → NOV) se origem for FUNCEF
+                totalRubrica = totalRubrica.add(
+                        calcularTotalRubricaAno(rubrica, ano, somaAno, consolidatedResponse.getOrigem()));
             }
             totalGeralConsolidado = totalGeralConsolidado.add(totalRubrica);
         }

@@ -134,11 +134,18 @@ Fonte primária: lista granular. Fallback: totais do RESUMO quando `pagamentosEf
 
 ---
 
-## 9. Doações Efetuadas (Página 5)
+## 9. Doações Efetuadas (Página ~4–5)
 
-| Campo no PDF | Status |
-|---|---|
-| Sem Informações → lista vazia | ✅ |
+| Campo no PDF | Campo no sistema | Status |
+|---|---|---|
+| Sem Informações → lista vazia | `doacoesEfetuadas = []` | ✅ |
+| Cód. / Nome / CPF-CNPJ / Valor pago | `doacoesEfetuadas[]` | ✅ |
+| Layout multilinha (campo por linha) | ✅ | |
+| Layout inline SERPRO (ex.: `41 NOME … CNPJ 1.000,00 0,00`) | ✅ | |
+
+> Em declaração **Simplificado**, o RESUMO costuma trazer `deducaoIncentivo = 0`. A simulação Completa usa a lista `doacoesEfetuadas` (cód. 40–43) como fonte primária — por isso a extração inline é necessária.
+
+Fonte primária do motor: lista granular. Fallback: `deducaoIncentivo` do RESUMO.
 
 ---
 
@@ -185,7 +192,12 @@ Fonte primária: lista granular. Fallback: totais do RESUMO quando `pagamentosEf
 | Resultado tributável da Atividade Rural | `resultadoAtividadeRural` | ✅ |
 | **TOTAL** | `rendimentosTributaveisTotal` | ✅ |
 
-> **Extração posicional (layouts 2018+):** em exercícios como 2018/AC 2017 o iText emite todos os rótulos agrupados e só depois os valores em sequência, fazendo os regex "preguiçosos" capturarem o mesmo primeiro valor (inclusive o TOTAL errado). `extractRendimentosTributaveisBreakdown` remapeia os valores por **posição** (7 sub-linhas + TOTAL) e só sobrescreve quando a soma das linhas confere com o TOTAL — caso contrário mantém o resultado por regex. Verificado: AC 2017 → PJ titular 373.152,82, PJ dependentes 10.560,00, demais 0,00, TOTAL 383.712,82.
+> **Extração do TOTAL — dois layouts (`extractRendimentosTributaveisBreakdown`):** o TOTAL de rendimentos tributáveis é sempre a soma das 7 sub-linhas. O iText produz dois layouts, ambos tratados (só sobrescreve quando a soma das sub-linhas confere com o TOTAL):
+>
+> 1. **Agrupado (ex.: 2018+):** todos os rótulos juntos e depois todos os valores em sequência → remapeia por **posição** (7 sub-linhas + TOTAL como último valor). Verificado: AC 2017 → PJ titular 373.152,82, PJ dep 10.560,00, demais 0,00, TOTAL 383.712,82.
+> 2. **Linha-a-linha (ex.: declaração simplificada):** cada sub-linha seguida do seu valor; o rótulo **"TOTAL DE RENDIMENTOS TRIBUTÁVEIS"** separa as sub-linhas do total. Corrige casos como Célia AC 2016 (PJ titular 67.963,80 + PF/Exterior 6.120,00 = **TOTAL 74.083,80**), em que o regex simples capturava só a 1ª linha.
+>
+> Regressão: `ITextIncomeTaxRendimentosBreakdownTest`.
 
 ---
 
@@ -219,6 +231,8 @@ Fonte primária: lista granular. Fallback: totais do RESUMO quando `pagamentosEf
 | Imposto devido II | `impostoDevidoII` | ✅ |
 | Imposto devido RRA | `impostoDevidoRRA` | ✅ |
 | Total do imposto devido | `totalImpostoDevido` | ✅ |
+
+> **Dedução de incentivo em layout embaralhado (`corrigirCamposImpostoDevidoResumo`):** em alguns PDFs (duas colunas) o iText emite os rótulos e valores do bloco IMPOSTO DEVIDO fora de ordem, e o regex por rótulo captura `Dedução de incentivo = 0,00` e `Imposto devido I` incorreto. Quando `impostoDevido` e `totalImpostoDevido` são confiáveis e há redução, os valores são **derivados aritmeticamente** (sem INSS doméstico): `impostoDevidoI = totalImpostoDevido − impostoDevidoRRA` e `deducaoIncentivo = impostoDevido − impostoDevidoI`. A dedução de incentivo corresponde às doações diretas na declaração (ECA/Idoso), que abatem o total do imposto devido. Ex.: Adriana AC 2021 → imposto devido 67.343,04, dedução de incentivo 4.040,58 (2×2.020,29), imposto devido I / total 63.302,46. Regressão: `ITextIncomeTaxDeducaoIncentivoTest`.
 
 ---
 

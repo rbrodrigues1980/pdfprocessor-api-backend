@@ -386,20 +386,26 @@ rubricaValidator.validateRubrica(entry.getRubricaCodigo(), entry.getRubricaDescr
 2. **Verifica se está ativa**:
    - Se `rubrica.ativo == false` → Entry ignorada (log warning)
 
-3. **Compara descrição** (match parcial):
-   - Verifica se a descrição extraída contém palavras-chave da descrição da rubrica
-   - Ou vice-versa (match bidirecional)
-   - Se não corresponder → Log warning, mas mantém a entry (código está correto)
+3. **Regra especial — código + descrição obrigatórios** (somente estas rubricas):
+   - `3396` → descrição esperada: `REP TAXA ADMINISTRATIVA BUA NOVO PLANO`
+   - `4432` → descrição esperada: `FUNCEF CONTR. EQUACIONAMENTO2 SALDADO`
+   - `4436` → descrição esperada: `FUNCEF CONTRIB EQU SALDADO 02 GRT NATAL`
+   - Comparação após normalização (trim, espaços colapsados, maiúsculas)
+   - Se o código bater mas a descrição **não** → Entry **ignorada** (valor não é considerado)
 
-4. **Resultado**:
-   - **Se encontrar e estiver ativa** → Entry mantida
-   - **Se não encontrar ou estiver inativa** → Entry ignorada (log warning)
+4. **Demais rubricas**: validam só por código (e ativo). A descrição extraída não bloqueia.
 
-**Exemplo:**
+5. **Resultado**:
+   - **Se encontrar, estiver ativa e (quando aplicável) a descrição bater** → Entry mantida
+   - **Se não encontrar, estiver inativa ou falhar a regra 3396/4432/4436** → Entry ignorada (log warning)
+
+**Exemplo (regra especial):**
 ```
-Entry extraída: código "4482", descrição "CONTRIBUIÇÃO EXTRAORDINÁRIA 2015"
-Rubrica no banco: código "4482", descrição "CONTRIBUIÇÃO EXTRAORDINÁRIA ABONO ANUAL 2015", ativo: true
-Resultado: ✅ Entry válida (match parcial na descrição)
+Entry extraída: código "4432", descrição "FUNCEF CONTR. EQUACIONAMENTO2 SALDADO"
+Resultado: ✅ Entry válida
+
+Entry extraída: código "4432", descrição "FUNCEF CONTRIB EQU SALDADO 02"
+Resultado: ❌ Entry ignorada (descrição não bate)
 ```
 
 ### 4.5 Persistência no Banco de Dados

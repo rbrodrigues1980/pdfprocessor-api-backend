@@ -257,23 +257,39 @@ Quando existem declarações IRPF importadas **cujo ano-calendário coincide com
 |--------|--------|-------|
 | A — Calendário | ano da aba | Ano-calendário |
 | B — Valores Restituídos / Pagos | Bloco 1 (declaração entregue) | Valor positivo entre `IMPOSTO A RESTITUIR` e `SALDO IMPOSTO A PAGAR` (ignora `0,00`) |
-| C — Valor Devido e ou a Restituir | Bloco 2 (simulação planilha) | `IMPOSTO A RESTITUIR` ou `SALDO DE IMPOSTO A PAGAR` da aba anual (ignora `0,00`) — mesmo valor exibido no bloco 2 |
-| D — Principal PGFN | derivado | Sim restituir + decl saldo pagar → `D = B + C`; sim restituir + decl restituir → `D = C − B`; demais → `max(B − C, 0)` |
+| C — Valor Devido e ou a Restituir | Bloco 2 (simulação planilha) | **Com impacto** → valor simulado (`IMPOSTO A RESTITUIR` ou `SALDO DE IMPOSTO A PAGAR`); **sem impacto** → **repete o valor da declaração (B)** |
+| D — Principal PGFN | derivado | **Resultado líquido com sinal** (restituir = `+`, saldo a pagar = `−`): `D = max(simNet − declNet, 0)` |
 | E — SELIC Acumulada RFB | `TaxaSelicService.calcularSelicReceitaFederal` | Taxa acumulada (%); só se `D > 0` |
 | F — Valor Correção R$ | SELIC | `valorCorrigido − D` |
 | G — Principal + Correção | derivado | `D + F` |
 | H — Observações | derivado | `"Impacto financeiro"` se `D > 0`; senão `"Sem impacto financeiro - Sistema de tributação"` |
 
-#### Situações de impacto financeiro (colunas C e D)
+#### Regra de impacto financeiro (colunas C e D)
 
-| # | Declaração (B) | Simulação (bloco 2) | C | D |
-|---|----------------|---------------------|---|---|
-| 1 | Saldo a pagar R$ 1.000 | Saldo a pagar R$ 500 | 500 | 500 |
-| 2 | Saldo a pagar R$ 1.000 | Saldo a pagar R$ 1.500 | 1.500 | 0 |
-| 3 | Saldo a pagar R$ 1.503,80 | Restituir R$ 4.044,88 | 4.044,88 | 5.548,68 |
-| 4 | Restituir R$ 1.000 | Restituir R$ 1.500 | 1.500 | 500 |
+O **impacto** é o benefício que o contribuinte obteria ao refazer a declaração com o aproveitamento das contribuições. Usa-se o **resultado líquido com sinal**: restituir conta como positivo, saldo a pagar como negativo.
 
-Implementação: `ExcelResumoGeralHelper.calcularValorColunaC` e `calcularPrincipal`.
+- `declNet = restituirDecl − saldoPagarDecl`
+- `simNet  = restituirSim − saldoPagarSim`
+- `principal (D) = max(simNet − declNet, 0)`
+
+Só há **"Impacto financeiro"** quando a simulação **melhora** a situação (`D > 0`). Quando a simulação é **igual ou pior**, `D = 0`, a observação é **"Sem impacto financeiro"** e a **coluna C repete o valor da declaração (B)** — o contribuinte manteria o regime originalmente entregue. Regra simétrica para imposto a pagar e a restituir.
+
+| # | Declaração (B) | Simulação (bloco 2) | C | D | Observação |
+|---|----------------|---------------------|---|---|------------|
+| 1 | Saldo a pagar R$ 1.000 | Saldo a pagar R$ 500 | 500 | 500 | Impacto |
+| 2 | Saldo a pagar R$ 1.000 | Saldo a pagar R$ 1.500 | **1.000** (repete B) | 0 | Sem impacto |
+| 3 | Saldo a pagar R$ 1.503,80 | Restituir R$ 4.044,88 | 4.044,88 | 5.548,68 | Impacto |
+| 4 | Restituir R$ 1.000 | Restituir R$ 1.500 | 1.500 | 500 | Impacto |
+| 5 | Restituir R$ 1.000 | Restituir R$ 900 | **1.000** (repete B) | 0 | Sem impacto |
+| 6 | Restituir R$ 1.121,56 | **Passa a pagar** R$ 194,77 | **1.121,56** (repete B) | 0 | Sem impacto |
+
+> Caso 6 (ex.: Célia AC 2017): a declaração restituía; a simulação completa passaria a pagar → sem benefício → coluna C repete a restituição da declaração e não marca impacto.
+
+Implementação: `ExcelResumoGeralHelper.calcularValorColunaC`, `calcularPrincipal` e a repetição de B em `montarLinha` quando `principal == 0`.
+
+#### Destaque de restituições (negrito)
+
+Quando **a declaração entregue (B) e a simulação (C) resultam ambas em restituição** (`origem == IMPOSTO A RESTITUIR` nas duas colunas), as células numéricas da linha (B–G) são exibidas em **negrito** no Excel. Implementação: variantes de estilo em `ConsolidationExcelServiceImpl.addResumoGeralSheet` (`createBoldVariant`).
 
 ### Totais e rodapé
 
@@ -346,7 +362,28 @@ Accept: application/json
 
 Regressão: `ExcelControllerResumoGeralTest`, `ResumoGeralUseCaseTest`.
 
-Frontend: botão **Resumo Geral** na lista de clientes (`persons-page.tsx`) abre modal full-screen (`ResumoGeralModal`) com botão **Exportar Excel**.
+Frontend: botão **Resumo Geral** na lista de clientes (`persons-page.tsx`) abre modal full-screen (`ResumoGeralModal`) com botões **Gerar PDF** e **Exportar Excel**.
+
+---
+
+# 14. Resumo Geral em PDF
+
+Gera o **Resumo Geral** em PDF (A4 paisagem, 1 página), espelhando a aba Excel "Resumo Geral" (grid de datas, tabela por ano, totais amarelos, honorários, rodapé do responsável e logo Origium).
+
+```
+GET /api/v1/persons/{personId}/resumo-geral/pdf
+Accept: application/pdf
+```
+
+| Status | Significado |
+|--------|-------------|
+| **200** | PDF (`application/pdf`) |
+| **204** | Pessoa existe, mas sem declarações IR alinhadas com contracheque |
+| **404** | Pessoa não encontrada / sem permissão |
+
+Reaproveita a montagem compartilhada (`ResumoGeralUseCase.montarByPersonId` → `ResumoGeralAssemblyService`), então segue exatamente as mesmas regras de colunas B–H (incluindo a regra de impacto financeiro acima). Valores monetários sem prefixo `R$`, como no Excel.
+
+Classes: `ResumoGeralPdfUseCase`, `ResumoGeralPdfGenerator` (iText), `ResumoGeralPdfResult`. Regressão: `ResumoGeralPdfGeneratorTest`.
 
 ---
 

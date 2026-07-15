@@ -17,6 +17,8 @@ import java.util.Set;
 public class ConsolidatedResponse {
     private String cpf;
     private String nome;
+    /** Filtro de origem aplicado na consolidação ({@code CAIXA}, {@code FUNCEF} ou null). */
+    private String origem;
     private Set<String> anos; // ["2016", "2017", "2018"]
     private List<String> meses; // ["01", "02", ..., "12"]
     private List<ConsolidationRow> rubricas;
