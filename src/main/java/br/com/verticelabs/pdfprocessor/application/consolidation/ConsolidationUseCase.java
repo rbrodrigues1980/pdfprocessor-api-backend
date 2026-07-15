@@ -195,7 +195,7 @@ public class ConsolidationUseCase {
                                             // 7. Construir resposta consolidada
                                             log.info("Passo 7: Construindo resposta consolidada");
                                             ConsolidatedResponse response = buildConsolidatedResponse(person,
-                                                    filteredEntries, ano, documentosMap);
+                                                    filteredEntries, ano, origem, documentosMap);
 
                                             log.info(
                                                     "=== ConsolidationUseCase.consolidate() CONCLUÍDO COM SUCESSO ===");
@@ -235,9 +235,9 @@ public class ConsolidationUseCase {
                         }
                     }
 
-                    // Filtro por origem
+                    // Filtro por origem (FUNCEF inclui o layout Demonstrativo)
                     if (origem != null && !origem.isEmpty()) {
-                        if (!origem.equals(entry.getOrigem())) {
+                        if (!origemCorresponde(origem, entry.getOrigem())) {
                             log.trace("Entry ignorada por filtro de origem: {} != {} - Entry origem: {}",
                                     entry.getOrigem(), origem, entry.getRubricaCodigo());
                             return false;
@@ -261,7 +261,7 @@ public class ConsolidationUseCase {
      * Constrói a resposta consolidada a partir das entries filtradas.
      */
     private ConsolidatedResponse buildConsolidatedResponse(Person person, List<PayrollEntry> entries, String anoFiltro,
-            Map<String, PayrollDocument> documentosMap) {
+            String origemFiltro, Map<String, PayrollDocument> documentosMap) {
         log.debug("=== buildConsolidatedResponse() INICIADO ===");
         log.debug("Total de entries para processar: {}", entries.size());
 
@@ -505,6 +505,7 @@ public class ConsolidationUseCase {
 
             // Calcular total da rubrica
             BigDecimal totalRubrica = BigDecimal.ZERO;
+            Map<String, BigDecimal> totaisPorAno = new TreeMap<>();
 
             for (String year : allYears) {
                 // Verificar ocorrências de YYYY-13 neste ano
@@ -523,29 +524,44 @@ public class ConsolidationUseCase {
                         })
                         .count();
 
-                // Regra de Negócio: Se tem múltiplos meses com YYYY-13 (ex: Fev e Nov),
-                // o total do ano deve ser apenas o valor do ÚLTIMO mês (geralmente Nov), não a
-                // soma.
-                if (mesesComValor13 > 1) {
-                    String ultimoMesComValor = meses.stream() // meses está ordenado 01..12
+                BigDecimal somaAno = meses.stream()
+                        .map(mes -> valoresCompletos.getOrDefault(year + "-" + mes, BigDecimal.ZERO))
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+                // Regra Funcef (inclui Demonstrativo): múltiplos meses com YYYY-13 → só o último.
+                // Fallback: valores só em FEV+NOV com origem Funcef → NOV (layout Demonstrativo).
+                BigDecimal totalAno;
+                boolean aplicaRegra13Funcef = mesesComValor13 > 1
+                        && entriesDoAnoSaoFuncef(rubricaEntries, entryToAdjustedRef, year);
+                boolean aplicaFevNovFuncef = !aplicaRegra13Funcef
+                        && entriesDoAnoSaoFuncef(rubricaEntries, entryToAdjustedRef, year)
+                        && somenteFevENovComValor(valoresCompletos, year);
+
+                if (aplicaRegra13Funcef || aplicaFevNovFuncef) {
+                    String ultimoMesComValor = meses.stream()
                             .filter(mes -> valoresCompletos.getOrDefault(year + "-" + mes, BigDecimal.ZERO)
                                     .compareTo(BigDecimal.ZERO) > 0)
-                            .reduce((first, second) -> second) // pega o último
+                            .reduce((first, second) -> second)
                             .orElse(null);
 
                     if (ultimoMesComValor != null) {
-                        BigDecimal valorUltimo = valoresCompletos.get(year + "-" + ultimoMesComValor);
-                        totalRubrica = totalRubrica.add(valorUltimo);
-                        log.info("Rubrica {} - Ano {} tem YYYY-13 múltiplo. Total ajustado para valor do mês {} ({})",
-                                codigo, year, ultimoMesComValor, valorUltimo);
+                        totalAno = valoresCompletos.get(year + "-" + ultimoMesComValor);
+                        log.info(
+                                "Rubrica {} - Ano {} Funcef 13º/FEV+NOV. Total = mês {} ({})",
+                                codigo, year, ultimoMesComValor, totalAno);
+                    } else {
+                        totalAno = somaAno;
                     }
                 } else {
-                    // Soma normal para outros casos
-                    BigDecimal somaAno = meses.stream()
-                            .map(mes -> valoresCompletos.getOrDefault(year + "-" + mes, BigDecimal.ZERO))
-                            .reduce(BigDecimal.ZERO, BigDecimal::add);
-                    totalRubrica = totalRubrica.add(somaAno);
+                    totalAno = somaAno;
+                    if (mesesComValor13 > 1) {
+                        log.info("Rubrica {} - Ano {} tem YYYY-13 múltiplo (CAIXA/não-Funcef). Total = soma ({})",
+                                codigo, year, somaAno);
+                    }
                 }
+
+                totaisPorAno.put(year, totalAno);
+                totalRubrica = totalRubrica.add(totalAno);
             }
 
             log.info("Rubrica {} - Total Final: {}", codigo, totalRubrica);
@@ -554,6 +570,7 @@ public class ConsolidationUseCase {
                     .codigo(codigo)
                     .descricao(descricao)
                     .valores(valoresCompletos)
+                    .totaisPorAno(totaisPorAno)
                     .total(totalRubrica)
                     .build();
 
@@ -593,6 +610,7 @@ public class ConsolidationUseCase {
         ConsolidatedResponse response = ConsolidatedResponse.builder()
                 .cpf(person.getCpf())
                 .nome(person.getNome())
+                .origem(origemEfetiva(origemFiltro, entries))
                 .anos(new TreeSet<>(allYears))
                 .meses(meses)
                 .rubricas(rubricas)
@@ -609,5 +627,81 @@ public class ConsolidationUseCase {
         log.info("  - Total geral: R$ {}", response.getTotalGeral());
 
         return response;
+    }
+
+    /** CAIXA ou família Funcef (FUNCEF / FUNCEF_DEMONSTRATIVO). */
+    static boolean isOrigemFuncef(String origem) {
+        if (origem == null || origem.isBlank()) {
+            return false;
+        }
+        String o = origem.trim().toUpperCase(Locale.ROOT);
+        return "FUNCEF".equals(o) || "FUNCEF_DEMONSTRATIVO".equals(o);
+    }
+
+    private static boolean origemCorresponde(String filtro, String entryOrigem) {
+        if (filtro == null || entryOrigem == null) {
+            return false;
+        }
+        if (filtro.equalsIgnoreCase(entryOrigem)) {
+            return true;
+        }
+        // Filtro FUNCEF também inclui o layout Demonstrativo
+        return "FUNCEF".equalsIgnoreCase(filtro) && isOrigemFuncef(entryOrigem);
+    }
+
+    /**
+     * Se o filtro veio nulo, infere origem única das entries (útil no Excel sem parâmetro).
+     */
+    private static String origemEfetiva(String origemFiltro, List<PayrollEntry> entries) {
+        if (origemFiltro != null && !origemFiltro.isBlank()) {
+            return origemFiltro;
+        }
+        if (entries == null || entries.isEmpty()) {
+            return null;
+        }
+        boolean algumaCaixa = entries.stream().anyMatch(e -> "CAIXA".equalsIgnoreCase(e.getOrigem()));
+        boolean algumaFuncef = entries.stream().anyMatch(e -> isOrigemFuncef(e.getOrigem()));
+        if (algumaFuncef && !algumaCaixa) {
+            return "FUNCEF";
+        }
+        if (algumaCaixa && !algumaFuncef) {
+            return "CAIXA";
+        }
+        return null;
+    }
+
+    private static boolean entriesDoAnoSaoFuncef(
+            List<PayrollEntry> rubricaEntries,
+            Map<PayrollEntry, String> entryToAdjustedRef,
+            String year) {
+        List<PayrollEntry> doAno = rubricaEntries.stream()
+                .filter(e -> {
+                    String adjusted = entryToAdjustedRef.get(e);
+                    return adjusted != null && adjusted.startsWith(year + "-");
+                })
+                .toList();
+        if (doAno.isEmpty()) {
+            return false;
+        }
+        return doAno.stream().allMatch(e -> isOrigemFuncef(e.getOrigem()));
+    }
+
+    private static boolean somenteFevENovComValor(Map<String, BigDecimal> valoresCompletos, String year) {
+        BigDecimal fev = valoresCompletos.getOrDefault(year + "-02", BigDecimal.ZERO);
+        BigDecimal nov = valoresCompletos.getOrDefault(year + "-11", BigDecimal.ZERO);
+        if (fev.compareTo(BigDecimal.ZERO) <= 0 || nov.compareTo(BigDecimal.ZERO) <= 0) {
+            return false;
+        }
+        for (int mes = 1; mes <= 12; mes++) {
+            if (mes == 2 || mes == 11) {
+                continue;
+            }
+            BigDecimal valor = valoresCompletos.getOrDefault(
+                    year + "-" + String.format("%02d", mes), BigDecimal.ZERO);
+            if (valor.compareTo(BigDecimal.ZERO) > 0) {
+                return false;
+            }
+        }
+        return true;
     }
 }

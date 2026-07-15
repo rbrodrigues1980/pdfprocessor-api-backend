@@ -15,6 +15,7 @@
 | [005 - API_9_3_SECURITY_ARCHITECTURE.md](./005%20-%20API_9_3_SECURITY_ARCHITECTURE.md) | Arquitetura de segurança completa: autenticação, 2FA, RBAC, isolamento multi-tenant, hardening (Argon2id, rate limiting, headers), segurança PDF, checklist OWASP/NIST. |
 | [006 - API_9_4_DOMAIN_MODELS_MULTI_TENANT.md](./006%20-%20API_9_4_DOMAIN_MODELS_MULTI_TENANT.md) | Modelos de domínio DDD adaptados para multi-tenant. Todos com tenantId obrigatório: Tenant, User, Person, PayrollDocument, PayrollEntry, Rubrica (global/custom), Consolidation, AuditLog. |
 | [007 - API_9_5_CONSOLIDADO_MULTI_TENANT.md](./007%20-%20API_9_5_CONSOLIDADO_MULTI_TENANT.md) | **Documento consolidado (~1.230 linhas).** Reúne tudo sobre multi-tenancy: visão geral, modelos, autenticação, Tenant Context, Tenant Filter, segurança, endpoints, diagramas e checklist de implementação. |
+| [008 - PERFIL_AVALIADOR_EVALUATOR.md](./008%20-%20PERFIL_AVALIADOR_EVALUATOR.md) | **Perfil Avaliador (EVALUATOR).** Perfil restrito com allowlist de clientes por usuário: só vê os clientes atribuídos e só sobe declaração de IR / gera Excel/Resumo Geral. Enforcement por filtro de ação (deny-by-default) + escopo por cliente. |
 
 ---
 
@@ -24,6 +25,9 @@
 SUPER_ADMIN          → Acesso global a todos os tenants
 ├── TENANT_ADMIN     → Administrador de um tenant específico
 └── TENANT_USER      → Usuário comum de um tenant
+
+EVALUATOR            → Perfil de avaliação (sem tenant); acesso restrito a uma
+                       allowlist de clientes; só leitura + upload de IR + export
 ```
 
 ## Ordem de leitura sugerida

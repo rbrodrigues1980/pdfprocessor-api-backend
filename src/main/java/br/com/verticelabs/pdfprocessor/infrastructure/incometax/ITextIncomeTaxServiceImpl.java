@@ -1043,7 +1043,7 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
         log.debug("🎁 Seção DOAÇÕES EFETUADAS ({} chars): {}", section.length(),
                 section.substring(0, Math.min(300, section.length())).replace("\n", "\\n"));
 
-        // Padrão estruturado igual ao de pagamentos
+        // Padrão estruturado igual ao de pagamentos (cada campo em linha)
         Pattern entryPattern = Pattern.compile(
                 "(?m)^\\s*(\\d{1,3})\\s*\\n([^\\n]{3,80})\\n([\\d]{2,3}\\.[\\d]{3}\\.[\\d]{3}[/-][\\d]{4}-[\\d]{2}|[\\d]{3}\\.[\\d]{3}\\.[\\d]{3}-[\\d]{2})\\s*\\n([\\d]{1,3}(?:[.]\\d{3})*,\\d{2})",
                 Pattern.UNICODE_CASE | Pattern.MULTILINE);
@@ -1056,6 +1056,24 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
             BigDecimal valor = parseMonetaryString(m.group(4));
             doacoes.add(new DoacaoEfetuada(codigo, nome, cnpj, valor));
             log.info("🎁 Doação encontrada: cód={}, nome={}, cnpj={}, valor={}", codigo, nome, cnpj, valor);
+        }
+
+        // Fallback: linha inline SERPRO (ex.: 2018 Cristiano)
+        // "41 FEDERACAO NACIONAL DAS ASSOCIACOES DO 34.267.237/0001-55 1.000,00 0,00"
+        // próxima linha pode continuar o nome: "PESSOAL DA CEF FENAE"
+        if (doacoes.isEmpty()) {
+            Matcher inline = PAGAMENTO_INLINE_PATTERN.matcher(section);
+            while (inline.find()) {
+                String codigo = inline.group(1).trim();
+                String nome = inline.group(2).trim();
+                String cnpj = inline.group(3).trim();
+                BigDecimal valor = parseMonetaryString(inline.group(5));
+                if (valor == null) {
+                    continue;
+                }
+                doacoes.add(new DoacaoEfetuada(codigo, nome, cnpj, valor));
+                log.info("🎁 Doação inline: cód={}, nome={}, cnpj={}, valor={}", codigo, nome, cnpj, valor);
+            }
         }
 
         // Fallback posicional
