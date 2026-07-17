@@ -29,6 +29,10 @@ public class PersonResponse {
     private Boolean ativo;
     private Boolean validado;
     private Instant validadoEm;
+    /** Nome do enum PersonStatus (ex.: EM_PROCESSAMENTO). */
+    private String status;
+    /** Rótulo legível do status. */
+    private String statusLabel;
     private Instant createdAt;
     private Instant updatedAt;
 }

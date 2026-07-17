@@ -2,6 +2,7 @@ package br.com.verticelabs.pdfprocessor.interfaces.persons;
 
 import br.com.verticelabs.pdfprocessor.application.persons.PersonRubricasMatrixUseCase;
 import br.com.verticelabs.pdfprocessor.domain.model.Person;
+import br.com.verticelabs.pdfprocessor.domain.model.PersonStatus;
 import br.com.verticelabs.pdfprocessor.interfaces.persons.dto.PersonResponse;
 import br.com.verticelabs.pdfprocessor.interfaces.persons.dto.PersonRubricasMatrixResponse;
 import org.springframework.stereotype.Component;
@@ -15,6 +16,8 @@ public class PersonMapper {
         java.util.List<String> documentos = person.getDocumentos() != null 
                 ? new java.util.ArrayList<>(person.getDocumentos()) 
                 : new java.util.ArrayList<>();
+
+        PersonStatus status = PersonStatus.fromNullable(person.getStatus());
         
         return PersonResponse.builder()
                 .id(person.getId())
@@ -28,6 +31,8 @@ public class PersonMapper {
                 .ativo(person.getAtivo())
                 .validado(Boolean.TRUE.equals(person.getValidado()))
                 .validadoEm(person.getValidadoEm())
+                .status(status.name())
+                .statusLabel(status.getLabel())
                 .createdAt(person.getCreatedAt())
                 .updatedAt(person.getUpdatedAt())
                 .build();

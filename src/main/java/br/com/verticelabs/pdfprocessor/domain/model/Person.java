@@ -51,6 +51,11 @@ public class Person {
     private Boolean validado = false; // Indica que todo o processamento do cliente foi validado (irreversível)
 
     private Instant validadoEm; // Data/hora em que foi marcado como validado
+
+    /**
+     * Status operacional do cliente. Nulo em documentos antigos é tratado como {@link PersonStatus#EM_PROCESSAMENTO}.
+     */
+    private PersonStatus status;
     
     private Instant createdAt;
     

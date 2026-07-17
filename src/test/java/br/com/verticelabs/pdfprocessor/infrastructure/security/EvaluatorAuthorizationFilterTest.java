@@ -32,6 +32,7 @@ class EvaluatorAuthorizationFilterTest {
         assertTrue(allowed(HttpMethod.GET, "/api/v1/persons/12345678900/excel"));
         assertTrue(allowed(HttpMethod.GET, "/api/v1/persons/abc123/excel-by-id"));
         assertTrue(allowed(HttpMethod.GET, "/api/v1/persons/12345678900/excel-by-tenant"));
+        assertTrue(allowed(HttpMethod.GET, "/api/v1/persons/reports/clientes/excel"));
         assertTrue(allowed(HttpMethod.POST, "/api/v1/persons/abc123/income-tax/upload"));
         assertTrue(allowed(HttpMethod.POST, "/api/v1/persons/abc123/income-tax/bulk-upload"));
         assertTrue(allowed(HttpMethod.GET, "/api/v1/documents/doc123"));

@@ -40,6 +40,8 @@ public class EvaluatorAuthorizationFilter implements WebFilter {
             // Leitura de clientes
             new AllowedRule(HttpMethod.GET, "^/api/v1/persons/?$"),
             new AllowedRule(HttpMethod.GET, "^/api/v1/persons/[^/]+$"),
+            // Relatório Excel da lista de clientes (allowlist aplicada no use case)
+            new AllowedRule(HttpMethod.GET, "^/api/v1/persons/reports/clientes/excel/?$"),
             // Leitura de documentos/lançamentos/rubricas + exportações por cliente
             new AllowedRule(HttpMethod.GET,
                     "^/api/v1/persons/[^/]+/(documents|documents-by-id|entries|rubricas|"
