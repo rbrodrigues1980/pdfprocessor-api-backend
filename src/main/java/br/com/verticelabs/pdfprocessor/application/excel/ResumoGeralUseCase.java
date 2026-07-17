@@ -54,20 +54,27 @@ public class ResumoGeralUseCase {
                             .flatMap(isSuperAdmin -> resolvePerson(personId, isSuperAdmin));
                 })
                 .switchIfEmpty(Mono.error(new PersonNotFoundException(personId)))
-                .flatMap(person -> consolidationUseCase.consolidate(person.getCpf(), person.getTenantId(), null, null)
-                        .flatMap(consolidated -> {
-                            if (consolidated.getRubricas() == null || consolidated.getRubricas().isEmpty()) {
-                                return Mono.error(new NoEntriesFoundException(person.getCpf()));
-                            }
-                            return buscarIrpfDeclaracoes(person)
-                                    .flatMap(irpf -> resumoGeralAssemblyService.montar(person, consolidated, irpf)
-                                            .flatMap(montagem -> {
-                                                if (montagem.linhas() == null || montagem.linhas().isEmpty()) {
-                                                    return Mono.empty();
-                                                }
-                                                return Mono.just(new MontagemBundle(person, montagem));
-                                            }));
-                        }));
+                .flatMap(this::montarForAuthorizedPerson);
+    }
+
+    /**
+     * Monta o Resumo Geral para uma pessoa já autorizada/resolvida (ex.: relatório em lote).
+     */
+    public Mono<MontagemBundle> montarForAuthorizedPerson(Person person) {
+        return consolidationUseCase.consolidate(person.getCpf(), person.getTenantId(), null, null)
+                .flatMap(consolidated -> {
+                    if (consolidated.getRubricas() == null || consolidated.getRubricas().isEmpty()) {
+                        return Mono.error(new NoEntriesFoundException(person.getCpf()));
+                    }
+                    return buscarIrpfDeclaracoes(person)
+                            .flatMap(irpf -> resumoGeralAssemblyService.montar(person, consolidated, irpf)
+                                    .flatMap(montagem -> {
+                                        if (montagem.linhas() == null || montagem.linhas().isEmpty()) {
+                                            return Mono.empty();
+                                        }
+                                        return Mono.just(new MontagemBundle(person, montagem));
+                                    }));
+                });
     }
 
     private Mono<Person> resolvePerson(String personId, boolean isSuperAdmin) {

@@ -1,7 +1,9 @@
 package br.com.verticelabs.pdfprocessor.application.persons;
 
 import br.com.verticelabs.pdfprocessor.application.security.EvaluatorAccessService;
+import br.com.verticelabs.pdfprocessor.domain.model.PayrollDocument;
 import br.com.verticelabs.pdfprocessor.domain.model.Person;
+import br.com.verticelabs.pdfprocessor.domain.model.PersonStatus;
 import br.com.verticelabs.pdfprocessor.infrastructure.security.ReactiveSecurityContextHelper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,8 +16,9 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
-import br.com.verticelabs.pdfprocessor.domain.model.PayrollDocument;
-
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -27,6 +30,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ListPersonsUseCase {
 
+    static final ZoneId ZONE_BR = ZoneId.of("America/Sao_Paulo");
+
     private static final Sort DEFAULT_SORT = Sort.by(
             Sort.Order.desc("updatedAt"),
             Sort.Order.desc("createdAt")
@@ -34,38 +39,79 @@ public class ListPersonsUseCase {
 
     private final ReactiveMongoTemplate mongoTemplate;
     private final EvaluatorAccessService evaluatorAccessService;
-    
-    public Mono<ListPersonsResult> execute(String nomeFilter, String cpfFilter, String matriculaFilter, Boolean validadoFilter, int page, int size) {
+
+    public Mono<ListPersonsResult> execute(ListPersonsFilters filters, int page, int size) {
+        ListPersonsFilters safeFilters = safeFilters(filters);
+
         return evaluatorAccessService.isEvaluator()
                 .flatMap(isEvaluator -> {
                     if (Boolean.TRUE.equals(isEvaluator)) {
-                        // EVALUATOR vê apenas os clientes atribuídos (allowlist), ignorando tenant
                         return evaluatorAccessService.currentAllowedPersonIds()
-                                .flatMap(allowed -> listAllowlistedPersons(allowed, nomeFilter, cpfFilter, matriculaFilter, validadoFilter, page, size));
+                                .flatMap(allowed -> listAllowlistedPersons(allowed, safeFilters, page, size));
                     }
                     return ReactiveSecurityContextHelper.isSuperAdmin()
                             .flatMap(isSuperAdmin -> {
                                 if (isSuperAdmin) {
-                                    // SUPER_ADMIN pode ver todas as pessoas (sem filtrar por tenantId)
-                                    return listAllPersons(nomeFilter, cpfFilter, matriculaFilter, validadoFilter, page, size);
-                                } else {
-                                    // Outros usuários só veem pessoas do seu tenant
-                                    return ReactiveSecurityContextHelper.getTenantId()
-                                            .flatMap(tenantId -> listPersonsByTenant(tenantId, nomeFilter, cpfFilter, matriculaFilter, validadoFilter, page, size));
+                                    return listAllPersons(safeFilters, page, size);
                                 }
+                                return ReactiveSecurityContextHelper.getTenantId()
+                                        .flatMap(tenantId -> listPersonsByTenant(tenantId, safeFilters, page, size));
                             });
                 });
     }
 
-    private Mono<ListPersonsResult> listAllowlistedPersons(Set<String> allowedPersonIds, String nomeFilter, String cpfFilter, String matriculaFilter, Boolean validadoFilter, int page, int size) {
+    /**
+     * Busca todos os clientes que batem com os filtros, sem paginação.
+     * Reutiliza a mesma query, ordenação e escopos de acesso da listagem.
+     */
+    public Mono<List<Person>> findAllMatching(ListPersonsFilters filters) {
+        ListPersonsFilters safeFilters = safeFilters(filters);
+
+        return evaluatorAccessService.isEvaluator()
+                .flatMap(isEvaluator -> {
+                    if (Boolean.TRUE.equals(isEvaluator)) {
+                        return evaluatorAccessService.currentAllowedPersonIds()
+                                .flatMap(allowed -> {
+                                    if (allowed == null || allowed.isEmpty()) {
+                                        return Mono.just(List.<Person>of());
+                                    }
+                                    Query findQuery = buildQuery(null, safeFilters)
+                                            .addCriteria(Criteria.where("_id").in(new ArrayList<>(allowed)))
+                                            .with(DEFAULT_SORT);
+                                    return mongoTemplate.find(findQuery, Person.class).collectList();
+                                });
+                    }
+                    return ReactiveSecurityContextHelper.isSuperAdmin()
+                            .flatMap(isSuperAdmin -> {
+                                if (Boolean.TRUE.equals(isSuperAdmin)) {
+                                    Query findQuery = buildQuery(null, safeFilters).with(DEFAULT_SORT);
+                                    return mongoTemplate.find(findQuery, Person.class).collectList();
+                                }
+                                return ReactiveSecurityContextHelper.getTenantId()
+                                        .flatMap(tenantId -> {
+                                            Query findQuery = buildQuery(tenantId, safeFilters).with(DEFAULT_SORT);
+                                            return mongoTemplate.find(findQuery, Person.class).collectList();
+                                        });
+                            });
+                });
+    }
+
+    private static ListPersonsFilters safeFilters(ListPersonsFilters filters) {
+        return filters != null
+                ? filters
+                : new ListPersonsFilters(null, null, null, null, null, null, null, null);
+    }
+
+    private Mono<ListPersonsResult> listAllowlistedPersons(
+            Set<String> allowedPersonIds, ListPersonsFilters filters, int page, int size) {
         if (allowedPersonIds == null || allowedPersonIds.isEmpty()) {
             return Mono.just(new ListPersonsResult(new ArrayList<>(), 0L, 0, page, size));
         }
 
         List<String> allowedIdsList = new ArrayList<>(allowedPersonIds);
-        Query countQuery = buildQuery(null, nomeFilter, cpfFilter, matriculaFilter, validadoFilter)
+        Query countQuery = buildQuery(null, filters)
                 .addCriteria(Criteria.where("_id").in(allowedIdsList));
-        Query findQuery = buildQuery(null, nomeFilter, cpfFilter, matriculaFilter, validadoFilter)
+        Query findQuery = buildQuery(null, filters)
                 .addCriteria(Criteria.where("_id").in(allowedIdsList));
 
         Pageable pageable = PageRequest.of(page, size, DEFAULT_SORT);
@@ -83,17 +129,17 @@ public class ListPersonsUseCase {
                             .map(reconciled -> new ListPersonsResult(reconciled, total, totalPages, page, size));
                 });
     }
-    
-    private Mono<ListPersonsResult> listAllPersons(String nomeFilter, String cpfFilter, String matriculaFilter, Boolean validadoFilter, int page, int size) {
-        Query countQuery = buildQuery(null, nomeFilter, cpfFilter, matriculaFilter, validadoFilter);
-        Query findQuery = buildQuery(null, nomeFilter, cpfFilter, matriculaFilter, validadoFilter);
-        
+
+    private Mono<ListPersonsResult> listAllPersons(ListPersonsFilters filters, int page, int size) {
+        Query countQuery = buildQuery(null, filters);
+        Query findQuery = buildQuery(null, filters);
+
         Pageable pageable = PageRequest.of(page, size, DEFAULT_SORT);
         findQuery.with(pageable);
-        
+
         Mono<Long> countMono = Mono.from(mongoTemplate.count(countQuery, Person.class));
         Mono<List<Person>> personsMono = mongoTemplate.find(findQuery, Person.class).collectList();
-        
+
         return Mono.zip(personsMono, countMono)
                 .flatMap(tuple -> {
                     List<Person> persons = tuple.getT1();
@@ -105,16 +151,17 @@ public class ListPersonsUseCase {
                 });
     }
 
-    private Mono<ListPersonsResult> listPersonsByTenant(String tenantId, String nomeFilter, String cpfFilter, String matriculaFilter, Boolean validadoFilter, int page, int size) {
-        Query countQuery = buildQuery(tenantId, nomeFilter, cpfFilter, matriculaFilter, validadoFilter);
-        Query findQuery = buildQuery(tenantId, nomeFilter, cpfFilter, matriculaFilter, validadoFilter);
-        
+    private Mono<ListPersonsResult> listPersonsByTenant(
+            String tenantId, ListPersonsFilters filters, int page, int size) {
+        Query countQuery = buildQuery(tenantId, filters);
+        Query findQuery = buildQuery(tenantId, filters);
+
         Pageable pageable = PageRequest.of(page, size, DEFAULT_SORT);
         findQuery.with(pageable);
-        
+
         Mono<Long> countMono = Mono.from(mongoTemplate.count(countQuery, Person.class));
         Mono<List<Person>> personsMono = mongoTemplate.find(findQuery, Person.class).collectList();
-        
+
         return Mono.zip(personsMono, countMono)
                 .flatMap(tuple -> {
                     List<Person> persons = tuple.getT1();
@@ -129,14 +176,6 @@ public class ListPersonsUseCase {
     /**
      * Reconcilia a lista de IDs de documentos de cada pessoa com a coleção real
      * de payroll_documents.
-     *
-     * Motivo: o array Person.documentos é denormalizado e atualizado no upload via
-     * read-modify-write não atômico. Em uploads concorrentes (bulk), o "last write
-     * wins" pode perder IDs, deixando a contagem defasada (ex.: mostrar 9 quando há
-     * 10 documentos). Aqui recalculamos a partir da fonte de verdade (a coleção de
-     * documentos), corrigindo a exibição e auto-curando dados antigos.
-     *
-     * @param tenantId quando não-nulo, restringe a busca ao tenant; null para SUPER_ADMIN.
      */
     private Mono<List<Person>> reconcileDocumentos(List<Person> persons, String tenantId) {
         if (persons.isEmpty()) {
@@ -174,40 +213,93 @@ public class ListPersonsUseCase {
                 });
     }
 
-    private Query buildQuery(String tenantId, String nomeFilter, String cpfFilter, String matriculaFilter, Boolean validadoFilter) {
+    Query buildQuery(String tenantId, ListPersonsFilters filters) {
         Query query = new Query();
-        
-        // Filtrar por tenantId apenas se fornecido (null para SUPER_ADMIN ver todas)
+
         if (tenantId != null) {
             query.addCriteria(Criteria.where("tenantId").is(tenantId));
         }
-        
-        if (nomeFilter != null && !nomeFilter.isEmpty()) {
-            query.addCriteria(Criteria.where("nome").regex(nomeFilter, "i"));
-        }
-        
-        if (cpfFilter != null && !cpfFilter.isEmpty()) {
-            query.addCriteria(Criteria.where("cpf").regex(cpfFilter, "i"));
-        }
-        
-        if (matriculaFilter != null && !matriculaFilter.isEmpty()) {
-            query.addCriteria(Criteria.where("matricula").regex(matriculaFilter, "i"));
+
+        if (filters.nome() != null && !filters.nome().isEmpty()) {
+            query.addCriteria(Criteria.where("nome").regex(filters.nome(), "i"));
         }
 
-        if (validadoFilter != null) {
-            if (Boolean.TRUE.equals(validadoFilter)) {
+        if (filters.cpf() != null && !filters.cpf().isEmpty()) {
+            query.addCriteria(Criteria.where("cpf").regex(filters.cpf(), "i"));
+        }
+
+        if (filters.matricula() != null && !filters.matricula().isEmpty()) {
+            query.addCriteria(Criteria.where("matricula").regex(filters.matricula(), "i"));
+        }
+
+        if (filters.validado() != null) {
+            if (Boolean.TRUE.equals(filters.validado())) {
                 query.addCriteria(Criteria.where("validado").is(true));
             } else {
-                query.addCriteria(new Criteria().orOperator(
-                        Criteria.where("validado").is(false),
-                        Criteria.where("validado").is(null),
-                        Criteria.where("validado").exists(false)));
+                // Evita $or: false/null/ausente ≡ não é true (não conflita com outros $or)
+                query.addCriteria(Criteria.where("validado").ne(true));
             }
         }
-        
+
+        if (filters.empresaId() != null && !filters.empresaId().isBlank()) {
+            query.addCriteria(Criteria.where("empresaId").is(filters.empresaId().trim()));
+        }
+
+        applyCreatedAtRange(query, filters.cadastroDe(), filters.cadastroAte());
+        applyStatusFilter(query, filters.status());
+
         return query;
     }
-    
+
+    /**
+     * Filtra por status. Documentos antigos sem o campo são tratados como {@link PersonStatus#EM_PROCESSAMENTO}.
+     * Usa {@code $nin} em vez de {@code $or} para não conflitar com outros critérios {@code $or}/{@code null}
+     * no mesmo {@link Query} (limitação do Spring Data MongoDB).
+     */
+    static void applyStatusFilter(Query query, PersonStatus status) {
+        if (status == null) {
+            return;
+        }
+        if (status == PersonStatus.EM_PROCESSAMENTO) {
+            query.addCriteria(Criteria.where("status").nin(
+                    PersonStatus.AGUARDANDO_DOC_COMPLEMENTAR,
+                    PersonStatus.AGUARDANDO_DOC_EXERCICIO,
+                    PersonStatus.FINALIZADO));
+        } else {
+            query.addCriteria(Criteria.where("status").is(status));
+        }
+    }
+
+    /**
+     * Aplica intervalo aberto/fechado sobre {@code createdAt}.
+     * {@code cadastroAte} é inclusivo (limite exclusivo no início do dia seguinte).
+     */
+    static void applyCreatedAtRange(Query query, LocalDate cadastroDe, LocalDate cadastroAte) {
+        Instant de = startOfDay(cadastroDe);
+        Instant ateExclusivo = startOfNextDay(cadastroAte);
+
+        if (de != null && ateExclusivo != null) {
+            query.addCriteria(Criteria.where("createdAt").gte(de).lt(ateExclusivo));
+        } else if (de != null) {
+            query.addCriteria(Criteria.where("createdAt").gte(de));
+        } else if (ateExclusivo != null) {
+            query.addCriteria(Criteria.where("createdAt").lt(ateExclusivo));
+        }
+    }
+
+    static Instant startOfDay(LocalDate date) {
+        if (date == null) {
+            return null;
+        }
+        return date.atStartOfDay(ZONE_BR).toInstant();
+    }
+
+    static Instant startOfNextDay(LocalDate date) {
+        if (date == null) {
+            return null;
+        }
+        return date.plusDays(1).atStartOfDay(ZONE_BR).toInstant();
+    }
+
     public record ListPersonsResult(List<Person> persons, Long total, Integer totalPages, Integer page, Integer size) {}
 }
-

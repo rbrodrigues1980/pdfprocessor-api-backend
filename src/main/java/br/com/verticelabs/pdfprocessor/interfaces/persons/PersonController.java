@@ -14,14 +14,17 @@ import br.com.verticelabs.pdfprocessor.interfaces.documents.dto.BulkUploadItemRe
 import br.com.verticelabs.pdfprocessor.interfaces.documents.dto.BulkUploadResponse;
 import br.com.verticelabs.pdfprocessor.interfaces.entries.EntryMapper;
 import br.com.verticelabs.pdfprocessor.interfaces.entries.dto.PersonEntriesResponse;
+import br.com.verticelabs.pdfprocessor.domain.model.PersonStatus;
 import br.com.verticelabs.pdfprocessor.interfaces.persons.dto.CreatePersonRequest;
 import br.com.verticelabs.pdfprocessor.interfaces.persons.dto.PersonListResponse;
 import br.com.verticelabs.pdfprocessor.interfaces.persons.dto.PersonResponse;
 import br.com.verticelabs.pdfprocessor.interfaces.persons.dto.PersonRubricasMatrixResponse;
 import br.com.verticelabs.pdfprocessor.interfaces.persons.dto.UpdatePersonRequest;
+import br.com.verticelabs.pdfprocessor.interfaces.persons.dto.UpdatePersonStatusRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -30,6 +33,7 @@ import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -52,6 +56,7 @@ public class PersonController {
         private final ActivatePersonUseCase activatePersonUseCase;
         private final DeactivatePersonUseCase deactivatePersonUseCase;
         private final MarkPersonAsValidatedUseCase markPersonAsValidatedUseCase;
+        private final UpdatePersonStatusUseCase updatePersonStatusUseCase;
         private final GetPersonByIdUseCase getPersonByIdUseCase;
         private final DocumentUploadUseCase documentUploadUseCase;
         private final BulkDocumentUploadUseCase bulkDocumentUploadUseCase;
@@ -154,8 +159,28 @@ public class PersonController {
         }
 
         /**
+         * PATCH /api/v1/persons/{id}/status
+         * Atualiza o status operacional do cliente (pode ser alterado a qualquer momento).
+         */
+        @PatchMapping("/{id}/status")
+        public Mono<ResponseEntity<Object>> updatePersonStatus(
+                        @PathVariable String id,
+                        @Valid @RequestBody UpdatePersonStatusRequest request) {
+                log.info("📥 PATCH /api/v1/persons/{}/status - Atualizar status: {}", id, request.getStatus());
+
+                return updatePersonStatusUseCase.execute(id, request.getStatus())
+                                .flatMap(person -> personResponseEnricher.enrich(person)
+                                                .map(response -> ResponseEntity.ok((Object) response)));
+        }
+
+        /**
          * GET /api/v1/persons
          * Lista todas as pessoas com paginação e filtros.
+         *
+         * @param empresaId  filtra pela empresa vinculada
+         * @param cadastroDe data inicial inclusiva do cadastro (yyyy-MM-dd)
+         * @param cadastroAte data final inclusiva do cadastro (yyyy-MM-dd)
+         * @param status     filtra pelo status operacional do cliente
          */
         @GetMapping
         public Mono<ResponseEntity<PersonListResponse>> listPersons(
@@ -163,11 +188,20 @@ public class PersonController {
                         @RequestParam(required = false) String cpf,
                         @RequestParam(required = false) String matricula,
                         @RequestParam(required = false) Boolean validado,
+                        @RequestParam(required = false) String empresaId,
+                        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate cadastroDe,
+                        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate cadastroAte,
+                        @RequestParam(required = false) PersonStatus status,
                         @RequestParam(defaultValue = "0") int page,
                         @RequestParam(defaultValue = "100") int size) {
-                log.debug("📥 GET /api/v1/persons - Listar pessoas (page={}, size={}, validado={})", page, size, validado);
+                log.debug(
+                                "📥 GET /api/v1/persons - Listar pessoas (page={}, size={}, validado={}, empresaId={}, cadastroDe={}, cadastroAte={}, status={})",
+                                page, size, validado, empresaId, cadastroDe, cadastroAte, status);
 
-                return listPersonsUseCase.execute(nome, cpf, matricula, validado, page, size)
+                ListPersonsFilters filters = new ListPersonsFilters(
+                                nome, cpf, matricula, validado, empresaId, cadastroDe, cadastroAte, status);
+
+                return listPersonsUseCase.execute(filters, page, size)
                                 .flatMap(result -> personResponseEnricher.enrichAll(result.persons())
                                                 .map(personResponses -> {
                                         PersonListResponse response = PersonListResponse.builder()

@@ -1,18 +1,24 @@
 package br.com.verticelabs.pdfprocessor.interfaces.excel;
 
+import br.com.verticelabs.pdfprocessor.application.excel.ClientesExcelReportUseCase;
 import br.com.verticelabs.pdfprocessor.application.excel.ExcelExportUseCase;
 import br.com.verticelabs.pdfprocessor.application.excel.ResumoGeralPdfUseCase;
 import br.com.verticelabs.pdfprocessor.application.excel.ResumoGeralUseCase;
+import br.com.verticelabs.pdfprocessor.application.persons.ListPersonsFilters;
+import br.com.verticelabs.pdfprocessor.domain.model.PersonStatus;
 import br.com.verticelabs.pdfprocessor.interfaces.excel.dto.ResumoGeralResponse;
 import br.com.verticelabs.pdfprocessor.domain.exceptions.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
+
+import java.time.LocalDate;
 
 @Slf4j
 @RestController
@@ -23,6 +29,46 @@ public class ExcelController {
     private final ExcelExportUseCase excelExportUseCase;
     private final ResumoGeralUseCase resumoGeralUseCase;
     private final ResumoGeralPdfUseCase resumoGeralPdfUseCase;
+    private final ClientesExcelReportUseCase clientesExcelReportUseCase;
+
+    /**
+     * GET /api/v1/persons/reports/clientes/excel
+     * Relatório Excel da lista de clientes, respeitando os mesmos filtros da listagem (sem paginação).
+     */
+    @GetMapping(value = "/reports/clientes/excel", produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
+    public Mono<ResponseEntity<byte[]>> exportClientesReport(
+            @RequestParam(required = false) String nome,
+            @RequestParam(required = false) String cpf,
+            @RequestParam(required = false) String matricula,
+            @RequestParam(required = false) Boolean validado,
+            @RequestParam(required = false) String empresaId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate cadastroDe,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate cadastroAte,
+            @RequestParam(required = false) PersonStatus status) {
+
+        log.info("=== INÍCIO: GET /api/v1/persons/reports/clientes/excel ===");
+        ListPersonsFilters filters = new ListPersonsFilters(
+                nome, cpf, matricula, validado, empresaId, cadastroDe, cadastroAte, status);
+
+        return clientesExcelReportUseCase.execute(filters)
+                .map(result -> {
+                    HttpHeaders headers = new HttpHeaders();
+                    headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+                    headers.setContentDispositionFormData("attachment", result.getFilename());
+                    headers.setContentLength(result.getBytes().length);
+                    log.info("Relatório de clientes gerado: {} ({} bytes)",
+                            result.getFilename(), result.getBytes().length);
+                    return ResponseEntity.ok().headers(headers).body(result.getBytes());
+                })
+                .onErrorResume(IllegalArgumentException.class, e -> {
+                    log.warn("Relatório de clientes rejeitado: {}", e.getMessage());
+                    return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST).build());
+                })
+                .onErrorResume(Exception.class, e -> {
+                    log.error("Erro ao gerar relatório Excel de clientes", e);
+                    return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build());
+                });
+    }
 
     /**
      * GET /api/v1/persons/{cpf}/excel
