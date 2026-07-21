@@ -19,6 +19,7 @@ import br.com.verticelabs.pdfprocessor.interfaces.persons.dto.CreatePersonReques
 import br.com.verticelabs.pdfprocessor.interfaces.persons.dto.PersonListResponse;
 import br.com.verticelabs.pdfprocessor.interfaces.persons.dto.PersonResponse;
 import br.com.verticelabs.pdfprocessor.interfaces.persons.dto.PersonRubricasMatrixResponse;
+import br.com.verticelabs.pdfprocessor.interfaces.persons.dto.UpdatePersonObservacoesRequest;
 import br.com.verticelabs.pdfprocessor.interfaces.persons.dto.UpdatePersonRequest;
 import br.com.verticelabs.pdfprocessor.interfaces.persons.dto.UpdatePersonStatusRequest;
 import jakarta.validation.Valid;
@@ -57,6 +58,7 @@ public class PersonController {
         private final DeactivatePersonUseCase deactivatePersonUseCase;
         private final MarkPersonAsValidatedUseCase markPersonAsValidatedUseCase;
         private final UpdatePersonStatusUseCase updatePersonStatusUseCase;
+        private final UpdatePersonObservacoesUseCase updatePersonObservacoesUseCase;
         private final GetPersonByIdUseCase getPersonByIdUseCase;
         private final DocumentUploadUseCase documentUploadUseCase;
         private final BulkDocumentUploadUseCase bulkDocumentUploadUseCase;
@@ -169,6 +171,21 @@ public class PersonController {
                 log.info("📥 PATCH /api/v1/persons/{}/status - Atualizar status: {}", id, request.getStatus());
 
                 return updatePersonStatusUseCase.execute(id, request.getStatus())
+                                .flatMap(person -> personResponseEnricher.enrich(person)
+                                                .map(response -> ResponseEntity.ok((Object) response)));
+        }
+
+        /**
+         * PATCH /api/v1/persons/{id}/observacoes
+         * Atualiza as observações em texto livre do cliente (pode ser alterado a qualquer momento).
+         */
+        @PatchMapping("/{id}/observacoes")
+        public Mono<ResponseEntity<Object>> updatePersonObservacoes(
+                        @PathVariable String id,
+                        @Valid @RequestBody UpdatePersonObservacoesRequest request) {
+                log.info("📥 PATCH /api/v1/persons/{}/observacoes - Atualizar observações", id);
+
+                return updatePersonObservacoesUseCase.execute(id, request.getObservacoes())
                                 .flatMap(person -> personResponseEnricher.enrich(person)
                                                 .map(response -> ResponseEntity.ok((Object) response)));
         }

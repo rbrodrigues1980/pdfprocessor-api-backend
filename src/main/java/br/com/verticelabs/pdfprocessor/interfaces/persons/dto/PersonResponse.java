@@ -33,6 +33,8 @@ public class PersonResponse {
     private String status;
     /** Rótulo legível do status. */
     private String statusLabel;
+    /** Observações em texto livre sobre o cliente. */
+    private String observacoes;
     private Instant createdAt;
     private Instant updatedAt;
 }

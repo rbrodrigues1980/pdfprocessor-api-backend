@@ -91,6 +91,7 @@ public class ClientesExcelReportUseCase {
                 person.getCpf(),
                 formatEntidade(person, honorarios),
                 PersonStatus.fromNullable(person.getStatus()).getLabel(),
+                person.getObservacoes(),
                 honorarios.percentualExibicao(),
                 principal,
                 principalMaisCorrecao);
@@ -103,6 +104,7 @@ public class ClientesExcelReportUseCase {
                 person.getCpf(),
                 formatEntidade(person, honorarios),
                 PersonStatus.fromNullable(person.getStatus()).getLabel(),
+                person.getObservacoes(),
                 honorarios.percentualExibicao(),
                 ZERO,
                 ZERO);

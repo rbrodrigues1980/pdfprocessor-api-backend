@@ -33,6 +33,7 @@ public class PersonMapper {
                 .validadoEm(person.getValidadoEm())
                 .status(status.name())
                 .statusLabel(status.getLabel())
+                .observacoes(person.getObservacoes())
                 .createdAt(person.getCreatedAt())
                 .updatedAt(person.getUpdatedAt())
                 .build();

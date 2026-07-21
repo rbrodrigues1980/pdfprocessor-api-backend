@@ -10,6 +10,7 @@ public enum PersonStatus {
     EM_PROCESSAMENTO("Em processamento"),
     AGUARDANDO_DOC_COMPLEMENTAR("Aguardando documentação complementar"),
     AGUARDANDO_DOC_EXERCICIO("Aguardando documentação Exercício: 2026 Ano-Calendario: 2025"),
+    ANOTACAO("Anotação"),
     FINALIZADO("Finalizado");
 
     private final String label;

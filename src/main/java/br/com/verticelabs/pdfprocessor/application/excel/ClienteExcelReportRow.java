@@ -10,6 +10,7 @@ public record ClienteExcelReportRow(
         String cpf,
         String entidade,
         String status,
+        String observacoes,
         BigDecimal percentualHonorarios,
         BigDecimal totalPrincipalPgfn,
         BigDecimal totalPrincipalMaisCorrecao

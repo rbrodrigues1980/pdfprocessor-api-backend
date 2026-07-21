@@ -335,22 +335,21 @@ public class DocumentUploadUseCase {
     }
 
     private Mono<java.io.InputStream> readFileContent(FilePart filePart) {
-        return filePart.content()
-                .collectList()
-                .map(dataBuffers -> {
-                    int totalSize = dataBuffers.stream()
-                            .mapToInt(buffer -> buffer.readableByteCount())
-                            .sum();
-                    
-                    byte[] bytes = new byte[totalSize];
-                    int offset = 0;
-                    for (org.springframework.core.io.buffer.DataBuffer buffer : dataBuffers) {
-                        int readable = buffer.readableByteCount();
-                        buffer.read(bytes, offset, readable);
-                        offset += readable;
-                    }
-                    return new java.io.ByteArrayInputStream(bytes);
-                });
+        // Escreve o conteúdo em arquivo temporário liberando cada DataBuffer conforme consumido,
+        // evitando manter todos os buffers diretos (NIO/Netty) em memória ao mesmo tempo
+        // (causa de OutOfMemoryError de direct buffer no upload múltiplo).
+        return Mono.fromCallable(() -> java.nio.file.Files.createTempFile("pdf-upload-", ".tmp"))
+                .subscribeOn(Schedulers.boundedElastic())
+                .flatMap(tempPath -> org.springframework.core.io.buffer.DataBufferUtils
+                        .write(filePart.content(), tempPath)
+                        .then(Mono.fromCallable(() -> {
+                            try {
+                                byte[] bytes = java.nio.file.Files.readAllBytes(tempPath);
+                                return (java.io.InputStream) new java.io.ByteArrayInputStream(bytes);
+                            } finally {
+                                java.nio.file.Files.deleteIfExists(tempPath);
+                            }
+                        }).subscribeOn(Schedulers.boundedElastic())));
     }
 
     private Mono<Person> ensurePersonExists(String cpf, String nome, String matricula, String tenantId) {

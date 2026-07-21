@@ -32,6 +32,7 @@ public class ClientesExcelReportServiceImpl implements ClientesExcelReportServic
             "CPF",
             "Entidade",
             "Status",
+            "Observações",
             "Percentual de honorários (%)",
             "Principal PGFN",
             "Principal + Correção"
@@ -83,15 +84,19 @@ public class ClientesExcelReportServiceImpl implements ClientesExcelReportServic
                 statusCell.setCellValue(nullToEmpty(rowData.status()));
                 statusCell.setCellStyle(textStyle);
 
-                Cell pctCell = row.createCell(4);
+                Cell observacoesCell = row.createCell(4);
+                observacoesCell.setCellValue(nullToEmpty(rowData.observacoes()));
+                observacoesCell.setCellStyle(textStyle);
+
+                Cell pctCell = row.createCell(5);
                 pctCell.setCellValue(toDouble(rowData.percentualHonorarios()));
                 pctCell.setCellStyle(percentStyle);
 
-                Cell principalCell = row.createCell(5);
+                Cell principalCell = row.createCell(6);
                 principalCell.setCellValue(toDouble(rowData.totalPrincipalPgfn()));
                 principalCell.setCellStyle(moneyStyle);
 
-                Cell principalCorrecaoCell = row.createCell(6);
+                Cell principalCorrecaoCell = row.createCell(7);
                 principalCorrecaoCell.setCellValue(toDouble(rowData.totalPrincipalMaisCorrecao()));
                 principalCorrecaoCell.setCellStyle(moneyStyle);
             }
@@ -105,9 +110,10 @@ public class ClientesExcelReportServiceImpl implements ClientesExcelReportServic
             sheet.setColumnWidth(1, 18 * 256);
             sheet.setColumnWidth(2, 36 * 256);
             sheet.setColumnWidth(3, 52 * 256);
-            sheet.setColumnWidth(4, 22 * 256);
-            sheet.setColumnWidth(5, 18 * 256);
-            sheet.setColumnWidth(6, 22 * 256);
+            sheet.setColumnWidth(4, 45 * 256);
+            sheet.setColumnWidth(5, 22 * 256);
+            sheet.setColumnWidth(6, 18 * 256);
+            sheet.setColumnWidth(7, 22 * 256);
 
             workbook.write(out);
             return out.toByteArray();
