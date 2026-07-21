@@ -10,6 +10,17 @@ spring:
     name: pdfprocessor-api-backend
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:local}
+  # Upload multipart (WebFlux): faz spill para arquivo temporário em vez de manter
+  # o conteúdo em memória direta (NIO/Netty), evitando OutOfMemoryError de direct buffer
+  # no upload múltiplo de PDFs. Ver docs/09-deploy.
+  webflux:
+    multipart:
+      streaming: false
+      max-in-memory-size: 256KB      # acima disso, a parte vai para disco (tmpfs no Cloud Run)
+      max-disk-usage-per-part: -1    # sem limite por parte (PDFs grandes)
+      max-parts: 128
+  codec:
+    max-in-memory-size: 1MB          # limite defensivo dos codecs de buffer
   data:
     mongodb:
       # Em Cloud Run: defina SPRING_DATA_MONGODB_URI nas variáveis do serviço.

@@ -28,6 +28,7 @@ class ClientesExcelReportServiceImplTest {
                 "12345678901",
                 "AEA/AL — Associação",
                 "Aguardando documentação complementar",
+                "faltam contracheques 2016",
                 new BigDecimal("12.00"),
                 new BigDecimal("1000.50"),
                 new BigDecimal("1500.75"));
@@ -42,18 +43,20 @@ class ClientesExcelReportServiceImplTest {
             assertEquals("CPF", header.getCell(1).getStringCellValue());
             assertEquals("Entidade", header.getCell(2).getStringCellValue());
             assertEquals("Status", header.getCell(3).getStringCellValue());
-            assertEquals("Percentual de honorários (%)", header.getCell(4).getStringCellValue());
-            assertEquals("Principal PGFN", header.getCell(5).getStringCellValue());
-            assertEquals("Principal + Correção", header.getCell(6).getStringCellValue());
+            assertEquals("Observações", header.getCell(4).getStringCellValue());
+            assertEquals("Percentual de honorários (%)", header.getCell(5).getStringCellValue());
+            assertEquals("Principal PGFN", header.getCell(6).getStringCellValue());
+            assertEquals("Principal + Correção", header.getCell(7).getStringCellValue());
 
             Row data = sheet.getRow(1);
             assertEquals("CLIENTE TESTE", data.getCell(0).getStringCellValue());
             assertEquals("123.456.789-01", data.getCell(1).getStringCellValue());
             assertEquals("AEA/AL — Associação", data.getCell(2).getStringCellValue());
             assertEquals("Aguardando documentação complementar", data.getCell(3).getStringCellValue());
-            assertEquals(12.00d, data.getCell(4).getNumericCellValue(), 0.001);
-            assertEquals(1000.50d, data.getCell(5).getNumericCellValue(), 0.001);
-            assertEquals(1500.75d, data.getCell(6).getNumericCellValue(), 0.001);
+            assertEquals("faltam contracheques 2016", data.getCell(4).getStringCellValue());
+            assertEquals(12.00d, data.getCell(5).getNumericCellValue(), 0.001);
+            assertEquals(1000.50d, data.getCell(6).getNumericCellValue(), 0.001);
+            assertEquals(1500.75d, data.getCell(7).getNumericCellValue(), 0.001);
         }
     }
 

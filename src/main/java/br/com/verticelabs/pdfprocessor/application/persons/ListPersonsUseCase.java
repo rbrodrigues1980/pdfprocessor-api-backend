@@ -264,6 +264,7 @@ public class ListPersonsUseCase {
             query.addCriteria(Criteria.where("status").nin(
                     PersonStatus.AGUARDANDO_DOC_COMPLEMENTAR,
                     PersonStatus.AGUARDANDO_DOC_EXERCICIO,
+                    PersonStatus.ANOTACAO,
                     PersonStatus.FINALIZADO));
         } else {
             query.addCriteria(Criteria.where("status").is(status));

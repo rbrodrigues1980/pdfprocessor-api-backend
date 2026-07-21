@@ -332,21 +332,21 @@ public class IncomeTaxUploadUseCase {
          * Lê o conteúdo do arquivo para um InputStream.
          */
         private Mono<InputStream> readFileContent(FilePart filePart) {
-                return filePart.content()
-                                .collectList()
-                                .map(dataBuffers -> {
-                                        java.io.ByteArrayOutputStream outputStream = new java.io.ByteArrayOutputStream();
-                                        dataBuffers.forEach(buffer -> {
-                                                byte[] bytes = new byte[buffer.readableByteCount()];
-                                                buffer.read(bytes);
-                                                try {
-                                                        outputStream.write(bytes);
-                                                } catch (java.io.IOException e) {
-                                                        throw new RuntimeException(e);
-                                                }
-                                        });
-                                        return new java.io.ByteArrayInputStream(outputStream.toByteArray());
-                                });
+                // Escreve o conteúdo em arquivo temporário liberando cada DataBuffer conforme consumido,
+                // evitando manter todos os buffers diretos (NIO/Netty) em memória ao mesmo tempo
+                // (causa de OutOfMemoryError de direct buffer no upload múltiplo).
+                return Mono.fromCallable(() -> java.nio.file.Files.createTempFile("irpf-upload-", ".tmp"))
+                                .subscribeOn(Schedulers.boundedElastic())
+                                .flatMap(tempPath -> org.springframework.core.io.buffer.DataBufferUtils
+                                                .write(filePart.content(), tempPath)
+                                                .then(Mono.fromCallable(() -> {
+                                                        try {
+                                                                byte[] bytes = java.nio.file.Files.readAllBytes(tempPath);
+                                                                return (InputStream) new java.io.ByteArrayInputStream(bytes);
+                                                        } finally {
+                                                                java.nio.file.Files.deleteIfExists(tempPath);
+                                                        }
+                                                }).subscribeOn(Schedulers.boundedElastic())));
         }
 
         /**

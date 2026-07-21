@@ -56,6 +56,11 @@ public class Person {
      * Status operacional do cliente. Nulo em documentos antigos é tratado como {@link PersonStatus#EM_PROCESSAMENTO}.
      */
     private PersonStatus status;
+
+    /**
+     * Observações em texto livre sobre o cliente (ex.: pendências de documentos). Independente do {@link #status}.
+     */
+    private String observacoes;
     
     private Instant createdAt;
     
