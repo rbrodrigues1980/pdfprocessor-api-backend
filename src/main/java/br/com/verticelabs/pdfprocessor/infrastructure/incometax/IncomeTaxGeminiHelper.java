@@ -99,11 +99,28 @@ public final class IncomeTaxGeminiHelper {
         BigDecimal impostoDevido = source.getImpostoDevido();
         BigDecimal deducaoIncentivo = source.getDeducaoIncentivo();
         BigDecimal impostoDevidoI = source.getImpostoDevidoI();
+        BigDecimal impostoDevidoII = source.getImpostoDevidoII();
         BigDecimal impostoDevidoRRA = source.getImpostoDevidoRRA();
         BigDecimal totalImpostoDevido = source.getTotalImpostoDevido();
+        BigDecimal contribuicaoPrevEmpregadorDomestico = source.getContribuicaoPrevEmpregadorDomestico();
 
         if (impostoDevidoI == null && isPositive(impostoDevido) && deducaoIncentivo != null) {
             impostoDevidoI = impostoDevido.subtract(deducaoIncentivo);
+        }
+        // Derivar RRA omitido pelo Gemini: Total = (II se houver, senão I) + RRA
+        if (!isPositive(impostoDevidoRRA)
+                && isPositive(totalImpostoDevido)
+                && isPositive(impostoDevidoI)) {
+            BigDecimal baseProgressivo = isPositive(impostoDevidoII) ? impostoDevidoII : impostoDevidoI;
+            BigDecimal rraDerivado = totalImpostoDevido.subtract(baseProgressivo)
+                    .setScale(2, RoundingMode.HALF_UP);
+            boolean gapExplicadoPorDomestico = !isPositive(impostoDevidoII)
+                    && isPositive(contribuicaoPrevEmpregadorDomestico)
+                    && rraDerivado.subtract(contribuicaoPrevEmpregadorDomestico).abs()
+                            .compareTo(TOLERANCE) <= 0;
+            if (rraDerivado.compareTo(TOLERANCE) > 0 && !gapExplicadoPorDomestico) {
+                impostoDevidoRRA = rraDerivado;
+            }
         }
         if (impostoDevidoI == null && isPositive(totalImpostoDevido) && !isPositive(impostoDevidoRRA)) {
             impostoDevidoI = totalImpostoDevido;
@@ -152,7 +169,7 @@ public final class IncomeTaxGeminiHelper {
         return new IncomeTaxInfo(
                 source.getNome(), source.getCpf(), source.getAnoCalendario(), source.getExercicio(),
                 baseCalculoImposto, impostoDevido, deducaoIncentivo, impostoDevidoI,
-                source.getContribuicaoPrevEmpregadorDomestico(), source.getImpostoDevidoII(), impostoDevidoRRA,
+                contribuicaoPrevEmpregadorDomestico, impostoDevidoII, impostoDevidoRRA,
                 totalImpostoDevido, source.getSaldoImpostoPagar(),
                 rendimentosTributaveis, deducoesTotal,
                 source.getImpostoRetidoFonteTitular(), impostoPagoTotal, source.getImpostoRestituir(),
@@ -176,6 +193,101 @@ public final class IncomeTaxGeminiHelper {
                 source.getAlimentandos(),
                 rendTitularPJ, rendDepPJ, rendTitularPF, rendDepPF,
                 resultadoRural, rendAcumTitular, rendAcumDep,
+                source.getImpostoPagoGanhosCapital(), source.getImpostoDevidoGanhosCapital(),
+                source.getImpostoDevidoGanhosCapitalMoedaEstrangeira(),
+                source.getImpostoPagoGanhosCapitalMoedaEstrangeira(),
+                source.getImpostoPagoRendaVariavel(),
+                source.getImpostoDevidoGanhosLiquidosRendaVariavel(),
+                source.getImpostoAPagarGanhosCapitalMoedaEstrangeira(),
+                source.getRendimentosTributaveisExigSuspensa(), source.getDepositosJudiciais(),
+                source.getImpostoDiferidoGanhosCapital(), source.getDoacoesPartidosPoliticos(),
+                source.getDoacoesEfetuadas());
+    }
+
+    /**
+     * Substitui a lista de pagamentos efetuados preservando os demais campos.
+     */
+    public static IncomeTaxInfo withPagamentos(IncomeTaxInfo source, List<IncomeTaxInfo.PagamentoEfetuado> pagamentos) {
+        if (source == null) {
+            return null;
+        }
+        return copyWith(
+                source,
+                pagamentos != null ? pagamentos : List.of(),
+                source.getDependentes(),
+                source.getTotalDeducaoDependentes());
+    }
+
+    /**
+     * Mescla lista/total de dependentes: preenche se a fonte ainda estiver vazia/nula.
+     */
+    public static IncomeTaxInfo withDependentes(
+            IncomeTaxInfo source,
+            List<IncomeTaxInfo.DependenteInfo> dependentes,
+            BigDecimal totalDeducao) {
+        if (source == null) {
+            return null;
+        }
+        List<IncomeTaxInfo.DependenteInfo> current = source.getDependentes();
+        boolean hasList = current != null && !current.isEmpty();
+        List<IncomeTaxInfo.DependenteInfo> mergedList = hasList
+                ? current
+                : (dependentes != null ? dependentes : List.of());
+        BigDecimal mergedTotal = source.getTotalDeducaoDependentes() != null
+                ? source.getTotalDeducaoDependentes()
+                : totalDeducao;
+        // Também preenche deducoesDependentes do RESUMO se ainda null e temos total
+        BigDecimal deducoesDependentes = source.getDeducoesDependentes() != null
+                ? source.getDeducoesDependentes()
+                : mergedTotal;
+        return copyWith(source, source.getPagamentosEfetuados(), mergedList, mergedTotal, deducoesDependentes);
+    }
+
+    private static IncomeTaxInfo copyWith(
+            IncomeTaxInfo source,
+            List<IncomeTaxInfo.PagamentoEfetuado> pagamentos,
+            List<IncomeTaxInfo.DependenteInfo> dependentes,
+            BigDecimal totalDeducaoDependentes) {
+        return copyWith(source, pagamentos, dependentes, totalDeducaoDependentes, source.getDeducoesDependentes());
+    }
+
+    private static IncomeTaxInfo copyWith(
+            IncomeTaxInfo source,
+            List<IncomeTaxInfo.PagamentoEfetuado> pagamentos,
+            List<IncomeTaxInfo.DependenteInfo> dependentes,
+            BigDecimal totalDeducaoDependentes,
+            BigDecimal deducoesDependentes) {
+        return new IncomeTaxInfo(
+                source.getNome(), source.getCpf(), source.getAnoCalendario(), source.getExercicio(),
+                source.getBaseCalculoImposto(), source.getImpostoDevido(), source.getDeducaoIncentivo(),
+                source.getImpostoDevidoI(),
+                source.getContribuicaoPrevEmpregadorDomestico(), source.getImpostoDevidoII(),
+                source.getImpostoDevidoRRA(),
+                source.getTotalImpostoDevido(), source.getSaldoImpostoPagar(),
+                source.getRendimentosTributaveis(), source.getDeducoes(),
+                source.getImpostoRetidoFonteTitular(), source.getImpostoPagoTotal(), source.getImpostoRestituir(),
+                source.getDeducoesContribPrevOficial(), source.getDeducoesContribPrevRRA(),
+                source.getDeducoesContribPrevCompl(), deducoesDependentes,
+                source.getDeducoesInstrucao(), source.getDeducoesMedicas(),
+                source.getDeducoesPensaoJudicial(), source.getDeducoesPensaoEscritura(),
+                source.getDeducoesPensaoRRA(), source.getDeducoesLivroCaixa(),
+                source.getImpostoRetidoFonteDependentes(), source.getCarneLeaoTitular(),
+                source.getCarneLeaoDependentes(), source.getImpostoComplementar(),
+                source.getImpostoPagoExterior(), source.getImpostoRetidoFonteLei11033(),
+                source.getImpostoRetidoRRA(),
+                source.getDescontoSimplificado(), source.getAliquotaEfetiva(),
+                source.getTipoTributacao(), source.getDataNascimento(), source.getTituloEleitoral(),
+                source.getTipoDeclaracao(), source.getDataEntrega(),
+                source.getBensAnterior(), source.getBensAtual(),
+                source.getDividasAnterior(), source.getDividasAtual(),
+                source.getRendimentosIsentos(), source.getRendimentosTributacaoExclusiva(),
+                pagamentos, source.getFontesPagadoras(),
+                source.getControle(), dependentes, totalDeducaoDependentes,
+                source.getAlimentandos(),
+                source.getRendimentosTributaveisTitularPJ(), source.getRendimentosTributaveisDependentesPJ(),
+                source.getRendimentosTributaveisTitularPF(), source.getRendimentosTributaveisDependentesPF(),
+                source.getResultadoAtividadeRural(), source.getRendimentosAcumuladosTitular(),
+                source.getRendimentosAcumuladosDependentes(),
                 source.getImpostoPagoGanhosCapital(), source.getImpostoDevidoGanhosCapital(),
                 source.getImpostoDevidoGanhosCapitalMoedaEstrangeira(),
                 source.getImpostoPagoGanhosCapitalMoedaEstrangeira(),

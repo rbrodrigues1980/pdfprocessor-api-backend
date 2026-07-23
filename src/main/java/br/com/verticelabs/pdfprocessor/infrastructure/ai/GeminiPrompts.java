@@ -164,6 +164,10 @@ public final class GeminiPrompts {
             - Se o título diz "TRIBUTAÇÃO UTILIZANDO AS DEDUÇÕES LEGAIS" → modeloDeclaracao = "COMPLETA"
               * A seção DEDUÇÕES lista itens individuais (previdência, dependentes, médicas, instrução, etc.)
               * O campo "descontoSimplificado" deve ser null.
+              * CRÍTICO: preencha SEMPRE "deducoes.dependentes" com o valor EXATO da linha "Dependentes"
+                (ex.: 4550.16). Nunca omita nem use null se o valor for maior que zero.
+              * CRÍTICO: preencha SEMPRE "deducoes.despesasMedicas" com o valor da linha "Despesas médicas"
+                quando > 0.
             - Se o título diz "TRIBUTAÇÃO UTILIZANDO O DESCONTO SIMPLIFICADO" → modeloDeclaracao = "SIMPLIFICADA"
               * A seção DEDUÇÕES mostra apenas o "Desconto Simplificado" (valor único).
               * Os campos individuais de deduções (previdenciaOficial, dependentes, etc.) devem ser null.
@@ -173,9 +177,16 @@ public final class GeminiPrompts {
             1. DADOS BÁSICOS: nome, CPF, exercício, ano-calendário, tipo e modelo da declaração
             2. RENDIMENTOS TRIBUTÁVEIS: lista de fontes + TOTAL
             3. DEDUÇÕES: lista de tipos + TOTAL (layout varia conforme o tipo de tributação acima)
-            4. IMPOSTO DEVIDO: base de cálculo, imposto devido, deduções de incentivo, etc.
+            4. IMPOSTO DEVIDO: base de cálculo, imposto devido, dedução de incentivo,
+               imposto devido I, imposto devido II (se houver), Imposto devido RRA (se houver),
+               alíquota efetiva, total do imposto devido
             5. IMPOSTO PAGO: retido na fonte, carnê-leão, complementar, etc. + TOTAL
             6. RESULTADO: saldo a pagar OU imposto a restituir
+
+            CRÍTICO — Imposto devido RRA:
+            - Se existir a linha "Imposto devido RRA" com valor > 0, preencha "impostoDevidoRRA"
+              com o valor EXATO (nunca omita nem use null).
+            - "totalImpostoDevido" = Imposto devido I (+ Imposto devido II se houver) + Imposto devido RRA.
 
             FORMATO JSON OBRIGATÓRIO:
             {
@@ -252,7 +263,8 @@ public final class GeminiPrompts {
 
             Extraia TODOS os dados visíveis das seções:
             RENDIMENTOS TRIBUTÁVEIS (cada linha + total), DEDUÇÕES (cada linha + total),
-            IMPOSTO DEVIDO (base, imposto devido, dedução de incentivo, imposto devido I, alíquota, total),
+            IMPOSTO DEVIDO (base, imposto devido, dedução de incentivo, imposto devido I,
+            imposto devido II se houver, Imposto devido RRA se houver, alíquota, total),
             IMPOSTO PAGO (retido na fonte + total) e RESULTADO (saldo a pagar ou restituir).
             A imagem 1 geralmente contém cabeçalho e rendimentos; a imagem 2 contém deduções, imposto e resultado.
 
@@ -263,6 +275,15 @@ public final class GeminiPrompts {
             Use os valores da lista itemizada em DEDUÇÕES (não de resumos condensados em outra parte).
             Leia cada dígito com cuidado em PDFs digitalizados. Confira: soma das linhas ≈ total deduções;
             rendimentos − total deduções ≈ base de cálculo.
+
+            Em declaração COMPLETA (deduções legais): preencha SEMPRE "dependentes" e "despesasMedicas"
+            com os valores das linhas correspondentes quando > 0 (nunca omita).
+            Em declaração SIMPLIFICADA: campos individuais de deduções = null; use "descontoSimplificado".
+
+            CRÍTICO — Imposto devido RRA:
+            - Se existir a linha "Imposto devido RRA" com valor > 0, preencha "impostoDevidoRRA"
+              com o valor EXATO (nunca omita nem use null).
+            - "totalImpostoDevido" = Imposto devido I (+ Imposto devido II se houver) + Imposto devido RRA.
 
             FORMATO JSON OBRIGATÓRIO (mesmo schema de IR_RESUMO_EXTRACTION):
             {
@@ -285,20 +306,34 @@ public final class GeminiPrompts {
               },
               "deducoes": {
                 "previdenciaOficial": null,
+                "previdenciaOficialRRA": null,
                 "previdenciaComplementar": null,
                 "dependentes": null,
                 "despesasMedicas": null,
                 "instrucao": null,
                 "pensaoAlimenticiaJudicial": null,
+                "pensaoAlimenticiaEscritura": null,
+                "pensaoAlimenticiaRRA": null,
+                "livrosCaixa": null,
                 "total": null
               },
               "baseCalculoImposto": null,
               "impostoDevido": null,
               "deducaoIncentivo": null,
               "impostoDevidoI": null,
+              "contribuicaoPrevEmpregadorDomestico": null,
+              "impostoDevidoII": null,
+              "impostoDevidoRRA": null,
               "totalImpostoDevido": null,
               "impostoPago": {
                 "retidoFonteTitular": null,
+                "retidoFonteDependentes": null,
+                "carneLeaoTitular": null,
+                "carneLeaoDependentes": null,
+                "complementar": null,
+                "exterior": null,
+                "retidoFonteLei11033": null,
+                "retidoRRA": null,
                 "total": null
               },
               "saldoImpostoPagar": null,
@@ -328,7 +363,7 @@ public final class GeminiPrompts {
             REGRAS:
             - Valores monetários com PONTO como decimal (ex: 168097.04)
             - Se algo não estiver legível, use null
-            - Retorne APENAS JSON válido
+            -             Retorne APENAS JSON válido
 
             JSON:
             {
@@ -346,6 +381,66 @@ public final class GeminiPrompts {
               "descontoSimplificado": 0.00,
               "aliquotaEfetiva": 0.00
             }
+            """;
+
+    /**
+     * Extração da seção PAGAMENTOS EFETUADOS (códigos SERPRO 09–26 saúde, 36 PGBL, etc.).
+     * Essencial para simulação Completa quando a DIRPF foi entregue no Desconto Simplificado.
+     */
+    public static final String IR_PAGAMENTOS_EXTRACTION = """
+            Você é um sistema de extração de dados de alta precisão especializado em declarações de Imposto de Renda brasileiras (IRPF).
+            Analise esta imagem e extraia a seção PAGAMENTOS EFETUADOS (se existir nesta página).
+
+            REGRAS:
+            - Se a página NÃO contém "PAGAMENTOS EFETUADOS", retorne {"pagamentos": []}.
+            - Extraia CADA linha de pagamento: código, nome do beneficiário, CPF/CNPJ, valor pago e parcela não dedutível (se houver).
+            - Códigos típicos: 21 (médicos/hospitais), 26 (planos de saúde), 36 (previdência complementar), 01–03 (instrução), etc.
+            - Valores monetários: PONTO como decimal, SEM separador de milhar (ex: 7349.58).
+            - NUNCA invente linhas. Se ilegível, omita a linha.
+
+            FORMATO JSON OBRIGATÓRIO:
+            {
+              "pagamentos": [
+                {
+                  "codigo": "26",
+                  "nomeBeneficiario": "NOME OU RAZAO SOCIAL",
+                  "cpfCnpj": "00.000.000/0001-00",
+                  "valorPago": 7349.58,
+                  "parcNaoDedutivel": 0.00
+                }
+              ]
+            }
+
+            Retorne APENAS o JSON. Sem markdown, sem explicações.
+            """;
+
+    /**
+     * Extração da lista de DEPENDENTES (geralmente página 1) + total de dedução.
+     */
+    public static final String IR_DEPENDENTES_EXTRACTION = """
+            Você é um sistema de extração de dados de alta precisão especializado em declarações de Imposto de Renda brasileiras (IRPF).
+            Analise esta imagem e extraia a seção DEPENDENTES (se existir).
+
+            REGRAS:
+            - Se NÃO houver seção DEPENDENTES ou estiver "Sem Informações", retorne {"dependentes": [], "totalDeducaoDependentes": null}.
+            - Extraia cada dependente: código (2 dígitos), nome, data de nascimento (DD/MM/YYYY) e CPF.
+            - Extraia também "TOTAL DE DEDUÇÃO COM DEPENDENTES" quando visível.
+            - Valores monetários: PONTO como decimal, SEM separador de milhar (ex: 4550.16).
+
+            FORMATO JSON OBRIGATÓRIO:
+            {
+              "dependentes": [
+                {
+                  "codigo": "22",
+                  "nome": "NOME COMPLETO",
+                  "dataNascimento": "19/02/1994",
+                  "cpf": "000.000.000-00"
+                }
+              ],
+              "totalDeducaoDependentes": 4550.16
+            }
+
+            Retorne APENAS o JSON. Sem markdown, sem explicações.
             """;
 
     // ==========================================

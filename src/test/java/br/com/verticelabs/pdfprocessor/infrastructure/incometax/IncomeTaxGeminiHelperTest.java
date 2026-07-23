@@ -152,4 +152,116 @@ class IncomeTaxGeminiHelperTest {
         assertEquals(new BigDecimal("49137.81"), result.deducoesTotal());
         assertEquals(new BigDecimal("34964.17"), result.prevComplementar());
     }
+
+    @Test
+    void enrichDerivaImpostoDevidoRRAQuandoGeminiOmiteCampo_nadelson2022() {
+        // Espelho RFB: I 52.161,90 + RRA 28.033,36 = Total 80.195,26; Gemini omite RRA
+        IncomeTaxInfo parcial = new IncomeTaxInfo(
+                "NADELSON LIMA DE CARVALHO", "000.000.000-00", "2022", "2023",
+                new BigDecimal("227615.37"), new BigDecimal("52161.90"), BigDecimal.ZERO,
+                new BigDecimal("52161.90"),
+                null, null, null,
+                new BigDecimal("80195.26"), null,
+                new BigDecimal("300000.00"), null,
+                null, null, null,
+                null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null,
+                null, new BigDecimal("17.39"),
+                "COMPLETO", null, null, null, null,
+                null, null, null, null,
+                null, null,
+                Collections.emptyList(), Collections.emptyList(),
+                null, Collections.emptyList(), null, Collections.emptyList(),
+                null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null, null, null,
+                Collections.emptyList());
+
+        IncomeTaxInfo enriched = IncomeTaxGeminiHelper.enrich(parcial);
+
+        assertEquals(0, new BigDecimal("28033.36").compareTo(enriched.getImpostoDevidoRRA()));
+        assertEquals(0, new BigDecimal("52161.90").compareTo(enriched.getImpostoDevidoI()));
+        assertEquals(0, new BigDecimal("80195.26").compareTo(enriched.getTotalImpostoDevido()));
+    }
+
+    @Test
+    void enrichNaoDerivaRRAQuandoTotalIgualImpostoDevidoI() {
+        IncomeTaxInfo parcial = new IncomeTaxInfo(
+                "FULANO", "123.456.789-00", "2022", "2023",
+                new BigDecimal("100000.00"), new BigDecimal("10000.00"), BigDecimal.ZERO,
+                new BigDecimal("10000.00"),
+                null, null, null,
+                new BigDecimal("10000.00"), null,
+                new BigDecimal("120000.00"), null,
+                null, null, null,
+                null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null,
+                null, null,
+                "COMPLETO", null, null, null, null,
+                null, null, null, null,
+                null, null,
+                Collections.emptyList(), Collections.emptyList(),
+                null, Collections.emptyList(), null, Collections.emptyList(),
+                null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null, null, null,
+                Collections.emptyList());
+
+        IncomeTaxInfo enriched = IncomeTaxGeminiHelper.enrich(parcial);
+
+        assertTrue(enriched.getImpostoDevidoRRA() == null
+                || enriched.getImpostoDevidoRRA().compareTo(BigDecimal.ZERO) == 0);
+    }
+
+    @Test
+    void enrichPreservaRRAJaExtraidoPeloGemini() {
+        IncomeTaxInfo parcial = new IncomeTaxInfo(
+                "NADELSON LIMA DE CARVALHO", "000.000.000-00", "2022", "2023",
+                new BigDecimal("227615.37"), new BigDecimal("52161.90"), BigDecimal.ZERO,
+                new BigDecimal("52161.90"),
+                null, null, new BigDecimal("28033.36"),
+                new BigDecimal("80195.26"), null,
+                new BigDecimal("300000.00"), null,
+                null, null, null,
+                null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null,
+                null, null,
+                "COMPLETO", null, null, null, null,
+                null, null, null, null,
+                null, null,
+                Collections.emptyList(), Collections.emptyList(),
+                null, Collections.emptyList(), null, Collections.emptyList(),
+                null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null, null, null,
+                Collections.emptyList());
+
+        IncomeTaxInfo enriched = IncomeTaxGeminiHelper.enrich(parcial);
+
+        assertEquals(0, new BigDecimal("28033.36").compareTo(enriched.getImpostoDevidoRRA()));
+    }
+
+    @Test
+    void parseJsonMultiPageComImpostoDevidoRRA() {
+        String json = """
+                {
+                  "exercicio": "2023",
+                  "anoCalendario": "2022",
+                  "nome": "NADELSON LIMA DE CARVALHO",
+                  "cpf": "000.000.000-00",
+                  "modeloDeclaracao": "COMPLETA",
+                  "rendimentosTributaveis": 300000.00,
+                  "baseCalculoImposto": 227615.37,
+                  "impostoDevido": 52161.90,
+                  "deducaoIncentivo": 0.00,
+                  "impostoDevidoI": 52161.90,
+                  "impostoDevidoRRA": 28033.36,
+                  "totalImpostoDevido": 80195.26,
+                  "aliquotaEfetiva": 17.39
+                }
+                """;
+
+        var info = GeminiResponseParser.parseIncomeTaxResponse(json);
+
+        assertTrue(IncomeTaxGeminiHelper.isIncomeTaxInfoSufficient(info));
+        assertEquals(0, new BigDecimal("28033.36").compareTo(info.getImpostoDevidoRRA()));
+        assertEquals(0, new BigDecimal("80195.26").compareTo(info.getTotalImpostoDevido()));
+    }
 }

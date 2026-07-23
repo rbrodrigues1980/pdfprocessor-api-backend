@@ -15,6 +15,7 @@ import br.com.verticelabs.pdfprocessor.domain.service.ITextIncomeTaxService;
 import br.com.verticelabs.pdfprocessor.domain.service.MonthYearDetectionService;
 import br.com.verticelabs.pdfprocessor.domain.service.PdfService;
 import br.com.verticelabs.pdfprocessor.infrastructure.ai.GeminiResponseParser;
+import br.com.verticelabs.pdfprocessor.infrastructure.incometax.IncomeTaxGeminiHelper;
 import br.com.verticelabs.pdfprocessor.infrastructure.pdf.*;
 import br.com.verticelabs.pdfprocessor.interfaces.documents.dto.ProcessDocumentResponse;
 import lombok.RequiredArgsConstructor;
@@ -75,6 +76,9 @@ public class DocumentProcessUseCase {
 
     /** Páginas finais a tentar com Gemini quando o PDF é digitalizado (RESUMO costuma estar no fim). */
     private static final int SCANNED_IR_RESUMO_PAGE_LOOKBACK = 10;
+
+    /** Páginas finais a varrer para PAGAMENTOS EFETUADOS em PDF digitalizado. */
+    private static final int SCANNED_IR_PAGAMENTOS_PAGE_LOOKBACK = 10;
 
     // Palavras-chave que indicam que o texto é de um contracheque legível
     private static final String[] PAYROLL_KEYWORDS = {
@@ -1220,7 +1224,8 @@ public class DocumentProcessUseCase {
                 Map.of("model", modelForIr, "scannedPdf", scannedPdf));
 
         return resolveCandidateResumoPages(pdfBytes, scannedPdf)
-                .flatMap(pages -> tryGeminiIrExtractionOnPages(document, pdfBytes, pages, scannedPdf));
+                .flatMap(pages -> tryGeminiIrExtractionOnPages(document, pdfBytes, pages, scannedPdf))
+                .flatMap(irInfo -> enrichIrWithPagamentosAndDependentes(document, pdfBytes, irInfo, scannedPdf));
     }
 
     private Mono<br.com.verticelabs.pdfprocessor.domain.service.IncomeTaxDeclarationService.IncomeTaxInfo>
@@ -1354,6 +1359,121 @@ public class DocumentProcessUseCase {
                 .onErrorResume(e -> {
                     log.error("❌ Gemini [{}] pág. {}: {}", modelName, resumoPage, e.getMessage());
                     return Mono.empty();
+                });
+    }
+
+    /**
+     * Após o RESUMO: em PDF digitalizado (ou quando listas vazias), extrai PAGAMENTOS EFETUADOS
+     * e DEPENDENTES via Gemini para alimentar a simulação Completa.
+     */
+    private Mono<br.com.verticelabs.pdfprocessor.domain.service.IncomeTaxDeclarationService.IncomeTaxInfo>
+            enrichIrWithPagamentosAndDependentes(
+                    PayrollDocument document,
+                    byte[] pdfBytes,
+                    br.com.verticelabs.pdfprocessor.domain.service.IncomeTaxDeclarationService.IncomeTaxInfo irInfo,
+                    boolean scannedPdf) {
+
+        boolean needsPagamentos = scannedPdf
+                || irInfo.getPagamentosEfetuados() == null
+                || irInfo.getPagamentosEfetuados().isEmpty();
+        boolean needsDependentes = scannedPdf
+                || irInfo.getDependentes() == null
+                || irInfo.getDependentes().isEmpty()
+                || irInfo.getTotalDeducaoDependentes() == null;
+
+        if (!needsPagamentos && !needsDependentes) {
+            return Mono.just(irInfo);
+        }
+
+        Mono<br.com.verticelabs.pdfprocessor.domain.service.IncomeTaxDeclarationService.IncomeTaxInfo> base =
+                needsPagamentos
+                        ? extractPagamentosViaGemini(document, pdfBytes, irInfo)
+                        : Mono.just(irInfo);
+
+        return base.flatMap(withPag -> needsDependentes
+                ? extractDependentesViaGemini(document, pdfBytes, withPag)
+                : Mono.just(withPag));
+    }
+
+    private Mono<br.com.verticelabs.pdfprocessor.domain.service.IncomeTaxDeclarationService.IncomeTaxInfo>
+            extractPagamentosViaGemini(
+                    PayrollDocument document,
+                    byte[] pdfBytes,
+                    br.com.verticelabs.pdfprocessor.domain.service.IncomeTaxDeclarationService.IncomeTaxInfo irInfo) {
+
+        return pdfService.getTotalPages(new ByteArrayInputStream(pdfBytes))
+                .flatMap(totalPages -> {
+                    List<Integer> pages = new ArrayList<>();
+                    int start = Math.max(1, totalPages - SCANNED_IR_PAGAMENTOS_PAGE_LOOKBACK + 1);
+                    for (int p = start; p <= totalPages; p++) {
+                        pages.add(p);
+                    }
+                    log.info("💳 Gemini PAGAMENTOS: candidatas = {} (de {} páginas)", pages, totalPages);
+
+                    return Flux.fromIterable(pages)
+                            .concatMap(page -> aiPdfExtractionService
+                                    .extractIncomeTaxPagamentosWithPro(pdfBytes, page)
+                                    .map(GeminiResponseParser::parsePagamentosResponse)
+                                    .filter(list -> list != null && !list.isEmpty())
+                                    .doOnNext(list -> log.info(
+                                            "✅ Gemini PAGAMENTOS pág. {}: {} item(ns)", page, list.size()))
+                                    .onErrorResume(e -> {
+                                        log.warn("⚠️ Gemini PAGAMENTOS pág. {}: {}", page, e.getMessage());
+                                        return Mono.empty();
+                                    }))
+                            .next()
+                            .map(pagamentos -> {
+                                addInfoEvent(document, null, ProcessingEventType.GEMINI_EXTRACTION_COMPLETED,
+                                        String.format("Gemini extraiu %d pagamento(s) efetuado(s).",
+                                                pagamentos.size()),
+                                        Map.of("pagamentosCount", pagamentos.size()));
+                                return IncomeTaxGeminiHelper.withPagamentos(irInfo, pagamentos);
+                            })
+                            .defaultIfEmpty(irInfo);
+                })
+                .onErrorResume(e -> {
+                    log.warn("⚠️ Falha ao extrair PAGAMENTOS via Gemini: {}", e.getMessage());
+                    return Mono.just(irInfo);
+                });
+    }
+
+    private Mono<br.com.verticelabs.pdfprocessor.domain.service.IncomeTaxDeclarationService.IncomeTaxInfo>
+            extractDependentesViaGemini(
+                    PayrollDocument document,
+                    byte[] pdfBytes,
+                    br.com.verticelabs.pdfprocessor.domain.service.IncomeTaxDeclarationService.IncomeTaxInfo irInfo) {
+
+        // Lista/total costumam estar na página 1; tenta também página 2 se a 1 falhar
+        return Flux.just(1, 2)
+                .concatMap(page -> aiPdfExtractionService
+                        .extractIncomeTaxDependentesWithPro(pdfBytes, page)
+                        .map(GeminiResponseParser::parseDependentesResponse)
+                        .filter(res -> (res.dependentes() != null && !res.dependentes().isEmpty())
+                                || res.totalDeducao() != null)
+                        .doOnNext(res -> log.info(
+                                "✅ Gemini DEPENDENTES pág. {}: {} pessoa(s), total={}",
+                                page,
+                                res.dependentes() != null ? res.dependentes().size() : 0,
+                                res.totalDeducao()))
+                        .onErrorResume(e -> {
+                            log.warn("⚠️ Gemini DEPENDENTES pág. {}: {}", page, e.getMessage());
+                            return Mono.empty();
+                        }))
+                .next()
+                .map(res -> {
+                    addInfoEvent(document, 1, ProcessingEventType.GEMINI_EXTRACTION_COMPLETED,
+                            String.format("Gemini extraiu dependentes: %d pessoa(s), total=%s",
+                                    res.dependentes() != null ? res.dependentes().size() : 0,
+                                    res.totalDeducao()),
+                            Map.of("dependentesCount",
+                                    res.dependentes() != null ? res.dependentes().size() : 0));
+                    return IncomeTaxGeminiHelper.withDependentes(
+                            irInfo, res.dependentes(), res.totalDeducao());
+                })
+                .defaultIfEmpty(irInfo)
+                .onErrorResume(e -> {
+                    log.warn("⚠️ Falha ao extrair DEPENDENTES via Gemini: {}", e.getMessage());
+                    return Mono.just(irInfo);
                 });
     }
 

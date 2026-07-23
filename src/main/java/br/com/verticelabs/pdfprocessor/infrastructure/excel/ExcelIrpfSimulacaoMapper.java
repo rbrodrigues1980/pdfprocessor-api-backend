@@ -46,7 +46,8 @@ public class ExcelIrpfSimulacaoMapper {
                 .previdenciaOficial(IrpfPrevidenciaOficialResolver.resolver(data))
                 .qtdDependentes(qtdDependentes)
                 .qtdAlimentandos(qtdAlimentandos)
-                .deducaoDependentesDeclarada(nvl(data.getDeducaoDependentes()))
+                // Sem nvl: null permite ao motor calcular qtd × valorDependente
+                .deducaoDependentesDeclarada(data.getDeducaoDependentes())
                 .impostoDevidoRRA(nvl(data.getImpostoSobreRRA()))
                 .impostoRetidoFonteTitular(nvl(data.getImpostoRetidoFonteTitular()))
                 .impostoRetidoFonteDependentes(nvl(data.getImpostoRetidoDependentes()))

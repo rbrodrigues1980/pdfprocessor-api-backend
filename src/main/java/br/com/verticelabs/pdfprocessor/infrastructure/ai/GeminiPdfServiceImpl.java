@@ -186,6 +186,18 @@ public class GeminiPdfServiceImpl implements AiPdfExtractionService {
     }
 
     @Override
+    public Mono<String> extractIncomeTaxPagamentosWithPro(byte[] pdfBytes, int pageNumber) {
+        return processWithModel(fallbackModel, config.getFallbackModel(), pdfBytes, pageNumber,
+                GeminiPrompts.IR_PAGAMENTOS_EXTRACTION, IR_EXTRACTION_DPI);
+    }
+
+    @Override
+    public Mono<String> extractIncomeTaxDependentesWithPro(byte[] pdfBytes, int pageNumber) {
+        return processWithModel(fallbackModel, config.getFallbackModel(), pdfBytes, pageNumber,
+                GeminiPrompts.IR_DEPENDENTES_EXTRACTION, IR_EXTRACTION_DPI);
+    }
+
+    @Override
     public Mono<String> validatePayrollData(String extractedDataJson) {
         if (!isEnabled()) {
             log.warn("Gemini AI desabilitado. Validação não será executada.");

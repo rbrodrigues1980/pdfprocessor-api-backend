@@ -56,6 +56,16 @@ public interface AiPdfExtractionService {
     Mono<String> extractIncomeTaxDataMultiPageWithPro(byte[] pdfBytes, List<Integer> pages);
 
     /**
+     * Extrai a seção PAGAMENTOS EFETUADOS de uma página (Gemini Pro).
+     */
+    Mono<String> extractIncomeTaxPagamentosWithPro(byte[] pdfBytes, int pageNumber);
+
+    /**
+     * Extrai a seção DEPENDENTES de uma página (tipicamente página 1; Gemini Pro).
+     */
+    Mono<String> extractIncomeTaxDependentesWithPro(byte[] pdfBytes, int pageNumber);
+
+    /**
      * Valida dados extraídos de um contracheque.
      * 
      * @param extractedDataJson JSON com dados extraídos

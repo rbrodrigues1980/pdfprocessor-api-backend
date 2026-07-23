@@ -12,6 +12,7 @@ import br.com.verticelabs.pdfprocessor.domain.service.IncomeTaxDeclarationServic
 import br.com.verticelabs.pdfprocessor.domain.service.IncomeTaxDeclarationService.IncomeTaxInfo.PagamentoEfetuado;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -101,7 +102,7 @@ public class IrpfDeclaracaoDataMapper {
                 .tipoDeclaracao(info.getTipoDeclaracao())
                 .tipoTributacao(info.getTipoTributacao())
                 .dependentes(dependentes)
-                .totalDeducaoDependentes(info.getTotalDeducaoDependentes())
+                .totalDeducaoDependentes(resolverDeducaoDependentes(info))
                 .alimentandos(alimentandos)
                 .rendimentosFontesTitular(fontes)
                 .descontoSimplificado(info.getDescontoSimplificado())
@@ -110,7 +111,8 @@ public class IrpfDeclaracaoDataMapper {
                 .contribuicaoPrevidenciaSocial(IrpfPrevidenciaOficialResolver.resolver(
                         fontes, info.getDeducoesContribPrevOficial(), null))
                 .contribuicaoPrevidenciaPrivada(info.getDeducoesContribPrevCompl())
-                .deducaoDependentes(info.getTotalDeducaoDependentes())
+                // Prioridade: total página 1 (iText) > linha Dependentes do RESUMO (Gemini/iText)
+                .deducaoDependentes(resolverDeducaoDependentes(info))
                 .despesasInstrucao(info.getDeducoesInstrucao())
                 .despesasMedicas(info.getDeducoesMedicas())
                 .pensaoAlimenticiaJudicial(info.getDeducoesPensaoJudicial())
@@ -162,5 +164,21 @@ public class IrpfDeclaracaoDataMapper {
                 .impostoDiferidoGanhosCapital(info.getImpostoDiferidoGanhosCapital())
                 .doacoesPartidosPoliticos(info.getDoacoesPartidosPoliticos())
                 .build();
+    }
+
+    /**
+     * Resolve a dedução de dependentes: total da página 1 (iText) tem prioridade;
+     * fallback para a linha "Dependentes" do RESUMO (Gemini/iText).
+     * No fluxo Gemini escaneado, {@code totalDeducaoDependentes} é sempre null.
+     */
+    static BigDecimal resolverDeducaoDependentes(IncomeTaxInfo info) {
+        if (info == null) {
+            return null;
+        }
+        return firstNonNull(info.getTotalDeducaoDependentes(), info.getDeducoesDependentes());
+    }
+
+    private static BigDecimal firstNonNull(BigDecimal a, BigDecimal b) {
+        return a != null ? a : b;
     }
 }
