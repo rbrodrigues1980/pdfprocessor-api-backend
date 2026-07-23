@@ -522,6 +522,83 @@ public class GeminiResponseParser {
         }
     }
 
+    /**
+     * Parseia resposta do prompt {@code IR_PAGAMENTOS_EXTRACTION}.
+     *
+     * @return lista de pagamentos (nunca null; vazia se ausente/inválido)
+     */
+    public static List<PagamentoEfetuado> parsePagamentosResponse(String jsonResponse) {
+        List<PagamentoEfetuado> result = new ArrayList<>();
+        if (jsonResponse == null || jsonResponse.trim().isEmpty()) {
+            return result;
+        }
+        try {
+            JsonNode root = mapper.readTree(jsonResponse.trim());
+            JsonNode arr = root.get("pagamentos");
+            if (arr == null || !arr.isArray()) {
+                return result;
+            }
+            for (JsonNode item : arr) {
+                String codigo = getTextOrNull(item, "codigo");
+                if (codigo == null || codigo.isBlank()) {
+                    continue;
+                }
+                String nome = getTextOrNull(item, "nomeBeneficiario");
+                String cpfCnpj = getTextOrNull(item, "cpfCnpj");
+                BigDecimal valorPago = getDecimalOrNull(item, "valorPago");
+                BigDecimal parc = getDecimalOrNull(item, "parcNaoDedutivel");
+                if (valorPago == null) {
+                    continue;
+                }
+                result.add(new PagamentoEfetuado(codigo.trim(), nome, cpfCnpj, valorPago, parc, null));
+            }
+            log.info("Gemini pagamentos parse — {} item(ns)", result.size());
+        } catch (Exception e) {
+            log.error("Erro ao parsear JSON de pagamentos Gemini: {}", e.getMessage());
+        }
+        return result;
+    }
+
+    /**
+     * Resultado da extração Gemini de dependentes (lista + total).
+     */
+    public record DependentesExtractionResult(List<DependenteInfo> dependentes, BigDecimal totalDeducao) {
+    }
+
+    /**
+     * Parseia resposta do prompt {@code IR_DEPENDENTES_EXTRACTION}.
+     */
+    public static DependentesExtractionResult parseDependentesResponse(String jsonResponse) {
+        List<DependenteInfo> dependentes = new ArrayList<>();
+        BigDecimal total = null;
+        if (jsonResponse == null || jsonResponse.trim().isEmpty()) {
+            return new DependentesExtractionResult(dependentes, null);
+        }
+        try {
+            JsonNode root = mapper.readTree(jsonResponse.trim());
+            total = getDecimalOrNull(root, "totalDeducaoDependentes");
+            JsonNode arr = root.get("dependentes");
+            if (arr != null && arr.isArray()) {
+                for (JsonNode item : arr) {
+                    String codigo = getTextOrNull(item, "codigo");
+                    String nome = getTextOrNull(item, "nome");
+                    if (nome == null || nome.isBlank()) {
+                        continue;
+                    }
+                    dependentes.add(new DependenteInfo(
+                            codigo,
+                            nome,
+                            getTextOrNull(item, "dataNascimento"),
+                            getTextOrNull(item, "cpf")));
+                }
+            }
+            log.info("Gemini dependentes parse — {} pessoa(s), total={}", dependentes.size(), total);
+        } catch (Exception e) {
+            log.error("Erro ao parsear JSON de dependentes Gemini: {}", e.getMessage());
+        }
+        return new DependentesExtractionResult(dependentes, total);
+    }
+
     private static String getTextOrNull(JsonNode node, String field) {
         JsonNode child = node.get(field);
         if (child == null || child.isNull() || child.asText().equalsIgnoreCase("null")) {

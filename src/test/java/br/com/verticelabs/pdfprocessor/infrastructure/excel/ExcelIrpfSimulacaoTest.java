@@ -89,6 +89,71 @@ class ExcelIrpfSimulacaoTest {
         assertEquals(new BigDecimal("13426.14"), req.getPrevidenciaPrivada());
     }
 
+    @Test
+    void deducaoDependentesNull_motorUsaQtdVezesParametro() {
+        IrpfDeclaracaoData data = IrpfDeclaracaoData.builder()
+                .anoCalendario("2016")
+                .rendimentosTributaveisTotal(new BigDecimal("100000.00"))
+                .contribuicaoPrevidenciaSocial(new BigDecimal("5000.00"))
+                .dependentes(List.of(
+                        IrpfDeclaracaoData.PessoaRelacionada.builder().nome("A").cpf("1").build(),
+                        IrpfDeclaracaoData.PessoaRelacionada.builder().nome("B").cpf("2").build()))
+                .deducaoDependentes(null)
+                .build();
+
+        SimuladorIrpfRequest req = mapper.fromDeclaracao(data, BigDecimal.ZERO);
+        assertEquals(2, req.getQtdDependentes());
+        assertEquals(null, req.getDeducaoDependentesDeclarada());
+
+        SimuladorIrpfResponse resp = motor.simular(req, faixas2016, params2016);
+        // 5000 prev + 2×2275.08 dependentes = 9550.16
+        assertEquals(0, new BigDecimal("9550.16").compareTo(resp.getModeloCompleto().getTotalDeducoes()));
+    }
+
+    @Test
+    void simplificadoComPagamentosMedicos_completaUsaAgregador() {
+        IrpfDeclaracaoData data = IrpfDeclaracaoData.builder()
+                .anoCalendario("2024")
+                .tipoTributacao("SIMPLIFICADO")
+                .rendimentosTributaveisTotal(new BigDecimal("100000.00"))
+                .despesasMedicas(null)
+                .pagamentosEfetuados(List.of(
+                        IrpfDeclaracaoData.PagamentoEfetuadoIrpf.builder()
+                                .codigo("21").nomeBeneficiario("CLINICA")
+                                .cpfCnpj("18.101.092/0001-61")
+                                .valorPago(new BigDecimal("350.00"))
+                                .parcNaoDedutivel(BigDecimal.ZERO)
+                                .build(),
+                        IrpfDeclaracaoData.PagamentoEfetuadoIrpf.builder()
+                                .codigo("26").nomeBeneficiario("CAIXA")
+                                .cpfCnpj("00.360.305/0001-04")
+                                .valorPago(new BigDecimal("7349.58"))
+                                .parcNaoDedutivel(BigDecimal.ZERO)
+                                .build()))
+                .build();
+
+        SimuladorIrpfRequest req = mapper.fromDeclaracao(data, BigDecimal.ZERO);
+        assertEquals(0, new BigDecimal("7699.58").compareTo(req.getDespesasMedicas()));
+    }
+
+    @Test
+    void nadelson_impostoDevidoRRAEntraNoTotalDaSimulacao() {
+        IrpfDeclaracaoData data = IrpfDeclaracaoData.builder()
+                .anoCalendario("2016")
+                .rendimentosTributaveisTotal(new BigDecimal("227615.37"))
+                .contribuicaoPrevidenciaSocial(new BigDecimal("10000.00"))
+                .impostoSobreRRA(new BigDecimal("28033.36"))
+                .build();
+
+        SimuladorIrpfRequest req = mapper.fromDeclaracao(data, BigDecimal.ZERO);
+        assertEquals(0, new BigDecimal("28033.36").compareTo(req.getImpostoDevidoRRA()));
+
+        SimuladorIrpfResponse resp = motor.simular(req, faixas2016, params2016);
+        BigDecimal impostoProgressivo = resp.getModeloCompleto().getImpostoDevidoFinal();
+        BigDecimal totalDevido = resp.getModeloCompleto().getResumo().getTotalImpostoDevido();
+        assertEquals(0, impostoProgressivo.add(new BigDecimal("28033.36")).compareTo(totalDevido));
+    }
+
     private IrpfDeclaracaoData elizabethAc2016Detalhada() {
         return IrpfDeclaracaoData.builder()
                 .exercicio("2017")
