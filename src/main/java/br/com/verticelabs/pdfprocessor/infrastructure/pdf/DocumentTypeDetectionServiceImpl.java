@@ -77,23 +77,32 @@ public class DocumentTypeDetectionServiceImpl implements DocumentTypeDetectionSe
                                 upperText.contains("ECONOMIÁRIOS FEDERAIS") ||
                                 upperText.contains("ECONOMIARIOS FEDERAIS"));
         
-        // 3. Campo "Ano Pagamento / Mês" (específico da FUNCEF)
+        // 3. Campo "Ano Pagamento / Mês" (específico da FUNCEF clássico)
         boolean hasFuncefDateField = upperText.contains("ANO PAGAMENTO / MÊS") ||
                                     upperText.contains("ANO PAGAMENTO / MES");
+
+        // 3b. Portal autoatendimento: "Mês/Ano Referência" + coluna "Tipo / Rubrica"
+        boolean hasFuncefPortalMesAno = containsMesAnoReferencia(upperText);
+        boolean hasFuncefPortalTipoRubrica = upperText.contains("TIPO / RUBRICA");
         
         // 4. Campo "Nº Benefício INSS"
         boolean hasFuncefBeneficio = upperText.contains("Nº BENEFÍCIO INSS") ||
                                      upperText.contains("Nº BENEFICIO INSS") ||
-                                     upperText.contains("N° BENEFÍCIO INSS");
+                                     upperText.contains("N° BENEFÍCIO INSS") ||
+                                     upperText.contains("N° BENEFICIO INSS");
         
-        // 5. Campo "Tipo Benefício"
+        // 5. Campo "Tipo Benefício" / "Tipo de Benefício"
         boolean hasFuncefTipoBeneficio = upperText.contains("TIPO BENEFÍCIO") ||
-                                         upperText.contains("TIPO BENEFICIO");
+                                         upperText.contains("TIPO BENEFICIO") ||
+                                         upperText.contains("TIPO DE BENEFÍCIO") ||
+                                         upperText.contains("TIPO DE BENEFICIO");
         
         // FUNCEF detectado se tiver pelo menos 2 desses padrões específicos
         boolean hasFuncef = (hasFuncefTitle ? 1 : 0) +
                            (hasFuncefLogo ? 1 : 0) +
                            (hasFuncefDateField ? 1 : 0) +
+                           (hasFuncefPortalMesAno ? 1 : 0) +
+                           (hasFuncefPortalTipoRubrica ? 1 : 0) +
                            (hasFuncefBeneficio ? 1 : 0) +
                            (hasFuncefTipoBeneficio ? 1 : 0) >= 2;
         
@@ -126,5 +135,61 @@ public class DocumentTypeDetectionServiceImpl implements DocumentTypeDetectionSe
         // Default para CAIXA se não encontrar nada
         return Mono.just(DocumentType.CAIXA);
     }
+
+    /**
+     * Página de continuação do portal Funcef (ex.: "Página 2 de 2") sem cabeçalho completo.
+     * Contém linhas de rubrica {@code N NNN YYYY/MM} e/ou rodapé de paginação.
+     */
+    public static boolean looksLikeFuncefPortalContinuation(String pageText) {
+        if (pageText == null || pageText.isBlank()) {
+            return false;
+        }
+        String upper = pageText.toUpperCase();
+        if (containsMesAnoReferencia(upper) || upper.contains("TIPO / RUBRICA")) {
+            return false; // página completa, não continuação
+        }
+        boolean paginaContinuacao = isPaginaDoisOuMais(upper);
+        boolean temLinhaRubrica = FUNCEF_RUBRICA_LINE.matcher(pageText).find();
+        return paginaContinuacao || temLinhaRubrica;
+    }
+
+    /**
+     * Continuação Funcef portal ({@code Página 2 de N}) só com totais/rodapé — sem rubricas.
+     * Nessas páginas 0 rubricas é esperado; Gemini não deve ser acionado.
+     */
+    public static boolean isFuncefPortalTotalsOnlyContinuation(String pageText) {
+        if (pageText == null || pageText.isBlank()) {
+            return false;
+        }
+        String upper = pageText.toUpperCase();
+        if (containsMesAnoReferencia(upper) || upper.contains("TIPO / RUBRICA")) {
+            return false;
+        }
+        if (!isPaginaDoisOuMais(upper)) {
+            return false;
+        }
+        return !FUNCEF_RUBRICA_LINE.matcher(pageText).find();
+    }
+
+    private static boolean isPaginaDoisOuMais(String upperText) {
+        return upperText.matches("(?s).*P[ÁA]GINA\\s+[2-9]\\s+DE\\s+\\d+.*");
+    }
+
+    private static boolean containsMesAnoReferencia(String upperText) {
+        String normalized = upperText
+                .replace('Ê', 'E')
+                .replace('É', 'E')
+                .replace('Á', 'A')
+                .replace('Í', 'I')
+                .replace('Ó', 'O')
+                .replace('Ã', 'A')
+                .replace('Ç', 'C');
+        return normalized.contains("MES/ANO REFERENCIA")
+                || upperText.contains("MÊS/ANO REFERÊNCIA")
+                || upperText.contains("MES/ANO REFERENCIA");
+    }
+
+    private static final java.util.regex.Pattern FUNCEF_RUBRICA_LINE = java.util.regex.Pattern.compile(
+            "(?m)^\\d\\s+\\d{3}\\s+\\d{4}/\\d{1,2}\\b");
 }
 

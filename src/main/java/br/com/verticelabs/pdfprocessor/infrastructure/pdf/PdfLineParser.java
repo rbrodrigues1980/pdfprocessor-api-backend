@@ -200,28 +200,35 @@ public class PdfLineParser {
             Pattern.MULTILINE);
 
     /**
-     * Regex para FUNCEF:
-     * Formato real encontrado: "2 033 2018/01 SUPL. APOS. TEMPO CONTRIB. BENEF.
-     * SALD. 4.741,41"
-     * ou: "4 430 2018/01 CONTRIBUIÇÃO EXTRAORDINARIA 2014 131,81"
-     * ou: "4 459 2016/13 CONT. EXTRAORDINARIA ABONO ANUAL - 2014 107,77"
-     * 
-     * Ordem: código → referência (YYYY/MM) → descrição → valor (sem data colada!)
-     * 
+     * Regex para FUNCEF (clássico e portal autoatendimento):
+     * Formato: "2 033 2018/01 SUPL. APOS. TEMPO CONTRIB. BENEF. SALD. 4.741,41"
+     * Portal:  "2 187 2017/12 PROVENTOS INSS R$ 3.659,69"
+     *
+     * Ordem: código → referência (YYYY/MM) → descrição → [prazo] → [R$] valor
+     *
      * Captura:
-     * 1. Código (3-4 dígitos, pode ter espaços - será normalizado)
-     * 2. Referência (YYYY/MM) - formato diferente de CAIXA (aceita qualquer 2 dígitos, incluindo 13 para 13º mês)
+     * 1. Código (3-4 dígitos, pode ter espaços)
+     * 2. Referência (YYYY/MM) — aceita mês 13 (abono)
      * 3. Descrição
-     * 4. Valor (com pontos e vírgulas, SEM data colada)
-     * 
-     * Nota: Código pode ter espaços (ex: "2 033" → normalizado para "2033")
-     * Nota: Referência vem ANTES da descrição no formato FUNCEF
-     * Nota: A descrição usa .+? (non-greedy) para capturar tudo até encontrar o padrão de valor no final
+     * 4. Prazo opcional
+     * 5. Valor
      */
-    // Prazo (coluna opcional, ex: "58") fica entre descrição e valor
     private static final Pattern FUNCEF_PATTERN = Pattern.compile(
-            "^([0-9]\\s*[0-9]\\s*[0-9]\\s*[0-9]?)\\s+([0-9]{4}/[0-9]{1,2})\\s+(.+?)\\s+(?:([0-9]{1,3})\\s+)?([0-9]{1,3}(?:\\.[0-9]{3})*,[0-9]{2})\\s*$",
+            "^([0-9]\\s*[0-9]\\s*[0-9]\\s*[0-9]?)\\s+([0-9]{4}/[0-9]{1,2})\\s+(.+?)\\s+(?:([0-9]{1,3})\\s+)?(?:R\\$\\s*)?([0-9]{1,3}(?:\\.[0-9]{3})*,[0-9]{2})\\s*$",
             Pattern.MULTILINE);
+
+    /** Início de linha Funcef (código + YYYY/MM) sem exigir valor. */
+    private static final Pattern FUNCEF_LINE_START = Pattern.compile(
+            "^([0-9]\\s*[0-9]\\s*[0-9]\\s*[0-9]?)\\s+([0-9]{4}/[0-9]{1,2})\\b");
+
+    private static final Pattern FUNCEF_VALUE_ONLY = Pattern.compile(
+            "^(?:R\\$\\s*)?([0-9]{1,3}(?:\\.[0-9]{3})*,[0-9]{2})\\s*$");
+
+    private static final Pattern FUNCEF_TOTAL_LABEL = Pattern.compile(
+            "^(?i)(RENDA\\s+BASE|BRUTO|DESCONTOS|L[IÍ]QUIDO|MARGEM\\s+CONSIGN[AÁ]VEL|"
+                    + "IR\\s+COMPENSADO|IR\\s+INFORMATIVO|EXCESSO\\s+DE\\s+D[EÉ]BITO|BASE\\s+DEFICIT|"
+                    + "OBSERVA[CÇ][AÃ]O|DOCUMENTO\\s+EMITIDO|TIPO\\s*/\\s*RUBRICA).*");
+
 
     /**
      * Representa uma linha de rubrica extraída do PDF.
@@ -275,8 +282,12 @@ public class PdfLineParser {
         log.info("════════════════════════════════════════════════════════════════════════════════");
 
         // Log para debug - mostrar TODAS as linhas numeradas
-        String[] lines = pageText.split("\n");
-        log.info("Processando página (tipo: {}, total de linhas: {})", documentType, lines.length);
+        String[] rawLines = pageText.split("\n");
+        String[] lines = documentType == DocumentType.FUNCEF
+                ? joinBrokenFuncefLines(rawLines)
+                : rawLines;
+        log.info("Processando página (tipo: {}, total de linhas: {}, após join Funcef: {})",
+                documentType, rawLines.length, lines.length);
 
         // ========== LOG DE TODAS AS LINHAS ==========
         log.info("════════════════════════════════════════════════════════════════════════════════");
@@ -354,6 +365,10 @@ public class PdfLineParser {
         for (int i = 0; i < lines.length; i++) {
             String line = lines[i].trim();
             if (line.isEmpty()) {
+                continue;
+            }
+            if (documentType == DocumentType.FUNCEF && FUNCEF_TOTAL_LABEL.matcher(line).matches()) {
+                log.debug("Ignorando linha de total/rodapé Funcef: [{}]", line);
                 continue;
             }
 
@@ -527,6 +542,9 @@ public class PdfLineParser {
                         // FUNCEF: código(1), referência(2), descrição(3), prazo(4 opcional), valor(5)
                         referencia = lineMatcher.group(2);
                         String descricaoRaw = lineMatcher.group(3);
+                        if (descricaoRaw != null) {
+                            descricaoRaw = descricaoRaw.replaceAll("(?i)\\s*R\\$\\s*$", "").trim();
+                        }
                         descricao = normalizer.normalizeDescription(descricaoRaw);
                         String prazo = lineMatcher.group(4);
                         valorStr = lineMatcher.group(5);
@@ -582,6 +600,58 @@ public class PdfLineParser {
     public List<ParsedLine> parseLinesFuncef(String pageText, String referenciaFromHeader) {
         // Usa o mesmo método parseLines que já tem o padrão correto
         return parseLines(pageText, DocumentType.FUNCEF);
+    }
+
+    /**
+     * Junta linhas Funcef quebradas pelo PDF (descrição em várias linhas / valor isolado).
+     * Ex.: {@code 2 033 2017/11 SUPL...} + {@code SALD.} + {@code R$ 11.622,86}
+     */
+    String[] joinBrokenFuncefLines(String[] rawLines) {
+        List<String> joined = new ArrayList<>();
+        StringBuilder pending = null;
+
+        for (String raw : rawLines) {
+            String line = raw == null ? "" : raw.trim();
+            if (line.isEmpty()) {
+                continue;
+            }
+            if (FUNCEF_TOTAL_LABEL.matcher(line).matches() && pending == null) {
+                joined.add(line);
+                continue;
+            }
+
+            if (pending != null) {
+                if (FUNCEF_LINE_START.matcher(line).find()) {
+                    // Nova rubrica — descarta fragmento incompleto
+                    log.warn("Descartando fragmento Funcef sem valor: [{}]", pending);
+                    pending = null;
+                    // cai no fluxo normal abaixo
+                } else {
+                    pending.append(' ').append(line);
+                    if (FUNCEF_PATTERN.matcher(pending.toString()).matches()) {
+                        joined.add(pending.toString());
+                        pending = null;
+                    }
+                    continue;
+                }
+            }
+
+            if (FUNCEF_PATTERN.matcher(line).matches()) {
+                joined.add(line);
+            } else if (FUNCEF_LINE_START.matcher(line).find()) {
+                pending = new StringBuilder(line);
+            } else if (FUNCEF_VALUE_ONLY.matcher(line).matches()) {
+                // valor órfão sem cabeçalho — ignora
+                log.debug("Ignorando valor Funcef órfão: [{}]", line);
+            } else {
+                joined.add(line);
+            }
+        }
+
+        if (pending != null) {
+            log.warn("Fragmento Funcef sem valor ao fim da página: [{}]", pending);
+        }
+        return joined.toArray(new String[0]);
     }
 
     /**

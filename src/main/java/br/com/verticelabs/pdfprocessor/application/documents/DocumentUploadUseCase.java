@@ -4,17 +4,19 @@ import br.com.verticelabs.pdfprocessor.domain.exceptions.DocumentoDuplicadoExcep
 import br.com.verticelabs.pdfprocessor.domain.exceptions.InvalidCpfException;
 import br.com.verticelabs.pdfprocessor.domain.exceptions.InvalidPdfException;
 import br.com.verticelabs.pdfprocessor.domain.exceptions.PersonNotFoundException;
+import br.com.verticelabs.pdfprocessor.domain.model.DetectedPage;
 import br.com.verticelabs.pdfprocessor.domain.model.DocumentStatus;
+import br.com.verticelabs.pdfprocessor.domain.model.DocumentType;
 import br.com.verticelabs.pdfprocessor.domain.model.PayrollDocument;
 import br.com.verticelabs.pdfprocessor.domain.model.Person;
 import br.com.verticelabs.pdfprocessor.domain.repository.PayrollDocumentRepository;
 import br.com.verticelabs.pdfprocessor.domain.repository.PersonRepository;
-import br.com.verticelabs.pdfprocessor.domain.model.DetectedPage;
 import br.com.verticelabs.pdfprocessor.domain.service.CpfValidationService;
 import br.com.verticelabs.pdfprocessor.domain.service.DocumentTypeDetectionService;
 import br.com.verticelabs.pdfprocessor.domain.service.GridFsService;
 import br.com.verticelabs.pdfprocessor.domain.service.MonthYearDetectionService;
 import br.com.verticelabs.pdfprocessor.domain.service.PdfService;
+import br.com.verticelabs.pdfprocessor.infrastructure.pdf.DocumentTypeDetectionServiceImpl;
 import br.com.verticelabs.pdfprocessor.infrastructure.security.ReactiveSecurityContextHelper;
 import br.com.verticelabs.pdfprocessor.infrastructure.tenant.ReactiveTenantContext;
 import br.com.verticelabs.pdfprocessor.interfaces.documents.dto.UploadDocumentResponse;
@@ -477,37 +479,53 @@ public class DocumentUploadUseCase {
                                                                 // Detectar origem da página
                                                                 return typeDetectionService.detectType(pageText)
                                                                         .map(pageType -> {
+                                                                            DocumentType resolvedType = resolvePageTypeForFuncefPortal(
+                                                                                    documentType, pageType, pageText);
                                                                             DetectedPage detectedPage = DetectedPage.builder()
                                                                                     .page(pageNumber)
-                                                                                    .origem(pageType.name())
+                                                                                    .origem(resolvedType.name())
                                                                                     .build();
                                                                             
-                                                                            return new PageResult(pageNumber, monthYearOpt, detectedPage);
+                                                                            return new PageResult(pageNumber, monthYearOpt, detectedPage, pageText);
                                                                         });
                                                             });
                                                 });
                                     })
                                     .collectList()
                                     .map(pageResults -> {
+                                        pageResults.sort(java.util.Comparator.comparingInt(r -> r.pageNumber));
+
                                         Set<String> mesesSet = new HashSet<>();
                                         List<DetectedPage> detectedPages = new ArrayList<>();
                                         Integer anoDetectado = null;
+                                        String lastMonthYear = null;
                                         
                                         for (PageResult result : pageResults) {
+                                            java.util.Optional<String> monthYear = result.monthYear;
+                                            // Continuação Funcef portal: herda mês da página anterior
+                                            if (monthYear.isEmpty()
+                                                    && "FUNCEF".equals(result.detectedPage.getOrigem())
+                                                    && lastMonthYear != null
+                                                    && DocumentTypeDetectionServiceImpl.looksLikeFuncefPortalContinuation(result.pageText)) {
+                                                monthYear = java.util.Optional.of(lastMonthYear);
+                                                log.info("Página {}: herdando mês/ano {} da página anterior (continuação Funcef portal)",
+                                                        result.pageNumber, lastMonthYear);
+                                            }
+
                                             detectedPages.add(result.detectedPage);
                                             
-                                            if (result.monthYear.isPresent()) {
-                                                String monthYear = result.monthYear.get();
-                                                mesesSet.add(monthYear);
+                                            if (monthYear.isPresent()) {
+                                                String my = monthYear.get();
+                                                mesesSet.add(my);
+                                                lastMonthYear = my;
                                                 
-                                                // Extrair ano (primeiros 4 caracteres)
                                                 try {
-                                                    int ano = Integer.parseInt(monthYear.substring(0, 4));
+                                                    int ano = Integer.parseInt(my.substring(0, 4));
                                                     if (anoDetectado == null || ano > anoDetectado) {
                                                         anoDetectado = ano;
                                                     }
                                                 } catch (NumberFormatException e) {
-                                                    log.warn("Erro ao extrair ano de: {}", monthYear);
+                                                    log.warn("Erro ao extrair ano de: {}", my);
                                                 }
                                             }
                                         }
@@ -519,6 +537,23 @@ public class DocumentUploadUseCase {
                                         return new PageData(mesesDetectados, detectedPages, anoDetectado);
                                     });
                 });
+    }
+
+    /**
+     * Páginas 2+ de um contracheque Funcef portal sem cabeçalho: força origem FUNCEF
+     * quando o documento já foi classificado como FUNCEF.
+     */
+    private static DocumentType resolvePageTypeForFuncefPortal(
+            DocumentType documentType,
+            DocumentType pageType,
+            String pageText) {
+        if (documentType == DocumentType.FUNCEF
+                && pageType != DocumentType.FUNCEF
+                && pageType != DocumentType.FUNCEF_DEMONSTRATIVO
+                && DocumentTypeDetectionServiceImpl.looksLikeFuncefPortalContinuation(pageText)) {
+            return DocumentType.FUNCEF;
+        }
+        return pageType;
     }
 
     /**
@@ -542,11 +577,13 @@ public class DocumentUploadUseCase {
         int pageNumber;
         java.util.Optional<String> monthYear;
         DetectedPage detectedPage;
+        String pageText;
         
-        PageResult(int pageNumber, java.util.Optional<String> monthYear, DetectedPage detectedPage) {
+        PageResult(int pageNumber, java.util.Optional<String> monthYear, DetectedPage detectedPage, String pageText) {
             this.pageNumber = pageNumber;
             this.monthYear = monthYear;
             this.detectedPage = detectedPage;
+            this.pageText = pageText;
         }
     }
 }

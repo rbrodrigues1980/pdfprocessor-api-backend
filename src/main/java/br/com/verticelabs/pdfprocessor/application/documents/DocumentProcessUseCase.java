@@ -724,6 +724,20 @@ public class DocumentProcessUseCase {
         // Tentar extrair texto normalmente primeiro
         return pdfService.extractTextFromPage(new ByteArrayInputStream(pdfBytes), pageNumber)
                 .flatMap(pageText -> {
+                    // Continuação Funcef portal só com totais: 0 rubricas é esperado — não chama Gemini
+                    if (shouldSkipGeminiForFuncefPortalTotalsOnly(document, pageText)) {
+                        int textLen = pageText != null ? pageText.trim().length() : 0;
+                        log.info(
+                                "Página {}: continuação Funcef portal sem rubricas (só totais/rodapé) — pulando Gemini ({} chars)",
+                                pageNumber, textLen);
+                        addInfoEvent(document, pageNumber, ProcessingEventType.TEXT_EXTRACTED,
+                                String.format(
+                                        "Página %d é continuação Funcef (Página 2 de N) sem rubricas — Gemini não necessário.",
+                                        pageNumber),
+                                Map.of("textLength", textLen, "skippedGemini", true));
+                        return Mono.just(new PageResult(new ArrayList<>()));
+                    }
+
                     // Se o texto extraído for ilegível (muito curto OU com fontes sem Unicode mapping),
                     // tentar usar Gemini AI com JSON estruturado
                     if (!isTextReadable(pageText)) {
@@ -861,7 +875,18 @@ public class DocumentProcessUseCase {
         }
 
         // Determinar origem da página
-        String origem = determinePageOrigin(document, pageNumber);
+        String origemDetectada = determinePageOrigin(document, pageNumber);
+        // Continuação Funcef portal pode ter sido classificada como CAIXA no upload antigo
+        final String origem;
+        if (document.getTipo() == DocumentType.FUNCEF
+                && !"FUNCEF".equals(origemDetectada)
+                && !"FUNCEF_DEMONSTRATIVO".equals(origemDetectada)
+                && DocumentTypeDetectionServiceImpl.looksLikeFuncefPortalContinuation(pageText)) {
+            origem = "FUNCEF";
+            log.info("Página {}: origem forçada para FUNCEF (continuação portal)", pageNumber);
+        } else {
+            origem = origemDetectada;
+        }
         log.debug("Página {} - Origem: {}", pageNumber, origem);
 
         // Determinar tipo do documento para esta página
@@ -873,7 +898,8 @@ public class DocumentProcessUseCase {
                     String referencia = monthYearOpt.orElse(null);
                     if (referencia == null) {
                         log.warn("Não foi possível detectar referência na página {}", pageNumber);
-                        if (!document.getMesesDetectados().isEmpty()) {
+                        // Evita mesesDetectados.get(0) em PDF multi-ano Funcef (pegaria o mês errado).
+                        if (pageType != DocumentType.FUNCEF && !document.getMesesDetectados().isEmpty()) {
                             referencia = document.getMesesDetectados().get(0);
                         }
                     }
@@ -888,6 +914,16 @@ public class DocumentProcessUseCase {
                         parsedLines = lineParser.parseLinesFuncef(pageText, referencia);
                     } else {
                         parsedLines = lineParser.parseLines(pageText, pageType);
+                    }
+
+                    // Continuação Funcef portal: se cabeçalho não trouxe mês, usa competência
+                    // da primeira linha com mês calendário 01-12 (não 13/abono).
+                    if (referencia == null && pageType == DocumentType.FUNCEF && !parsedLines.isEmpty()) {
+                        String fromLine = firstCalendarMesPagamento(parsedLines);
+                        if (fromLine != null) {
+                            referencia = fromLine;
+                            log.info("Página {}: mesPagamento derivado da linha Funcef → {}", pageNumber, referencia);
+                        }
                     }
 
                     log.info("📊 Total de linhas parseadas: {}", parsedLines.size());
@@ -921,6 +957,36 @@ public class DocumentProcessUseCase {
 
                     return new PageResult(entries);
                 });
+    }
+
+    /**
+     * Funcef portal: páginas {@code 2 de N} só com totais/rodapé não devem acionar Gemini.
+     */
+    private boolean shouldSkipGeminiForFuncefPortalTotalsOnly(PayrollDocument document, String pageText) {
+        if (document == null || document.getTipo() != DocumentType.FUNCEF) {
+            return false;
+        }
+        return DocumentTypeDetectionServiceImpl.isFuncefPortalTotalsOnlyContinuation(pageText);
+    }
+
+    /**
+     * Primeira competência de linha com mês 01–12, normalizada para {@code YYYY-MM}.
+     */
+    private String firstCalendarMesPagamento(List<PdfLineParser.ParsedLine> parsedLines) {
+        for (PdfLineParser.ParsedLine line : parsedLines) {
+            String ref = line.getReferencia();
+            if (ref == null || ref.isBlank()) {
+                continue;
+            }
+            String normalized = normalizer.normalizeReference(ref);
+            if (normalized != null && normalized.matches("\\d{4}-\\d{2}")) {
+                int month = Integer.parseInt(normalized.substring(5, 7));
+                if (month >= 1 && month <= 12) {
+                    return normalized;
+                }
+            }
+        }
+        return null;
     }
 
     /**
