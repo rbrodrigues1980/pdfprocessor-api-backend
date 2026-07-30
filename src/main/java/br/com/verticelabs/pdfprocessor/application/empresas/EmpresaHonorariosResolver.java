@@ -30,10 +30,8 @@ public class EmpresaHonorariosResolver {
 
         public String formatLabelHonorarios() {
             String pct = percentualExibicao.stripTrailingZeros().toPlainString() + "%";
-            if (empresaSigla != null && !empresaSigla.isBlank()) {
-                return "Honorários Advocatícios - " + empresaSigla + " - " + pct;
-            }
-            return "Honorários Advocatícios - Contratual - " + pct;
+            // Sempre "Contratuais" (sem sigla da entidade), conforme referencial do Resumo Geral.
+            return "Honorários Advocatícios - Contratuais - " + pct;
         }
     }
 

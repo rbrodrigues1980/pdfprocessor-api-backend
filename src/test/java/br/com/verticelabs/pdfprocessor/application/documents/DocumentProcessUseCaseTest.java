@@ -54,6 +54,10 @@ public class DocumentProcessUseCaseTest {
     private PdfNormalizer normalizer;
     @Mock
     private RubricaValidator rubricaValidator;
+    @Mock
+    private br.com.verticelabs.pdfprocessor.application.incometax.IrpfDeclaracaoDataMapper irpfDeclaracaoDataMapper;
+    @Mock
+    private br.com.verticelabs.pdfprocessor.infrastructure.pdf.InformeRendimentosFuncefExtractor informeRendimentosFuncefExtractor;
 
     @InjectMocks
     private DocumentProcessUseCase useCase;

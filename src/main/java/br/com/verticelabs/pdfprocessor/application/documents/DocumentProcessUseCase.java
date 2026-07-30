@@ -59,6 +59,7 @@ public class DocumentProcessUseCase {
     private final PdfNormalizer normalizer;
     private final RubricaValidator rubricaValidator;
     private final IrpfDeclaracaoDataMapper irpfDeclaracaoDataMapper;
+    private final InformeRendimentosFuncefExtractor informeRendimentosFuncefExtractor;
 
     // Limite mínimo de caracteres para considerar que o PDF tem texto suficiente
     // PDFs abaixo deste limite são considerados escaneados e usarão Gemini AI
@@ -156,6 +157,11 @@ public class DocumentProcessUseCase {
         if (document.getTipo() == DocumentType.INCOME_TAX) {
             log.info("Documento é declaração de IR. Extraindo informações específicas...");
             return processIncomeTaxDocument(document);
+        }
+
+        if (document.getTipo() == DocumentType.INFORME_RENDIMENTOS) {
+            log.info("Documento é Informe de Rendimentos Funcef. Extraindo seção 7 / cabeçalho...");
+            return processInformeRendimentosDocument(document);
         }
 
         return loadPdfFromGridFs(document.getOriginalFileId())
@@ -1540,6 +1546,63 @@ public class DocumentProcessUseCase {
                 .onErrorResume(e -> {
                     log.warn("⚠️ Falha ao extrair DEPENDENTES via Gemini: {}", e.getMessage());
                     return Mono.just(irInfo);
+                });
+    }
+
+    /**
+     * Processa Informe / Comprovante de Rendimentos Funcef (regex, sem Gemini).
+     */
+    private Mono<Long> processInformeRendimentosDocument(PayrollDocument document) {
+        log.info("Processando Informe de Rendimentos: {}", document.getId());
+        final long startTime = System.currentTimeMillis();
+
+        return loadPdfFromGridFs(document.getOriginalFileId())
+                .flatMap(pdfBytes -> pdfService.extractText(new ByteArrayInputStream(pdfBytes))
+                        .flatMap(text -> {
+                            InformeRendimentosData data = informeRendimentosFuncefExtractor.extract(text);
+                            int infos = data.getInformacoesComplementares() != null
+                                    ? data.getInformacoesComplementares().size() : 0;
+
+                            document.setInformeRendimentosData(data);
+                            if (data.getAnoCalendario() != null && !data.getAnoCalendario().isBlank()) {
+                                try {
+                                    document.setAnoDetectado(Integer.parseInt(data.getAnoCalendario().trim()));
+                                } catch (NumberFormatException ignored) {
+                                    // mantém ano atual
+                                }
+                            }
+                            if ((document.getCpf() == null || document.getCpf().isBlank())
+                                    && data.getCpfBeneficiario() != null) {
+                                document.setCpf(data.getCpfBeneficiario().replaceAll("\\D", ""));
+                            }
+
+                            document.setStatus(DocumentStatus.PROCESSED);
+                            document.setDataProcessamento(Instant.now());
+                            document.setTotalEntries((long) infos);
+                            document.setErro(null);
+
+                            long elapsed = System.currentTimeMillis() - startTime;
+                            addInfoEvent(document, null, ProcessingEventType.PROCESSING_COMPLETED,
+                                    String.format(
+                                            "Informe de Rendimentos extraído. ano=%s, processo(s)=%d, em %dms.",
+                                            data.getAnoCalendario(), infos, elapsed),
+                                    Map.of(
+                                            "anoCalendario", data.getAnoCalendario() != null ? data.getAnoCalendario() : "",
+                                            "informacoesComplementares", infos,
+                                            "processingTimeMs", elapsed));
+
+                            log.info("✅ Informe Rendimentos: cpf={}, ano={}, infos={}",
+                                    data.getCpfBeneficiario(), data.getAnoCalendario(), infos);
+                            return documentRepository.save(document).thenReturn((long) infos);
+                        }))
+                .onErrorResume(error -> {
+                    log.error("Erro ao processar Informe de Rendimentos", error);
+                    document.setStatus(DocumentStatus.ERROR);
+                    document.setErro(error.getMessage());
+                    addErrorEvent(document, null, ProcessingEventType.PROCESSING_FAILED,
+                            "Erro no Informe de Rendimentos: " + error.getMessage(),
+                            Map.of("errorMessage", String.valueOf(error.getMessage())));
+                    return documentRepository.save(document).then(Mono.error(error));
                 });
     }
 

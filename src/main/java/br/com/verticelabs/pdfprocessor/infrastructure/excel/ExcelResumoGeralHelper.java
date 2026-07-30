@@ -6,6 +6,8 @@ import br.com.verticelabs.pdfprocessor.application.tributacao.dto.SimuladorIrpfR
 import br.com.verticelabs.pdfprocessor.application.tributacao.dto.SimuladorIrpfResponse;
 import br.com.verticelabs.pdfprocessor.domain.model.IrParametrosAnuais;
 import br.com.verticelabs.pdfprocessor.domain.model.IrTabelaTributacao;
+import br.com.verticelabs.pdfprocessor.domain.model.InformeRendimentosData;
+import br.com.verticelabs.pdfprocessor.domain.model.InformeRendimentosData.InformacaoComplementarJudiciaria;
 import br.com.verticelabs.pdfprocessor.domain.model.IrpfDeclaracaoData;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -81,6 +83,15 @@ public class ExcelResumoGeralHelper {
             Map<String, BigDecimal> prevComplPorAno,
             Map<String, List<IrTabelaTributacao>> tabelasTributacao,
             Map<String, IrParametrosAnuais> parametrosTributacao) {
+        return montarLinhas(irpfDeclaracoes, prevComplPorAno, tabelasTributacao, parametrosTributacao, Map.of());
+    }
+
+    public List<ExcelResumoGeralLinhaDTO> montarLinhas(
+            Map<String, IrpfDeclaracaoData> irpfDeclaracoes,
+            Map<String, BigDecimal> prevComplPorAno,
+            Map<String, List<IrTabelaTributacao>> tabelasTributacao,
+            Map<String, IrParametrosAnuais> parametrosTributacao,
+            Map<String, InformeRendimentosData> informesPorAno) {
 
         if (irpfDeclaracoes == null || irpfDeclaracoes.isEmpty()) {
             return List.of();
@@ -111,7 +122,8 @@ public class ExcelResumoGeralHelper {
                     ? tabelasTributacao.getOrDefault(ano, List.of())
                     : List.of();
             IrParametrosAnuais params = parametrosTributacao != null ? parametrosTributacao.get(ano) : null;
-            linhas.add(montarLinha(ano, data, prevCompl, faixas, params));
+            InformeRendimentosData informe = informesPorAno != null ? informesPorAno.get(ano) : null;
+            linhas.add(montarLinha(ano, data, prevCompl, faixas, params, informe));
         }
         return linhas;
     }
@@ -179,10 +191,20 @@ public class ExcelResumoGeralHelper {
             BigDecimal prevComplPlanilha,
             List<IrTabelaTributacao> faixasTabela,
             IrParametrosAnuais paramsAno) {
+        return montarLinha(ano, data, prevComplPlanilha, faixasTabela, paramsAno, null);
+    }
+
+    public ExcelResumoGeralLinhaDTO montarLinha(
+            String ano,
+            IrpfDeclaracaoData data,
+            BigDecimal prevComplPlanilha,
+            List<IrTabelaTributacao> faixasTabela,
+            IrParametrosAnuais paramsAno,
+            InformeRendimentosData informeRendimentos) {
 
         BigDecimal valorDeclaracao = extrairResultadoPositivoDeclaracao(data);
         ResultadoBloco2Simulacao bloco2 = calcularResultadoBloco2SimulacaoSeguro(
-                ano, data, prevComplPlanilha, faixasTabela, paramsAno);
+                ano, data, prevComplPlanilha, faixasTabela, paramsAno, informeRendimentos);
         BigDecimal valorSimulacao = calcularValorColunaC(data, bloco2);
         String origemValorDeclaracao = extrairTipoResultadoPositivo(
                 data.getImpostoRestituir(), data.getSaldoImpostoPagar());
@@ -191,7 +213,7 @@ public class ExcelResumoGeralHelper {
 
         // Sem impacto financeiro (principal = 0): a mudança de sistema de tributação não
         // beneficia o contribuinte (simulação igual ou pior), então a coluna
-        // "Valor Devido e ou a Restituir" repete o valor da declaração (regime entregue),
+        // de valores com deduções (Tema 1.224/STJ) repete o valor da declaração (regime entregue),
         // e não o valor simulado. Regra simétrica para imposto a pagar e a restituir.
         boolean semImpacto = principal.compareTo(ZERO) == 0;
         if (semImpacto && valorDeclaracao.compareTo(ZERO) > 0) {
@@ -283,6 +305,15 @@ public class ExcelResumoGeralHelper {
             BigDecimal prevComplPlanilha,
             List<IrTabelaTributacao> faixasTabela,
             IrParametrosAnuais paramsAno) {
+        return calcularResultadoBloco2Simulacao(data, prevComplPlanilha, faixasTabela, paramsAno, null);
+    }
+
+    public ResultadoBloco2Simulacao calcularResultadoBloco2Simulacao(
+            IrpfDeclaracaoData data,
+            BigDecimal prevComplPlanilha,
+            List<IrTabelaTributacao> faixasTabela,
+            IrParametrosAnuais paramsAno,
+            InformeRendimentosData informeRendimentos) {
 
         SimuladorIrpfRequest request = excelIrpfSimulacaoMapper.fromDeclaracao(
                 data, prevComplPlanilha, true);
@@ -297,7 +328,8 @@ public class ExcelResumoGeralHelper {
         BigDecimal totalDevido = modelo.getResumo() != null && modelo.getResumo().getTotalImpostoDevido() != null
                 ? modelo.getResumo().getTotalImpostoDevido()
                 : nvl(impostoProgressivoTotal).add(nvl(data.getImpostoSobreRRA()));
-        BigDecimal totalPago = calcularTotalImpostoPagoDeclaracao(data);
+        BigDecimal totalPago = calcularTotalImpostoPagoDeclaracao(data)
+                .add(somarIrrfDepositoJudicial(informeRendimentos));
 
         return calcularResultadoPositivoDeTotais(totalPago, totalDevido);
     }
@@ -315,14 +347,15 @@ public class ExcelResumoGeralHelper {
             IrpfDeclaracaoData data,
             BigDecimal prevComplPlanilha,
             List<IrTabelaTributacao> faixasTabela,
-            IrParametrosAnuais paramsAno) {
+            IrParametrosAnuais paramsAno,
+            InformeRendimentosData informeRendimentos) {
         if (paramsAno == null || faixasTabela == null || faixasTabela.isEmpty()) {
             log.warn(
                     "Resumo Geral ano {}: parâmetros ou tabela de tributação ausentes — usando valores da declaração",
                     ano);
             return resultadoFallbackDeclaracao(data);
         }
-        return calcularResultadoBloco2Simulacao(data, prevComplPlanilha, faixasTabela, paramsAno);
+        return calcularResultadoBloco2Simulacao(data, prevComplPlanilha, faixasTabela, paramsAno, informeRendimentos);
     }
 
     private ResultadoBloco2Simulacao resultadoFallbackDeclaracao(IrpfDeclaracaoData data) {
@@ -369,6 +402,45 @@ public class ExcelResumoGeralHelper {
                 .add(nvl(data.getImpostoPagoExterior()))
                 .add(nvl(data.getImpostoRetidoFonteLei11033()))
                 .add(nvl(data.getImpostoRetidoRRA()));
+    }
+
+    /**
+     * Soma IRRF + IRRF 13º das informações complementares judiciais do Informe de Rendimentos.
+     */
+    public BigDecimal somarIrrfDepositoJudicial(InformeRendimentosData informe) {
+        if (informe == null || informe.getInformacoesComplementares() == null) {
+            return ZERO.setScale(2, RM);
+        }
+        BigDecimal sum = ZERO;
+        for (InformacaoComplementarJudiciaria info : informe.getInformacoesComplementares()) {
+            if (info == null) {
+                continue;
+            }
+            sum = sum.add(valorPositivoOuZero(info.getIrrf())).add(valorPositivoOuZero(info.getIrrf13()));
+        }
+        return sum.setScale(2, RM);
+    }
+
+    public String formatLabelDepositoJudicial(InformacaoComplementarJudiciaria info) {
+        if (info == null) {
+            return "Imposto Pago - Através de Depósito Judicial";
+        }
+        StringBuilder sb = new StringBuilder("Imposto Pago - Através de Depósito Judicial - Processo Jud ");
+        sb.append(nullToEmpty(info.getNumeroProcesso()));
+        if (info.getData() != null && !info.getData().isBlank()) {
+            sb.append(" - ").append(info.getData().trim());
+        }
+        if (info.getCodigo() != null && !info.getCodigo().isBlank()) {
+            sb.append(" - ").append(info.getCodigo().trim());
+        }
+        if (info.getVaraOuLocal() != null && !info.getVaraOuLocal().isBlank()) {
+            sb.append(" - ").append(info.getVaraOuLocal().trim());
+        }
+        return sb.toString();
+    }
+
+    private static String nullToEmpty(String s) {
+        return s != null ? s.trim() : "";
     }
 
     public record TotaisResumoGeral(

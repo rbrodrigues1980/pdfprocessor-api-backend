@@ -67,5 +67,11 @@ public class PayrollDocument {
      * Contém: identificação, controle, dependentes, alimentandos, fontes pagadoras e resumo financeiro.
      */
     private IrpfDeclaracaoData irpfData;
+
+    /**
+     * Dados extraídos do Informe / Comprovante de Rendimentos Funcef.
+     * Preenchido apenas quando {@link #tipo} for {@code INFORME_RENDIMENTOS}.
+     */
+    private InformeRendimentosData informeRendimentosData;
 }
 

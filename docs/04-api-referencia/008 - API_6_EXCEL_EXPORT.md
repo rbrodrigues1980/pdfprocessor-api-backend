@@ -256,12 +256,12 @@ Quando existem declarações IRPF importadas **cujo ano-calendário coincide com
 | Coluna | Origem | Regra |
 |--------|--------|-------|
 | A — Calendário | ano da aba | Ano-calendário |
-| B — Valores Restituídos / Pagos | Bloco 1 (declaração entregue) | Valor positivo entre `IMPOSTO A RESTITUIR` e `SALDO IMPOSTO A PAGAR` (ignora `0,00`) |
-| C — Valor Devido e ou a Restituir | Bloco 2 (simulação planilha) | **Com impacto** → valor simulado (`IMPOSTO A RESTITUIR` ou `SALDO DE IMPOSTO A PAGAR`); **sem impacto** → **repete o valor da declaração (B)** |
-| D — Principal PGFN | derivado | **Resultado líquido com sinal** (restituir = `+`, saldo a pagar = `−`): `D = max(simNet − declNet, 0)` |
-| E — SELIC Acumulada RFB | `TaxaSelicService.calcularSelicReceitaFederal` | Taxa acumulada (%); só se `D > 0` |
-| F — Valor Correção R$ | SELIC | `valorCorrigido − D` |
-| G — Principal + Correção | derivado | `D + F` |
+| B — Valores conforme declarações | Bloco 1 (declaração entregue) | Valor positivo entre `IMPOSTO A RESTITUIR` e `SALDO IMPOSTO A PAGAR` (ignora `0,00`). **Cor:** vermelho se a pagar; verde se a restituir |
+| C — Valores da declaração com deduções - Tema 1.224/STJ | Bloco 2 (simulação planilha) | **Com impacto** → valor simulado (`IMPOSTO A RESTITUIR` ou `SALDO DE IMPOSTO A PAGAR`); **sem impacto** → **repete o valor da declaração (B)**. **Cor:** vermelho se a pagar; verde se a restituir |
+| D — Diferença Devida | derivado | **Resultado líquido com sinal** (restituir = `+`, saldo a pagar = `−`): `D = max(simNet − declNet, 0)`. Fonte verde |
+| E — SELIC Acumulada RFB | `TaxaSelicService.calcularSelicReceitaFederal` | Taxa acumulada (%); só se `D > 0` (senão `-` em verde) |
+| F — Valor Correção R$ | SELIC | `valorCorrigido − D`. Fonte verde |
+| G — Valor devido + SELIC RFB | derivado | `D + F`. Fonte verde |
 | H — Observações | derivado | `"Impacto financeiro"` se `D > 0`; senão `"Sem impacto financeiro - Sistema de tributação"` |
 
 #### Regra de impacto financeiro (colunas C e D)
@@ -287,15 +287,19 @@ Só há **"Impacto financeiro"** quando a simulação **melhora** a situação (
 
 Implementação: `ExcelResumoGeralHelper.calcularValorColunaC`, `calcularPrincipal` e a repetição de B em `montarLinha` quando `principal == 0`.
 
-#### Destaque de restituições (negrito)
+#### Cores (imposto a pagar / a restituir)
 
-Quando **a declaração entregue (B) e a simulação (C) resultam ambas em restituição** (`origem == IMPOSTO A RESTITUIR` nas duas colunas), as células numéricas da linha (B–G) são exibidas em **negrito** no Excel. Implementação: variantes de estilo em `ConsolidationExcelServiceImpl.addResumoGeralSheet` (`createBoldVariant`).
+- Colunas **B** e **C**: fonte **vermelha** (`RGB 255,0,0`) quando a origem é `SALDO DE IMPOSTO A PAGAR`; **verde** (`RGB 0,176,80`) quando é `IMPOSTO A RESTITUIR`.
+- Colunas **D, F, G** (e traços `R$ -` / `-` sem impacto): fonte **verde**.
+- Honorários: fonte vermelha (já existente).
+
+Implementação: variantes de estilo em `ConsolidationExcelServiceImpl.addResumoGeralSheet` (`createRgbFontVariant` / `stylePorOrigem`).
 
 ### Totais e rodapé
 
 - **Total da diferença R$** — soma de D, F e G
-- **Honorários Advocatícios — {sigla ou Contratual} — {N}%** — percentual sobre total G (padrão **12%** quando o cliente não tem empresa/percentual vinculado)
-- **Valor a Receber** — total G − honorários
+- **Valor Líquido para o Exequente** — total G − honorários
+- **Honorários Advocatícios — Contratuais — {N}%** — percentual sobre total G (padrão **12%** quando o cliente não tem empresa/percentual vinculado)
 
 ### Percentual de honorários por cliente
 
@@ -304,7 +308,7 @@ O percentual aplicado na linha de honorários é resolvido por `EmpresaHonorario
 1. Se o cliente possui empresa e percentual vigente cadastrados → usa o percentual da empresa (ex.: APCEF 15%).
 2. Caso contrário → fallback **12%** (`ExcelResumoGeralHelper.PERCENTUAL_HONORARIOS_DEFAULT`).
 
-O rótulo da linha segue o padrão `Honorários Advocatícios - {SIGLA} - {N}%` (ex.: `Honorários Advocatícios - APCEF - 12%`); sem empresa vinculada, usa `Contratual` no lugar da sigla.
+O rótulo da linha é sempre `Honorários Advocatícios - Contratuais - {N}%` (sem sigla da entidade).
 
 Regressão: `ElizeteResumoGeralTest` (12% padrão e percentual customizado 15%).
 - Rodapé com responsável técnico (constantes em `ExcelResumoGeralHelper`)
@@ -317,8 +321,8 @@ Regressão: `ElizeteResumoGeralTest` (12% padrão e percentual customizado 15%).
 ### Layout visual
 
 - **Colunas A–G:** largura fixa ~105 px (15 caracteres); **coluna H:** ~280 px (40 caracteres)
-- **Borda externa espessa** (`MEDIUM`) em torno do bloco principal (A1:H até "Valor a Receber")
-- Bordas internas finas na tabela; linha dupla (`DOUBLE`) nas linhas de totais/honorários/valor a receber
+- **Borda externa espessa** (`MEDIUM`) em torno do bloco principal (A1:H até a linha de Honorários)
+- Bordas internas finas na tabela; linha dupla (`DOUBLE`) nas linhas de totais / valor líquido / honorários
 - Rodapé (Responsável / CORECON) em caixa separada abaixo, com borda espessa própria
 - Linha do economista: merge **B:F** com o texto CORECON; coluna **H** com data/hora de geração (`dd/MM/yyyy HH:mm`, fuso `America/Sao_Paulo`)
 - Cabeçalho da tabela com fundo cinza e altura ~64 pt

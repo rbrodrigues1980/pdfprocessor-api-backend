@@ -48,6 +48,8 @@ public class ResumoGeralPdfGenerator {
     private static final DeviceRgb HEADER_BG = new DeviceRgb(191, 191, 191);
     private static final DeviceRgb TOTAL_BG = new DeviceRgb(255, 255, 0);
     private static final DeviceRgb HONOR_COLOR = new DeviceRgb(192, 0, 0);
+    private static final DeviceRgb RED_PAGAR = new DeviceRgb(255, 0, 0);
+    private static final DeviceRgb GREEN_RESTITUIR = new DeviceRgb(0, 176, 80);
     private static final DateTimeFormatter DATA_BR = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final DateTimeFormatter DATA_HORA_BR = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
     private static final DateTimeFormatter FILENAME_TS = DateTimeFormatter.ofPattern("yyyyMMddHHmm");
@@ -117,13 +119,20 @@ public class ResumoGeralPdfGenerator {
 
         SolidBorder inner = innerBorder();
         for (ExcelResumoGeralLinhaDTO linha : montagem.linhas()) {
+            boolean semImpacto = linha.getPrincipal() == null
+                    || linha.getPrincipal().compareTo(BigDecimal.ZERO) <= 0;
+            DeviceRgb corB = corPorOrigem(linha.getOrigemValorDeclaracao());
+            DeviceRgb corC = corPorOrigem(linha.getOrigemValorSimulacao());
+            DeviceRgb corImpacto = GREEN_RESTITUIR;
+
             table.addCell(dataCell(linha.getAnoCalendario(), baseFont, inner, TextAlignment.CENTER, false, null, cellPad, null, true, false, false));
-            table.addCell(dataCell(formatMoney(linha.getValorDeclaracao()), baseFont, inner, TextAlignment.RIGHT, false, null, cellPad, null, false, false, false));
-            table.addCell(dataCell(formatMoney(linha.getValorSimulacao()), baseFont, inner, TextAlignment.RIGHT, false, null, cellPad, null, false, false, false));
-            table.addCell(dataCell(formatPrincipal(linha.getPrincipal()), baseFont, inner, TextAlignment.RIGHT, false, null, cellPad, null, false, false, false));
-            table.addCell(dataCell(formatPercent(linha.getPrincipal(), linha.getSelicAcumulada()), baseFont, inner, TextAlignment.RIGHT, false, null, cellPad, null, false, false, false));
-            table.addCell(dataCell(formatCorrecao(linha.getPrincipal(), linha.getValorCorrecao()), baseFont, inner, TextAlignment.RIGHT, false, null, cellPad, null, false, false, false));
-            table.addCell(dataCell(formatCorrecao(linha.getPrincipal(), linha.getPrincipalMaisCorrecao()), baseFont, inner, TextAlignment.RIGHT, false, null, cellPad, null, false, false, false));
+            table.addCell(dataCell(formatMoney(linha.getValorDeclaracao()), baseFont, inner, TextAlignment.RIGHT, false, corB, cellPad, null, false, false, false));
+            table.addCell(dataCell(formatMoney(linha.getValorSimulacao()), baseFont, inner, TextAlignment.RIGHT, false, corC, cellPad, null, false, false, false));
+            table.addCell(dataCell(formatPrincipal(linha.getPrincipal()), baseFont, inner, TextAlignment.RIGHT, false, corImpacto, cellPad, null, false, false, false));
+            table.addCell(dataCell(formatPercent(linha.getPrincipal(), linha.getSelicAcumulada()), baseFont, inner, TextAlignment.RIGHT, false,
+                    semImpacto ? GREEN_RESTITUIR : null, cellPad, null, false, false, false));
+            table.addCell(dataCell(formatCorrecao(linha.getPrincipal(), linha.getValorCorrecao()), baseFont, inner, TextAlignment.RIGHT, false, corImpacto, cellPad, null, false, false, false));
+            table.addCell(dataCell(formatCorrecao(linha.getPrincipal(), linha.getPrincipalMaisCorrecao()), baseFont, inner, TextAlignment.RIGHT, false, corImpacto, cellPad, null, false, false, false));
             table.addCell(dataCell(nullSafe(linha.getObservacao()), baseFont, inner, TextAlignment.LEFT, false, null, cellPad, null, false, true, false));
         }
 
@@ -140,18 +149,18 @@ public class ResumoGeralPdfGenerator {
         table.addCell(totalValueCell(formatMoney(totais.totalPrincipalMaisCorrecao()), baseFont, inner, cellPad, doubleSep, false, false, false));
         table.addCell(emptyDataCell(inner, cellPad, doubleSep, false, true, false));
 
-        table.addCell(totalLabelCell(honor.formatLabelHonorarios(), baseFont, inner, cellPad, doubleSep, true, false, false));
+        table.addCell(totalLabelCell("Valor Líquido para o Exequente", baseFont, inner, cellPad, doubleSep, true, false, false));
         for (int i = 0; i < 5; i++) {
             table.addCell(emptyDataCell(inner, cellPad, doubleSep, false, false, false));
         }
-        table.addCell(dataCell(formatMoney(totais.honorarios()), baseFont, inner, TextAlignment.RIGHT, false, HONOR_COLOR, cellPad, doubleSep, false, false, false));
+        table.addCell(dataCell(formatMoney(totais.valorReceber()), baseFont + 0.5f, inner, TextAlignment.RIGHT, true, null, cellPad, doubleSep, false, false, false));
         table.addCell(emptyDataCell(inner, cellPad, doubleSep, false, true, false));
 
-        table.addCell(totalLabelCell("Valor a Receber", baseFont, inner, cellPad, doubleSep, true, false, true));
+        table.addCell(totalLabelCell(honor.formatLabelHonorarios(), baseFont, inner, cellPad, doubleSep, true, false, true));
         for (int i = 0; i < 5; i++) {
             table.addCell(emptyDataCell(inner, cellPad, doubleSep, false, false, true));
         }
-        table.addCell(dataCell(formatMoney(totais.valorReceber()), baseFont + 0.5f, inner, TextAlignment.RIGHT, true, null, cellPad, doubleSep, false, false, true));
+        table.addCell(dataCell(formatMoney(totais.honorarios()), baseFont, inner, TextAlignment.RIGHT, false, HONOR_COLOR, cellPad, doubleSep, false, false, true));
         table.addCell(emptyDataCell(inner, cellPad, doubleSep, false, true, true));
 
         return table;
@@ -236,12 +245,12 @@ public class ResumoGeralPdfGenerator {
     private void addTableHeaderRow(Table table, float fontSize, float pad) {
         String[] headers = {
                 "Calendário",
-                "Valores Restituidos / Pagos",
-                "Valor Devido  e ou a Restituir",
-                "Valor Principal a ser Restituido pela PGFN ao Contribuinte",
-                "SELIC Acumulada - RFB",
+                "Valores conforme declarações",
+                "Valores da declaração com deduções - Tema 1.224/STJ",
+                "Diferença Devida",
+                "SELIC Acumulada RFB",
                 "Valor Correção R$",
-                "Principal + Correção Valores a Receber",
+                "Valor devido + SELIC RFB",
                 "Observações"
         };
         SolidBorder inner = innerBorder();
@@ -404,6 +413,16 @@ public class ResumoGeralPdfGenerator {
 
     private SolidBorder innerBorder() {
         return new SolidBorder(INNER);
+    }
+
+    private static DeviceRgb corPorOrigem(String origem) {
+        if (ExcelResumoGeralHelper.ORIGEM_SALDO_IMPOSTO_A_PAGAR.equals(origem)) {
+            return RED_PAGAR;
+        }
+        if (ExcelResumoGeralHelper.ORIGEM_IMPOSTO_A_RESTITUIR.equals(origem)) {
+            return GREEN_RESTITUIR;
+        }
+        return null;
     }
 
     private Image loadLogo() {

@@ -66,7 +66,7 @@ class ExcelControllerResumoGeralTest {
                         .valorReceber(new BigDecimal("4882.84"))
                         .build())
                 .honorarios(ResumoGeralHonorariosResponse.builder()
-                        .label("Honorários Advocatícios - APCEF/SC - 12%")
+                        .label("Honorários Advocatícios - Contratuais - 12%")
                         .build())
                 .build();
 

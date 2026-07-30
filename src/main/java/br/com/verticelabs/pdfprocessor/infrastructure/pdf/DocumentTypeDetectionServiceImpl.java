@@ -16,6 +16,12 @@ public class DocumentTypeDetectionServiceImpl implements DocumentTypeDetectionSe
         
         String upperText = pdfText.toUpperCase();
         
+        // ===== INFORME / COMPROVANTE DE RENDIMENTOS FUNCEF =====
+        // Deve vir antes de FUNCEF genérico (o PDF também cita FUNCEF + Fundação).
+        if (isInformeRendimentosFuncef(upperText)) {
+            return Mono.just(DocumentType.INFORME_RENDIMENTOS);
+        }
+
         // ===== PADRÕES ESPECÍFICOS DA CAIXA =====
         // 1. Título do documento CAIXA
         boolean hasCaixaTitle = upperText.contains("DEMONSTRATIVO DE PAGAMENTO");
@@ -187,6 +193,20 @@ public class DocumentTypeDetectionServiceImpl implements DocumentTypeDetectionSe
         return normalized.contains("MES/ANO REFERENCIA")
                 || upperText.contains("MÊS/ANO REFERÊNCIA")
                 || upperText.contains("MES/ANO REFERENCIA");
+    }
+
+    /**
+     * Comprovante Funcef de rendimentos pagos / retenção de IR na fonte.
+     */
+    private static boolean isInformeRendimentosFuncef(String upperText) {
+        boolean hasComprovante = upperText.contains("COMPROVANTE DE RENDIMENTOS PAGOS");
+        boolean hasSecao7 = upperText.contains("INFORMACOES COMPLEMENTARES")
+                || upperText.contains("INFORMAÇÕES COMPLEMENTARES");
+        boolean hasFuncefFonte = upperText.contains("FUNCEF")
+                || upperText.contains("ECONOMIARIOS FEDERAIS")
+                || upperText.contains("ECONOMIÁRIOS FEDERAIS")
+                || upperText.contains("00.436.923/0001-90");
+        return hasComprovante && (hasSecao7 || hasFuncefFonte);
     }
 
     private static final java.util.regex.Pattern FUNCEF_RUBRICA_LINE = java.util.regex.Pattern.compile(

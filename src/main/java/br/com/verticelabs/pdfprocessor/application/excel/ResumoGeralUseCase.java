@@ -5,6 +5,8 @@ import br.com.verticelabs.pdfprocessor.application.security.EvaluatorAccessServi
 import br.com.verticelabs.pdfprocessor.domain.exceptions.NoEntriesFoundException;
 import br.com.verticelabs.pdfprocessor.domain.exceptions.PersonNotFoundException;
 import br.com.verticelabs.pdfprocessor.domain.model.DocumentType;
+import br.com.verticelabs.pdfprocessor.domain.model.InformeRendimentosData;
+import br.com.verticelabs.pdfprocessor.domain.model.InformeRendimentosData.InformacaoComplementarJudiciaria;
 import br.com.verticelabs.pdfprocessor.domain.model.IrpfDeclaracaoData;
 import br.com.verticelabs.pdfprocessor.domain.model.Person;
 import br.com.verticelabs.pdfprocessor.domain.repository.PayrollDocumentRepository;
@@ -66,8 +68,9 @@ public class ResumoGeralUseCase {
                     if (consolidated.getRubricas() == null || consolidated.getRubricas().isEmpty()) {
                         return Mono.error(new NoEntriesFoundException(person.getCpf()));
                     }
-                    return buscarIrpfDeclaracoes(person)
-                            .flatMap(irpf -> resumoGeralAssemblyService.montar(person, consolidated, irpf)
+                    return Mono.zip(buscarIrpfDeclaracoes(person), buscarInformesRendimentos(person))
+                            .flatMap(tuple -> resumoGeralAssemblyService.montar(
+                                            person, consolidated, tuple.getT1(), tuple.getT2())
                                     .flatMap(montagem -> {
                                         if (montagem.linhas() == null || montagem.linhas().isEmpty()) {
                                             return Mono.empty();
@@ -107,5 +110,52 @@ public class ResumoGeralUseCase {
                     return map;
                 })
                 .onErrorReturn(Map.of());
+    }
+
+    private Mono<Map<String, InformeRendimentosData>> buscarInformesRendimentos(Person person) {
+        return documentRepository.findByTenantIdAndCpf(person.getTenantId(), person.getCpf())
+                .filter(doc -> doc.getTipo() == DocumentType.INFORME_RENDIMENTOS
+                        && doc.getInformeRendimentosData() != null)
+                .collectList()
+                .map(docs -> {
+                    Map<String, InformeRendimentosData> map = new HashMap<>();
+                    for (var doc : docs) {
+                        InformeRendimentosData data = doc.getInformeRendimentosData();
+                        String ano = data.getAnoCalendario();
+                        if (ano == null || ano.isBlank()) {
+                            continue;
+                        }
+                        String key = ano.trim();
+                        InformeRendimentosData existing = map.get(key);
+                        if (existing == null) {
+                            map.put(key, data);
+                        } else {
+                            map.put(key, mergeInformes(existing, data));
+                        }
+                    }
+                    return map;
+                })
+                .onErrorReturn(Map.of());
+    }
+
+    private static InformeRendimentosData mergeInformes(InformeRendimentosData a, InformeRendimentosData b) {
+        java.util.List<InformacaoComplementarJudiciaria> merged = new java.util.ArrayList<>();
+        if (a.getInformacoesComplementares() != null) {
+            merged.addAll(a.getInformacoesComplementares());
+        }
+        if (b.getInformacoesComplementares() != null) {
+            merged.addAll(b.getInformacoesComplementares());
+        }
+        return InformeRendimentosData.builder()
+                .cnpjFontePagadora(a.getCnpjFontePagadora() != null ? a.getCnpjFontePagadora() : b.getCnpjFontePagadora())
+                .razaoSocialFontePagadora(a.getRazaoSocialFontePagadora() != null
+                        ? a.getRazaoSocialFontePagadora() : b.getRazaoSocialFontePagadora())
+                .anoCalendario(a.getAnoCalendario() != null ? a.getAnoCalendario() : b.getAnoCalendario())
+                .cpfBeneficiario(a.getCpfBeneficiario() != null ? a.getCpfBeneficiario() : b.getCpfBeneficiario())
+                .nomeBeneficiario(a.getNomeBeneficiario() != null ? a.getNomeBeneficiario() : b.getNomeBeneficiario())
+                .naturezaRendimento(a.getNaturezaRendimento() != null ? a.getNaturezaRendimento() : b.getNaturezaRendimento())
+                .informacoesComplementaresRaw(a.getInformacoesComplementaresRaw())
+                .informacoesComplementares(merged)
+                .build();
     }
 }

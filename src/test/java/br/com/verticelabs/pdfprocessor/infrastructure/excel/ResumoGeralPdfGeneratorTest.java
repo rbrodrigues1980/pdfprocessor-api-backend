@@ -53,6 +53,7 @@ class ResumoGeralPdfGeneratorTest {
                 Map.of(),
                 Map.of(),
                 Map.of(),
+                Map.of(),
                 LocalDate.now(),
                 LocalDateTime.of(2026, 6, 24, 20, 26));
 

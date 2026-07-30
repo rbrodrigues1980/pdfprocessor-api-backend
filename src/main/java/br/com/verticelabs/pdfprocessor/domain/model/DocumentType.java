@@ -10,6 +10,12 @@ public enum DocumentType {
      * Colunas: Mês Ref. | Data Início (vazia) | Código (6 dígitos) | Descrição | Valor | Resíduo | Prazo
      * Código: apenas os 4 primeiros dígitos identificam a rubrica (ex: 436204 → 4362).
      */
-    FUNCEF_DEMONSTRATIVO
+    FUNCEF_DEMONSTRATIVO,
+    /**
+     * Comprovante / Informe de Rendimentos Funcef
+     * ("COMPROVANTE DE RENDIMENTOS PAGOS E DE RETENÇÃO DE IMPOSTO DE RENDA NA FONTE").
+     * Dados estruturados em {@link InformeRendimentosData} (seção 7 + cabeçalho).
+     */
+    INFORME_RENDIMENTOS
 }
 

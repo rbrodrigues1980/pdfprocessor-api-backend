@@ -3,6 +3,7 @@ package br.com.verticelabs.pdfprocessor.application.excel;
 import br.com.verticelabs.pdfprocessor.application.empresas.EmpresaHonorariosResolver;
 import br.com.verticelabs.pdfprocessor.domain.model.IrParametrosAnuais;
 import br.com.verticelabs.pdfprocessor.domain.model.IrTabelaTributacao;
+import br.com.verticelabs.pdfprocessor.domain.model.InformeRendimentosData;
 import br.com.verticelabs.pdfprocessor.domain.model.IrpfDeclaracaoData;
 import br.com.verticelabs.pdfprocessor.infrastructure.excel.ExcelResumoGeralHelper;
 import br.com.verticelabs.pdfprocessor.infrastructure.excel.ExcelResumoGeralLinhaDTO;
@@ -21,6 +22,7 @@ public record ResumoGeralMontagemResult(
         Map<String, BigDecimal> prevComplPorAno,
         Map<String, List<IrTabelaTributacao>> tabelasTributacao,
         Map<String, IrParametrosAnuais> parametrosTributacao,
+        Map<String, InformeRendimentosData> informesPorAno,
         LocalDate dataPagamentoSelic,
         LocalDateTime dataGeracao) {
 }

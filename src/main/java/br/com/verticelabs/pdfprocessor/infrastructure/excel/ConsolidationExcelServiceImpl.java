@@ -13,6 +13,8 @@ import br.com.verticelabs.pdfprocessor.application.tributacao.dto.SimuladorIrpfR
 import br.com.verticelabs.pdfprocessor.domain.model.IrParametrosAnuais;
 import br.com.verticelabs.pdfprocessor.domain.exceptions.ExcelGenerationException;
 import br.com.verticelabs.pdfprocessor.domain.model.DocumentType;
+import br.com.verticelabs.pdfprocessor.domain.model.InformeRendimentosData;
+import br.com.verticelabs.pdfprocessor.domain.model.InformeRendimentosData.InformacaoComplementarJudiciaria;
 import br.com.verticelabs.pdfprocessor.domain.model.IrpfDeclaracaoData;
 import br.com.verticelabs.pdfprocessor.domain.model.PayrollEntry;
 import br.com.verticelabs.pdfprocessor.domain.model.Person;
@@ -25,6 +27,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.ss.util.CellReference;
+import org.apache.poi.xssf.usermodel.DefaultIndexedColorMap;
+import org.apache.poi.xssf.usermodel.XSSFColor;
+import org.apache.poi.xssf.usermodel.XSSFFont;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
@@ -64,11 +69,14 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
         // Buscar entries de IR e declarações IRPF completas em paralelo
         return Mono.zip(
                 buscarEntriesIncomeTax(person),
-                buscarIrpfDeclaracoes(person)
+                buscarIrpfDeclaracoes(person),
+                buscarInformesRendimentos(person)
         ).flatMap(tuple -> {
                     Map<String, Map<String, BigDecimal>> incomeTaxEntries = tuple.getT1();
                     Map<String, IrpfDeclaracaoData> irpfDeclaracoes = tuple.getT2();
-                    return resumoGeralAssemblyService.montar(person, consolidatedResponse, irpfDeclaracoes)
+                    Map<String, InformeRendimentosData> informesPorAno = tuple.getT3();
+                    return resumoGeralAssemblyService.montar(
+                                    person, consolidatedResponse, irpfDeclaracoes, informesPorAno)
                             .flatMap(montagem -> {
                                 List<ExcelResumoGeralLinhaDTO> linhasResumo = montagem.linhas();
                                 var honorariosConfig = montagem.honorariosConfig();
@@ -78,6 +86,7 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
                                 Map<String, java.util.List<br.com.verticelabs.pdfprocessor.domain.model.IrTabelaTributacao>> tabelasTributacao =
                                         montagem.tabelasTributacao();
                                 Map<String, IrParametrosAnuais> parametrosTributacao = montagem.parametrosTributacao();
+                                Map<String, InformeRendimentosData> informes = montagem.informesPorAno();
                                 TreeSet<String> anosOrdenados = new TreeSet<>(consolidatedResponse.getAnos());
 
                                 return Mono.fromCallable(() -> {
@@ -130,6 +139,8 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
                                             CellStyle simHighlightGreenStyle = createSimHighlightGreenStyle(workbook);
 
                                             IrpfDeclaracaoData irpfAno = irpfDeclaracoesAlinhadas.get(ano);
+                                            InformeRendimentosData informeAno =
+                                                    informes != null ? informes.get(ano) : null;
                                             if (irpfAno != null) {
                                                 if ("SIMPLIFICADO".equalsIgnoreCase(irpfAno.getTipoTributacao())) {
                                                     currentRow = addBlocoConformeDeclaracaoSimplificada(
@@ -145,7 +156,7 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
                                                             simTotalLabelStyle, simAliquotaStyle);
                                                 }
                                                 currentRow = addBlocoSimulacaoCompletaPlanilha(
-                                                        sheet, person, ano, irpfAno, prevComplPlanilha,
+                                                        sheet, person, ano, irpfAno, prevComplPlanilha, informeAno,
                                                         tabelasTributacao, parametrosTributacao, currentRow,
                                                         simTitleStyle, simBannerSubtitleStyle, simLabelStyle,
                                                         simValueStyle, simSubLabelStyle, simTotalStyle,
@@ -985,16 +996,32 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
         return style;
     }
 
-    /** Clona um estilo aplicando fonte Arial 10 em negrito (destaque de linhas de restituição). */
-    private CellStyle createBoldVariant(Workbook workbook, CellStyle base) {
+    /** Clona estilo aplicando cor RGB na fonte (XSSF). */
+    private CellStyle createRgbFontVariant(Workbook workbook, CellStyle base, int r, int g, int b) {
         CellStyle style = workbook.createCellStyle();
         style.cloneStyleFrom(base);
         Font font = workbook.createFont();
-        font.setBold(true);
         font.setFontName("Arial");
         font.setFontHeightInPoints((short) 10);
+        if (font instanceof XSSFFont xssfFont) {
+            xssfFont.setColor(new XSSFColor(new byte[]{(byte) r, (byte) g, (byte) b}, new DefaultIndexedColorMap()));
+        } else if (r >= 200 && g < 80 && b < 80) {
+            font.setColor(IndexedColors.RED.getIndex());
+        } else {
+            font.setColor(IndexedColors.GREEN.getIndex());
+        }
         style.setFont(font);
         return style;
+    }
+
+    private CellStyle stylePorOrigem(String origem, CellStyle red, CellStyle green, CellStyle fallback) {
+        if (ExcelResumoGeralHelper.ORIGEM_SALDO_IMPOSTO_A_PAGAR.equals(origem)) {
+            return red;
+        }
+        if (ExcelResumoGeralHelper.ORIGEM_IMPOSTO_A_RESTITUIR.equals(origem)) {
+            return green;
+        }
+        return fallback;
     }
 
     /**
@@ -1078,6 +1105,59 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
                     log.warn("Erro ao buscar declarações IRPF (continuando sem dados): {}", e.getMessage());
                     return Mono.just(Collections.emptyMap());
                 });
+    }
+
+    private Mono<Map<String, InformeRendimentosData>> buscarInformesRendimentos(Person person) {
+        log.info("Buscando Informes de Rendimentos para pessoa: {} ({})", person.getNome(), person.getCpf());
+        return documentRepository.findByTenantIdAndCpf(person.getTenantId(), person.getCpf())
+                .filter(doc -> doc.getTipo() == DocumentType.INFORME_RENDIMENTOS
+                        && doc.getInformeRendimentosData() != null)
+                .collectList()
+                .map(docs -> {
+                    Map<String, InformeRendimentosData> map = new HashMap<>();
+                    for (var doc : docs) {
+                        InformeRendimentosData data = doc.getInformeRendimentosData();
+                        String ano = data.getAnoCalendario();
+                        if (ano == null || ano.isBlank()) {
+                            continue;
+                        }
+                        String key = ano.trim();
+                        InformeRendimentosData existing = map.get(key);
+                        if (existing == null) {
+                            map.put(key, data);
+                        } else {
+                            map.put(key, mergeInformesRendimentos(existing, data));
+                        }
+                    }
+                    log.info("Informes de Rendimentos mapeados: {}", map.keySet());
+                    return map;
+                })
+                .onErrorResume(e -> {
+                    log.warn("Erro ao buscar Informes de Rendimentos (continuando sem dados): {}", e.getMessage());
+                    return Mono.just(Collections.emptyMap());
+                });
+    }
+
+    private static InformeRendimentosData mergeInformesRendimentos(
+            InformeRendimentosData a, InformeRendimentosData b) {
+        List<InformacaoComplementarJudiciaria> merged = new ArrayList<>();
+        if (a.getInformacoesComplementares() != null) {
+            merged.addAll(a.getInformacoesComplementares());
+        }
+        if (b.getInformacoesComplementares() != null) {
+            merged.addAll(b.getInformacoesComplementares());
+        }
+        return InformeRendimentosData.builder()
+                .cnpjFontePagadora(a.getCnpjFontePagadora() != null ? a.getCnpjFontePagadora() : b.getCnpjFontePagadora())
+                .razaoSocialFontePagadora(a.getRazaoSocialFontePagadora() != null
+                        ? a.getRazaoSocialFontePagadora() : b.getRazaoSocialFontePagadora())
+                .anoCalendario(a.getAnoCalendario() != null ? a.getAnoCalendario() : b.getAnoCalendario())
+                .cpfBeneficiario(a.getCpfBeneficiario() != null ? a.getCpfBeneficiario() : b.getCpfBeneficiario())
+                .nomeBeneficiario(a.getNomeBeneficiario() != null ? a.getNomeBeneficiario() : b.getNomeBeneficiario())
+                .naturezaRendimento(a.getNaturezaRendimento() != null ? a.getNaturezaRendimento() : b.getNaturezaRendimento())
+                .informacoesComplementaresRaw(a.getInformacoesComplementaresRaw())
+                .informacoesComplementares(merged)
+                .build();
     }
 
     // =============================================
@@ -1204,6 +1284,7 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
     private int addBlocoSimulacaoCompletaPlanilha(
             Sheet sheet, Person person, String ano, IrpfDeclaracaoData data,
             BigDecimal prevComplPlanilha,
+            InformeRendimentosData informeRendimentos,
             Map<String, java.util.List<br.com.verticelabs.pdfprocessor.domain.model.IrTabelaTributacao>> tabelasTributacao,
             Map<String, IrParametrosAnuais> parametrosTributacao, int startRow,
             CellStyle titleStyle, CellStyle bannerSubtitleStyle, CellStyle sectionHeaderStyle,
@@ -1276,8 +1357,16 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
         row = addSimTituloBloco(sheet, row,
                 "IMPOSTO PAGO — ESTUDO COM APROVEITAMENTO DAS CONTRIBUIÇÕES EXTRAS", sectionHeaderStyle);
         row = addSimImpostoPagoLinhas(sheet, row, data, subLabelStyle, valueStyle);
-        BigDecimal totalPago = calcularTotalImpostoPagoDeclaracao(data);
-        row = addSimDestaqueRow(sheet, row, "Total do imposto pago", totalPago, totalStyle, totalLabelStyle);
+        BigDecimal totalPagoDirpf = calcularTotalImpostoPagoDeclaracao(data);
+        row = addSimDestaqueRow(sheet, row, "Total do imposto pago", totalPagoDirpf, totalStyle, totalLabelStyle);
+
+        BigDecimal totalPago = totalPagoDirpf;
+        BigDecimal irrfJudicial = resumoGeralHelper.somarIrrfDepositoJudicial(informeRendimentos);
+        if (irrfJudicial.compareTo(BigDecimal.ZERO) > 0) {
+            row = addSimDepositosJudiciaisLinhas(sheet, row, informeRendimentos, subLabelStyle, valueStyle);
+            totalPago = totalPagoDirpf.add(irrfJudicial);
+            row = addSimDestaqueRow(sheet, row, "Total do imposto pago", totalPago, totalStyle, totalLabelStyle);
+        }
 
         sheet.createRow(row++);
         row = addSimTituloBloco(sheet, row,
@@ -1292,6 +1381,44 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
 
         sheet.createRow(row++);
         return row;
+    }
+
+    /**
+     * Linhas de IRRF / IRRF 13º via depósito judicial (Informe de Rendimentos, seção 7).
+     */
+    private int addSimDepositosJudiciaisLinhas(
+            Sheet sheet, int row, InformeRendimentosData informe,
+            CellStyle labelStyle, CellStyle valueStyle) {
+        if (informe == null || informe.getInformacoesComplementares() == null) {
+            return row;
+        }
+        for (InformacaoComplementarJudiciaria info : informe.getInformacoesComplementares()) {
+            if (info == null) {
+                continue;
+            }
+            String label = resumoGeralHelper.formatLabelDepositoJudicial(info);
+            if (info.getIrrf() != null && info.getIrrf().compareTo(BigDecimal.ZERO) > 0) {
+                row = addSimLinhaSemIndent(sheet, row, label, info.getIrrf(), labelStyle, valueStyle);
+            }
+            if (info.getIrrf13() != null && info.getIrrf13().compareTo(BigDecimal.ZERO) > 0) {
+                row = addSimLinhaSemIndent(sheet, row, label, info.getIrrf13(), labelStyle, valueStyle);
+            }
+        }
+        return row;
+    }
+
+    private int addSimLinhaSemIndent(Sheet sheet, int row, String label, BigDecimal valor,
+            CellStyle labelStyle, CellStyle valueStyle) {
+        Row r = sheet.createRow(row);
+        Cell lbl = r.createCell(SIM_COL_LABEL_START);
+        lbl.setCellValue(label != null ? label : "");
+        lbl.setCellStyle(labelStyle);
+        mergeSimRegion(sheet, row, SIM_COL_LABEL_START, SIM_COL_LABEL_END);
+        fillSimRowCells(r, SIM_COL_LABEL_START, SIM_COL_LABEL_END, labelStyle);
+        Cell val = r.createCell(SIM_COL_VALOR);
+        val.setCellValue(valor != null ? valor.doubleValue() : 0.0);
+        val.setCellStyle(valueStyle);
+        return row + 1;
     }
 
     /** Imposto devido II só tem valor quando há crédito INSS doméstico (RESUMO IRPF). */
@@ -1333,11 +1460,11 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
         CellStyle resumoEmptyStyle = createResumoEmptyStyle(workbook);
         CellStyle resumoFooterDateTimeStyle = createResumoFooterDateTimeStyle(workbook);
 
-        // Variantes em negrito para linhas em que a declaração entregue e a simulação
-        // resultam em restituição (destaque dos valores).
-        CellStyle numberStyleBold = createBoldVariant(workbook, numberStyle);
-        CellStyle resumoPercentStyleBold = createBoldVariant(workbook, resumoPercentStyle);
-        CellStyle resumoZeroDashStyleBold = createBoldVariant(workbook, resumoZeroDashStyle);
+        // Cores por origem: imposto a pagar = vermelho; a restituir = verde (referencial).
+        CellStyle moneyRed = createRgbFontVariant(workbook, numberStyle, 255, 0, 0);
+        CellStyle moneyGreen = createRgbFontVariant(workbook, numberStyle, 0, 176, 80);
+        CellStyle dashGreen = createRgbFontVariant(workbook, resumoZeroDashStyle, 0, 176, 80);
+        CellStyle percentGreen = createRgbFontVariant(workbook, resumoPercentStyle, 0, 176, 80);
 
         int row = 0;
         final int topRow = 0;
@@ -1378,12 +1505,12 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
         headerRow.setHeightInPoints(64.5f);
         String[] headers = {
                 "Calendário",
-                "Valores Restituidos / Pagos",
-                "Valor Devido  e ou a Restituir",
-                "Valor Principal a ser Restituido pela PGFN ao Contribuinte",
-                "SELIC Acumulada - RFB",
+                "Valores conforme declarações",
+                "Valores da declaração com deduções - Tema 1.224/STJ",
+                "Diferença Devida",
+                "SELIC Acumulada RFB",
                 "Valor Correção R$",
-                "Principal + Correção Valores a Receber",
+                "Valor devido + SELIC RFB",
                 "Observações"
         };
         for (int i = 0; i < headers.length; i++) {
@@ -1396,22 +1523,19 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
         for (ExcelResumoGeralLinhaDTO linha : linhas) {
             Row dataRow = sheet.createRow(row++);
 
-            // Negrito quando a declaração entregue E a simulação resultam em restituição.
-            boolean restituicaoDeclESim = ExcelResumoGeralHelper.ORIGEM_IMPOSTO_A_RESTITUIR
-                    .equals(linha.getOrigemValorDeclaracao())
-                    && ExcelResumoGeralHelper.ORIGEM_IMPOSTO_A_RESTITUIR
-                            .equals(linha.getOrigemValorSimulacao());
-            CellStyle money = restituicaoDeclESim ? numberStyleBold : numberStyle;
-            CellStyle percent = restituicaoDeclESim ? resumoPercentStyleBold : resumoPercentStyle;
-            CellStyle dash = restituicaoDeclESim ? resumoZeroDashStyleBold : resumoZeroDashStyle;
+            CellStyle moneyB = stylePorOrigem(linha.getOrigemValorDeclaracao(), moneyRed, moneyGreen, numberStyle);
+            CellStyle moneyC = stylePorOrigem(linha.getOrigemValorSimulacao(), moneyRed, moneyGreen, numberStyle);
+            boolean semImpacto = linha.getPrincipal() == null
+                    || linha.getPrincipal().compareTo(BigDecimal.ZERO) <= 0;
+            CellStyle percentE = semImpacto ? percentGreen : resumoPercentStyle;
 
             setResumoAnoCell(dataRow, 0, linha.getAnoCalendario(), defaultStyle);
-            setResumoMoneyCell(dataRow, 1, linha.getValorDeclaracao(), money);
-            setResumoMoneyCell(dataRow, 2, linha.getValorSimulacao(), money);
-            setResumoPrincipalCell(dataRow, 3, linha.getPrincipal(), money, dash);
-            setResumoPercentCell(dataRow, 4, linha.getPrincipal(), linha.getSelicAcumulada(), percent);
-            setResumoCorrecaoCell(dataRow, 5, linha.getPrincipal(), linha.getValorCorrecao(), money, dash);
-            setResumoCorrecaoCell(dataRow, 6, linha.getPrincipal(), linha.getPrincipalMaisCorrecao(), money, dash);
+            setResumoMoneyCell(dataRow, 1, linha.getValorDeclaracao(), moneyB);
+            setResumoMoneyCell(dataRow, 2, linha.getValorSimulacao(), moneyC);
+            setResumoPrincipalCell(dataRow, 3, linha.getPrincipal(), moneyGreen, dashGreen);
+            setResumoPercentCell(dataRow, 4, linha.getPrincipal(), linha.getSelicAcumulada(), percentE, dashGreen);
+            setResumoCorrecaoCell(dataRow, 5, linha.getPrincipal(), linha.getValorCorrecao(), moneyGreen, dashGreen);
+            setResumoCorrecaoCell(dataRow, 6, linha.getPrincipal(), linha.getPrincipalMaisCorrecao(), moneyGreen, dashGreen);
             Cell obsCell = dataRow.createCell(7);
             obsCell.setCellValue(linha.getObservacao() != null ? linha.getObservacao() : "");
             obsCell.setCellStyle(defaultStyle);
@@ -1433,6 +1557,24 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
         totalGCell.setCellValue(totais.totalPrincipalMaisCorrecao().doubleValue());
         totalGCell.setCellStyle(totalStyle);
 
+        // Ordem do referencial: Valor Líquido, depois Honorários.
+        Row liquidoRow = sheet.createRow(row++);
+        liquidoRow.setHeightInPoints(16.5f);
+        Cell liquidoLabel = liquidoRow.createCell(0);
+        liquidoLabel.setCellValue("Valor Líquido para o Exequente");
+        liquidoLabel.setCellStyle(resumoTotalLabelStyle);
+        Cell liquidoCell = liquidoRow.createCell(6);
+        liquidoCell.setCellValue(totais.valorReceber().doubleValue());
+        Font boldFont = workbook.createFont();
+        boldFont.setBold(true);
+        boldFont.setFontName("Arial");
+        boldFont.setFontHeightInPoints((short) 10);
+        CellStyle liquidoStyle = workbook.createCellStyle();
+        liquidoStyle.cloneStyleFrom(numberStyle);
+        liquidoStyle.setFont(boldFont);
+        liquidoCell.setCellStyle(liquidoStyle);
+
+        int honorRowIdx = row;
         Row honorRow = sheet.createRow(row++);
         honorRow.setHeightInPoints(16.5f);
         Cell honorLabel = honorRow.createCell(0);
@@ -1442,26 +1584,9 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
         honorCell.setCellValue(totais.honorarios().doubleValue());
         honorCell.setCellStyle(resumoHonorariosStyle);
 
-        int receberRowIdx = row;
-        Row receberRow = sheet.createRow(row++);
-        receberRow.setHeightInPoints(16.5f);
-        Cell receberLabel = receberRow.createCell(0);
-        receberLabel.setCellValue("Valor a Receber");
-        receberLabel.setCellStyle(resumoTotalLabelStyle);
-        Cell receberCell = receberRow.createCell(6);
-        receberCell.setCellValue(totais.valorReceber().doubleValue());
-        Font boldFont = workbook.createFont();
-        boldFont.setBold(true);
-        boldFont.setFontName("Arial");
-        boldFont.setFontHeightInPoints((short) 10);
-        CellStyle receberStyle = workbook.createCellStyle();
-        receberStyle.cloneStyleFrom(numberStyle);
-        receberStyle.setFont(boldFont);
-        receberCell.setCellStyle(receberStyle);
-
-        // Bordas externas espessas + internas finas (bloco principal A1:H até Valor a Receber)
+        // Bordas externas espessas + internas finas (bloco principal A1:H até Honorários)
         applyResumoGeralBordas(sheet, workbook, resumoEmptyStyle,
-                topRow, receberRowIdx, dateGridStartRow, dateGridEndRow,
+                topRow, honorRowIdx, dateGridStartRow, dateGridEndRow,
                 tableHeaderRow, firstDataRow, lastDataRow, firstTotalRow);
 
         // Rodapé (fora do bloco principal)
@@ -1678,15 +1803,17 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
         }
     }
 
-    private void setResumoPercentCell(Row row, int col, BigDecimal principal, BigDecimal taxa, CellStyle style) {
+    private void setResumoPercentCell(Row row, int col, BigDecimal principal, BigDecimal taxa,
+            CellStyle style, CellStyle dashStyle) {
         Cell cell = row.createCell(col);
         if (principal == null || principal.compareTo(BigDecimal.ZERO) <= 0 || taxa == null
                 || taxa.compareTo(BigDecimal.ZERO) <= 0) {
-            cell.setCellValue(0);
+            cell.setCellValue("-");
+            cell.setCellStyle(dashStyle);
         } else {
             cell.setCellValue(taxa.divide(new BigDecimal("100"), 6, RoundingMode.HALF_UP).doubleValue());
+            cell.setCellStyle(style);
         }
-        cell.setCellStyle(style);
     }
 
     private void setResumoCorrecaoCell(Row row, int col, BigDecimal principal, BigDecimal valor,

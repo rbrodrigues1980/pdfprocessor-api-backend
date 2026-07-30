@@ -428,7 +428,7 @@ class ElizeteResumoGeralTest {
 
     /**
      * Regra Célia: quando não há impacto financeiro (imposto a restituir), a coluna
-     * "Valor Devido e ou a Restituir" deve repetir o valor da declaração, não o valor
+     * de valores com deduções (Tema 1.224/STJ) deve repetir o valor da declaração, não o valor
      * simulado (menor). Cenário: restituição integral do imposto pago — a simulação
      * completa jamais supera isso, então principal = 0 (sem impacto).
      */
