@@ -109,7 +109,7 @@ class ResumoGeralUseCaseTest {
                         new BigDecimal("665.84"), new BigDecimal("4882.84")),
                 Map.of("2018", IrpfDeclaracaoData.builder().anoCalendario("2018").build()),
                 Map.of("2018", BigDecimal.TEN),
-                Map.of(), Map.of(),
+                Map.of(), Map.of(), Map.of(),
                 LocalDate.now(), LocalDateTime.now());
 
         var response = br.com.verticelabs.pdfprocessor.interfaces.excel.dto.ResumoGeralResponse.builder()
@@ -125,7 +125,7 @@ class ResumoGeralUseCaseTest {
                         .tipo(DocumentType.INCOME_TAX)
                         .irpfData(IrpfDeclaracaoData.builder().anoCalendario("2018").build())
                         .build()));
-        when(resumoGeralAssemblyService.montar(eq(person), eq(consolidated), any()))
+        when(resumoGeralAssemblyService.montar(eq(person), eq(consolidated), any(), any()))
                 .thenReturn(Mono.just(montagem));
         when(resumoGeralResponseMapper.toResponse(person, montagem)).thenReturn(response);
 
@@ -149,14 +149,14 @@ class ResumoGeralUseCaseTest {
                         new BigDecimal("0.12"), new BigDecimal("12.00"), null, null, null),
                 new ExcelResumoGeralHelper.TotaisResumoGeral(
                         BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO),
-                Map.of(), Map.of(), Map.of(), Map.of(),
+                Map.of(), Map.of(), Map.of(), Map.of(), Map.of(),
                 LocalDate.now(), LocalDateTime.now());
 
         when(personRepository.findById("p1")).thenReturn(Mono.just(person));
         when(consolidationUseCase.consolidate(eq(person.getCpf()), eq("t1"), eq(null), eq(null)))
                 .thenReturn(Mono.just(consolidated));
         when(documentRepository.findByTenantIdAndCpf("t1", person.getCpf())).thenReturn(Flux.empty());
-        when(resumoGeralAssemblyService.montar(eq(person), eq(consolidated), any()))
+        when(resumoGeralAssemblyService.montar(eq(person), eq(consolidated), any(), any()))
                 .thenReturn(Mono.just(montagemVazia));
 
         try (MockedStatic<ReactiveSecurityContextHelper> security = mockSuperAdmin()) {

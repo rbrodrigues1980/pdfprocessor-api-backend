@@ -230,6 +230,19 @@ public class DocumentController {
         }
 
         /**
+         * GET /api/v1/documents/{id}/informe-rendimentos-data
+         * Retorna os dados do Informe / Comprovante de Rendimentos Funcef.
+         */
+        @GetMapping("/{id}/informe-rendimentos-data")
+        public Mono<ResponseEntity<Object>> getInformeRendimentosData(@PathVariable String id) {
+                log.debug("=== INÍCIO: GET /api/v1/documents/{}/informe-rendimentos-data ===", id);
+                return documentQueryUseCase.findInformeRendimentosDataById(id)
+                                .<ResponseEntity<Object>>map(data -> ResponseEntity.ok((Object) data))
+                                .onErrorResume(IllegalStateException.class, e ->
+                                        Mono.just(ResponseEntity.notFound().build()));
+        }
+
+        /**
          * GET /api/v1/documents/{id}/summary
          * Retorna resumo das rubricas e estatísticas do documento.
          */

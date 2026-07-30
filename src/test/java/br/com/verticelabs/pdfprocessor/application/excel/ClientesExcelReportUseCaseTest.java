@@ -126,7 +126,7 @@ class ClientesExcelReportUseCaseTest {
                         new BigDecimal("108.00"));
 
         ResumoGeralMontagemResult montagem = new ResumoGeralMontagemResult(
-                List.of(), honorarios, totais, null, null, null, null, null, null);
+                List.of(), honorarios, totais, null, null, null, null, null, null, null);
 
         when(listPersonsUseCase.findAllMatching(any())).thenReturn(Mono.just(List.of(person)));
         when(empresaHonorariosResolver.resolve(person)).thenReturn(Mono.just(honorarios));

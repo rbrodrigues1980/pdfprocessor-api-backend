@@ -5,6 +5,7 @@ import br.com.verticelabs.pdfprocessor.domain.exceptions.DocumentNotFoundExcepti
 import br.com.verticelabs.pdfprocessor.domain.exceptions.PersonNotFoundException;
 import br.com.verticelabs.pdfprocessor.domain.model.DocumentStatus;
 import br.com.verticelabs.pdfprocessor.domain.model.DocumentType;
+import br.com.verticelabs.pdfprocessor.domain.model.InformeRendimentosData;
 import br.com.verticelabs.pdfprocessor.domain.model.IrpfDeclaracaoData;
 import br.com.verticelabs.pdfprocessor.domain.model.PayrollDocument;
 import br.com.verticelabs.pdfprocessor.domain.model.ProcessingEvent;
@@ -320,6 +321,19 @@ public class DocumentQueryUseCase {
                         throw new IllegalStateException("Dados de IRPF não disponíveis para este documento");
                     }
                     return doc.getIrpfData();
+                });
+    }
+
+    public Mono<InformeRendimentosData> findInformeRendimentosDataById(String id) {
+        return documentRepository.findById(id)
+                .switchIfEmpty(Mono.defer(() ->
+                        Mono.error(new DocumentNotFoundException("Documento não encontrado: " + id))))
+                .map(doc -> {
+                    if (doc.getInformeRendimentosData() == null) {
+                        throw new IllegalStateException(
+                                "Dados de Informe de Rendimentos não disponíveis para este documento");
+                    }
+                    return doc.getInformeRendimentosData();
                 });
     }
 

@@ -5,6 +5,7 @@ import br.com.verticelabs.pdfprocessor.application.selic.TaxaSelicService;
 import br.com.verticelabs.pdfprocessor.application.tributacao.IrTributacaoService;
 import br.com.verticelabs.pdfprocessor.domain.model.IrParametrosAnuais;
 import br.com.verticelabs.pdfprocessor.domain.model.IrTabelaTributacao;
+import br.com.verticelabs.pdfprocessor.domain.model.InformeRendimentosData;
 import br.com.verticelabs.pdfprocessor.domain.model.IrpfDeclaracaoData;
 import br.com.verticelabs.pdfprocessor.domain.model.Person;
 import br.com.verticelabs.pdfprocessor.infrastructure.excel.PrevComplPlanilhaHelper;
@@ -45,13 +46,22 @@ public class ResumoGeralAssemblyService {
             Person person,
             ConsolidatedResponse consolidatedResponse,
             Map<String, IrpfDeclaracaoData> irpfDeclaracoes) {
+        return montar(person, consolidatedResponse, irpfDeclaracoes, Map.of());
+    }
+
+    public Mono<ResumoGeralMontagemResult> montar(
+            Person person,
+            ConsolidatedResponse consolidatedResponse,
+            Map<String, IrpfDeclaracaoData> irpfDeclaracoes,
+            Map<String, InformeRendimentosData> informesPorAno) {
 
         Set<String> anosContracheque = new HashSet<>(consolidatedResponse.getAnos());
         Map<String, IrpfDeclaracaoData> irpfDeclaracoesAlinhadas =
                 resumoGeralHelper.filtrarDeclaracoesPorAnosContracheque(irpfDeclaracoes, anosContracheque);
+        Map<String, InformeRendimentosData> informes = informesPorAno != null ? informesPorAno : Map.of();
 
-        log.info("Anos com contracheque: {}; declarações IR alinhadas: {}",
-                anosContracheque, irpfDeclaracoesAlinhadas.keySet());
+        log.info("Anos com contracheque: {}; declarações IR alinhadas: {}; informes: {}",
+                anosContracheque, irpfDeclaracoesAlinhadas.keySet(), informes.keySet());
 
         return Mono.zip(
                         buscarTabelasTributacao(anosContracheque),
@@ -70,15 +80,16 @@ public class ResumoGeralAssemblyService {
 
                     if (irpfDeclaracoesAlinhadas.isEmpty()) {
                         return buildResult(person, List.of(), irpfDeclaracoesAlinhadas, prevComplPorAno,
-                                tabelasTributacao, parametrosTributacao);
+                                tabelasTributacao, parametrosTributacao, informes);
                     }
 
                     List<ExcelResumoGeralLinhaDTO> linhasResumoBase = resumoGeralHelper.montarLinhas(
-                            irpfDeclaracoesAlinhadas, prevComplPorAno, tabelasTributacao, parametrosTributacao);
+                            irpfDeclaracoesAlinhadas, prevComplPorAno, tabelasTributacao, parametrosTributacao,
+                            informes);
 
                     if (linhasResumoBase.isEmpty()) {
                         return buildResult(person, List.of(), irpfDeclaracoesAlinhadas, prevComplPorAno,
-                                tabelasTributacao, parametrosTributacao);
+                                tabelasTributacao, parametrosTributacao, informes);
                     }
 
                     LocalDate dataPagamentoSelic = LocalDate.now(FUSO);
@@ -103,7 +114,7 @@ public class ResumoGeralAssemblyService {
                             .collectList()
                             .map(resumoGeralHelper::ordenarPorAnoCalendario)
                             .flatMap(linhas -> buildResult(person, linhas, irpfDeclaracoesAlinhadas, prevComplPorAno,
-                                    tabelasTributacao, parametrosTributacao));
+                                    tabelasTributacao, parametrosTributacao, informes));
                 });
     }
 
@@ -113,7 +124,8 @@ public class ResumoGeralAssemblyService {
             Map<String, IrpfDeclaracaoData> irpfDeclaracoesAlinhadas,
             Map<String, BigDecimal> prevComplPorAno,
             Map<String, List<IrTabelaTributacao>> tabelasTributacao,
-            Map<String, IrParametrosAnuais> parametrosTributacao) {
+            Map<String, IrParametrosAnuais> parametrosTributacao,
+            Map<String, InformeRendimentosData> informesPorAno) {
 
         LocalDate dataPagamentoSelic = LocalDate.now(FUSO);
         LocalDateTime dataGeracao = LocalDateTime.now(FUSO);
@@ -133,6 +145,7 @@ public class ResumoGeralAssemblyService {
                             prevComplPorAno,
                             tabelasTributacao,
                             parametrosTributacao,
+                            informesPorAno != null ? informesPorAno : Map.of(),
                             dataPagamentoSelic,
                             dataGeracao);
                 });
