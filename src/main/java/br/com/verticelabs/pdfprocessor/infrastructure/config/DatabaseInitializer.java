@@ -12,7 +12,7 @@ import reactor.core.publisher.Mono;
 
 @Slf4j
 @Component
-@Order(1) // Executa antes do RubricaDataInitializer
+@Order(1)
 @RequiredArgsConstructor
 public class DatabaseInitializer implements CommandLineRunner {
 

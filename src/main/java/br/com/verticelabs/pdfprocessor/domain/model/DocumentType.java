@@ -16,6 +16,17 @@ public enum DocumentType {
      * ("COMPROVANTE DE RENDIMENTOS PAGOS E DE RETENÇÃO DE IMPOSTO DE RENDA NA FONTE").
      * Dados estruturados em {@link InformeRendimentosData} (seção 7 + cabeçalho).
      */
-    INFORME_RENDIMENTOS
+    INFORME_RENDIMENTOS,
+    /**
+     * Demonstrativo de Pagamento SABESP (ativa).
+     * Identificação: PERÍODO, MATRÍC, NOME DO EMPREGADO (CPF opcional no PDF).
+     * Rubricas: parser genérico + whitelist na tabela {@code rubricas}.
+     */
+    SABESP,
+    /**
+     * Ficha Financeira de Pagamentos SABESPREV (aposentado) — matriz anual rubrica × JAN–DEZ.
+     * Identificação: FICHA FINANCEIRA + SABESPREV + ANO. Origem das entries: {@code SABESPREV}.
+     */
+    SABESPREV_FICHA
 }
 

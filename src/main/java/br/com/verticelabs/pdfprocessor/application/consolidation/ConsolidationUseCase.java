@@ -38,7 +38,7 @@ public class ConsolidationUseCase {
      * 
      * @param cpf    CPF da pessoa
      * @param ano    Ano opcional para filtrar (formato: "2017")
-     * @param origem Origem opcional para filtrar ("CAIXA" ou "FUNCEF")
+     * @param origem Origem opcional para filtrar ("CAIXA", "FUNCEF", "SABESP" ou "SABESPREV")
      * @return Mono com a resposta consolidada
      */
     public Mono<ConsolidatedResponse> consolidate(String cpf, String ano, String origem) {
@@ -54,7 +54,7 @@ public class ConsolidationUseCase {
      * @param tenantId ID do tenant da pessoa (opcional, se null usa multi-tenancy
      *                 do contexto)
      * @param ano      Ano opcional para filtrar (formato: "2017")
-     * @param origem   Origem opcional para filtrar ("CAIXA" ou "FUNCEF")
+     * @param origem   Origem opcional para filtrar ("CAIXA", "FUNCEF", "SABESP" ou "SABESPREV")
      * @return Mono com a resposta consolidada
      */
     public Mono<ConsolidatedResponse> consolidate(String cpf, String tenantId, String ano, String origem) {
@@ -64,7 +64,8 @@ public class ConsolidationUseCase {
         // Validar origem se fornecida
         if (origem != null && !origem.isEmpty()) {
             log.debug("Validando origem: {}", origem);
-            if (!origem.equals("CAIXA") && !origem.equals("FUNCEF")) {
+            if (!origem.equals("CAIXA") && !origem.equals("FUNCEF")
+                    && !origem.equals("SABESP") && !origem.equals("SABESPREV")) {
                 log.warn("Origem inválida recebida: {}", origem);
                 return Mono.error(new InvalidOriginException(origem));
             }
@@ -661,10 +662,18 @@ public class ConsolidationUseCase {
         }
         boolean algumaCaixa = entries.stream().anyMatch(e -> "CAIXA".equalsIgnoreCase(e.getOrigem()));
         boolean algumaFuncef = entries.stream().anyMatch(e -> isOrigemFuncef(e.getOrigem()));
-        if (algumaFuncef && !algumaCaixa) {
+        boolean algumaSabesp = entries.stream().anyMatch(e -> "SABESP".equalsIgnoreCase(e.getOrigem()));
+        boolean algumaSabesprev = entries.stream().anyMatch(e -> "SABESPREV".equalsIgnoreCase(e.getOrigem()));
+        if (algumaSabesprev && !algumaCaixa && !algumaFuncef && !algumaSabesp) {
+            return "SABESPREV";
+        }
+        if (algumaSabesp && !algumaCaixa && !algumaFuncef && !algumaSabesprev) {
+            return "SABESP";
+        }
+        if (algumaFuncef && !algumaCaixa && !algumaSabesp && !algumaSabesprev) {
             return "FUNCEF";
         }
-        if (algumaCaixa && !algumaFuncef) {
+        if (algumaCaixa && !algumaFuncef && !algumaSabesp && !algumaSabesprev) {
             return "CAIXA";
         }
         return null;

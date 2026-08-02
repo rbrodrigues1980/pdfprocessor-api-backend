@@ -12,6 +12,10 @@
 | [002 - SPRINT_PLAN.md](./002%20-%20SPRINT_PLAN.md) | Plano de 4 sprints principais (2 semanas cada) + 2 opcionais. Sprint 1: Infraestrutura & Upload. Sprint 2: Processamento PDF. Sprint 3: Consolidação & Query. Sprint 4: Excel & Admin. User stories com checkboxes. |
 | [003 - PLANEJAMENTO_GERENCIAMENTO_USUARIOS.md](./003%20-%20PLANEJAMENTO_GERENCIAMENTO_USUARIOS.md) | Planejamento do CRUD completo de usuários. Matriz de permissões SUPER_ADMIN/TENANT_ADMIN, endpoints propostos (criar, listar, editar, desativar, reativar), DTOs, validações e checklist de implementação. |
 | [004 - ORGANIZACAO_APIS_AUTH_USUARIOS_TENANTS.md](./004%20-%20ORGANIZACAO_APIS_AUTH_USUARIOS_TENANTS.md) | Organização atual das APIs: autenticação em `/api/v1/auth`, tenants em `/api/v1/tenants`. Documenta funcionalidades existentes e faltantes (CRUD de usuários). |
+| [005 - PLANO_AUTOMACAO_IRPF.md](./005%20-%20PLANO_AUTOMACAO_IRPF.md) | **Histórico** — esboço antigo de automação IRPF/informe (Kotlin/Gemini). MVP entregue: ver [011 - API_INFORME_RENDIMENTOS](../04-api-referencia/011%20-%20API_INFORME_RENDIMENTOS.md). |
+| [006 - PLANO_APP_PYTHON_IRPF_DESKTOP.md](./006%20-%20PLANO_APP_PYTHON_IRPF_DESKTOP.md) | Plano de app desktop Python para IRPF. |
+| [007 - PLANO_PROCESSING_LOG_AUDITORIA.md](./007%20-%20PLANO_PROCESSING_LOG_AUDITORIA.md) | Plano de processing log / auditoria. |
+| [008 - PLANOS_EXECUTADOS_PDFPROCESSOR.md](./008%20-%20PLANOS_EXECUTADOS_PDFPROCESSOR.md) | **Catálogo** dos planos Cursor executados no pdfprocessor (inclui onda SABESP/SABESPREV ago/2026) + convenção de documentação e links operacionais. |
 
 ---
 

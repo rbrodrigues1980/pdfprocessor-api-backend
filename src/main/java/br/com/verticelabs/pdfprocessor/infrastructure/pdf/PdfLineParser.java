@@ -229,6 +229,13 @@ public class PdfLineParser {
                     + "IR\\s+COMPENSADO|IR\\s+INFORMATIVO|EXCESSO\\s+DE\\s+D[EÉ]BITO|BASE\\s+DEFICIT|"
                     + "OBSERVA[CÇ][AÃ]O|DOCUMENTO\\s+EMITIDO|TIPO\\s*/\\s*RUBRICA).*");
 
+    /**
+     * SABESP — layout {@code CONTA DESCRIÇÃO … valor} (último valor monetário da linha).
+     * Código qualquer 3–4 dígitos; a whitelist é a tabela {@code rubricas} ({@code RubricaValidator}).
+     * Ex.: {@code 3347 Supl.Apos.Sabesprev 700,39}
+     */
+    private static final Pattern SABESP_LINE_PATTERN = Pattern.compile(
+            "^([0-9]{3,4})\\s+(.+)\\s+([0-9]{1,3}(?:\\.[0-9]{3})*,[0-9]{2})\\s*$");
 
     /**
      * Representa uma linha de rubrica extraída do PDF.
@@ -344,6 +351,8 @@ public class PdfLineParser {
         } else if (documentType == DocumentType.FUNCEF_DEMONSTRATIVO) {
             patternsToTry.add(FUNCEF_DEMONSTRATIVO_PATTERN);
             patternsToTry.add(FUNCEF_DEMONSTRATIVO_PATTERN_GLUED);
+        } else if (documentType == DocumentType.SABESP) {
+            patternsToTry.add(SABESP_LINE_PATTERN);
         }
 
         log.info("════════════════════════════════════════════════════════════════════════════════");
@@ -538,6 +547,18 @@ public class PdfLineParser {
                         log.info("      ├─ Referência: [{}]", referencia);
                         log.info("      ├─ Descrição: [{}]", descricao);
                         log.info("      └─ Valor: [{}]", valorStr);
+                    } else if (documentType == DocumentType.SABESP) {
+                        // SABESP: código(1), descrição(2), valor desconto(3) — referência vem do PERÍODO da página
+                        descricao = lineMatcher.group(2) != null
+                                ? normalizer.normalizeDescription(lineMatcher.group(2))
+                                : null;
+                        valorStr = lineMatcher.group(3) != null ? lineMatcher.group(3).trim() : "";
+                        referencia = null;
+
+                        log.info("  └─ ✅ RUBRICA SABESP EXTRAÍDA (filtro final = rubricas ativas no Mongo):");
+                        log.info("      ├─ Código: [{}]", codigo);
+                        log.info("      ├─ Descrição: [{}]", descricao != null ? descricao : "(não encontrada)");
+                        log.info("      └─ Valor (último da linha): [{}]", valorStr);
                     } else {
                         // FUNCEF: código(1), referência(2), descrição(3), prazo(4 opcional), valor(5)
                         referencia = lineMatcher.group(2);

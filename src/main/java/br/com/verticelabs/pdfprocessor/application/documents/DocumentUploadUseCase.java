@@ -14,9 +14,12 @@ import br.com.verticelabs.pdfprocessor.domain.repository.PersonRepository;
 import br.com.verticelabs.pdfprocessor.domain.service.CpfValidationService;
 import br.com.verticelabs.pdfprocessor.domain.service.DocumentTypeDetectionService;
 import br.com.verticelabs.pdfprocessor.domain.service.GridFsService;
+import br.com.verticelabs.pdfprocessor.domain.service.MatriculaNormalizer;
 import br.com.verticelabs.pdfprocessor.domain.service.MonthYearDetectionService;
 import br.com.verticelabs.pdfprocessor.domain.service.PdfService;
 import br.com.verticelabs.pdfprocessor.infrastructure.pdf.DocumentTypeDetectionServiceImpl;
+import br.com.verticelabs.pdfprocessor.infrastructure.pdf.SabespPayslipMetadataExtractor;
+import br.com.verticelabs.pdfprocessor.infrastructure.pdf.SabesprevFichaMetadataExtractor;
 import br.com.verticelabs.pdfprocessor.infrastructure.security.ReactiveSecurityContextHelper;
 import br.com.verticelabs.pdfprocessor.infrastructure.tenant.ReactiveTenantContext;
 import br.com.verticelabs.pdfprocessor.interfaces.documents.dto.UploadDocumentResponse;
@@ -217,13 +220,77 @@ public class DocumentUploadUseCase {
         return pdfService.extractText(new java.io.ByteArrayInputStream(fileBytes))
                             .flatMap(pdfText -> {
                                 log.info("Texto extraído. Tamanho: {} caracteres", pdfText != null ? pdfText.length() : 0);
-                                // Detectar tipo do documento
-                                return typeDetectionService.detectType(pdfText);
+                                return typeDetectionService.detectType(pdfText)
+                                        .map(documentType -> new Object() {
+                                            final DocumentType tipo = documentType;
+                                            final String text = pdfText;
+                                        });
                             })
-                            .flatMap(documentType -> {
+                            .flatMap(ctx -> {
+                                DocumentType documentType = ctx.tipo;
                                 log.info("Tipo detectado: {}", documentType);
+                                String nomeEfetivo = nome;
+                                String matriculaEfetiva = matricula;
+                                String cpfEfetivo = cpf;
+                                if (documentType == DocumentType.SABESP) {
+                                    var metaOpt = SabespPayslipMetadataExtractor.extract(ctx.text);
+                                    if (metaOpt.isPresent()) {
+                                        var meta = metaOpt.get();
+                                        if ((nomeEfetivo == null || nomeEfetivo.isBlank())
+                                                && meta.nome() != null) {
+                                            nomeEfetivo = meta.nome();
+                                        }
+                                        if (meta.matricula() != null) {
+                                            String matForm = matriculaEfetiva != null
+                                                    ? matriculaEfetiva.replaceAll("\\D", "") : "";
+                                            if (matForm.isBlank()) {
+                                                matriculaEfetiva = meta.matricula();
+                                                log.info("SABESP: matrícula obtida do PDF: {}", matriculaEfetiva);
+                                            } else if (!matForm.equals(meta.matricula().replaceAll("\\D", ""))) {
+                                                log.warn(
+                                                        "SABESP: matrícula do PDF ({}) diverge da matrícula do cadastro/upload ({})",
+                                                        meta.matricula(), matForm);
+                                            }
+                                        }
+                                        if (meta.cpf() != null) {
+                                            String cpfForm = cpf != null ? cpf.replaceAll("\\D", "") : "";
+                                            if (cpfForm.isBlank()) {
+                                                cpfEfetivo = meta.cpf();
+                                                log.info("SABESP: CPF obtido do PDF: {}", cpfEfetivo);
+                                            } else if (!cpfForm.equals(meta.cpf())) {
+                                                log.warn(
+                                                        "SABESP: CPF do PDF ({}) diverge do CPF do upload/cliente ({})",
+                                                        meta.cpf(), cpfForm);
+                                            }
+                                        }
+                                    }
+                                } else if (documentType == DocumentType.SABESPREV_FICHA) {
+                                    var metaOpt = SabesprevFichaMetadataExtractor.extract(ctx.text);
+                                    if (metaOpt.isPresent()) {
+                                        var meta = metaOpt.get();
+                                        if ((nomeEfetivo == null || nomeEfetivo.isBlank())
+                                                && meta.nome() != null) {
+                                            nomeEfetivo = meta.nome();
+                                        }
+                                        if (meta.matricula() != null) {
+                                            String matForm = matriculaEfetiva != null
+                                                    ? matriculaEfetiva.replaceAll("\\D", "") : "";
+                                            if (matForm.isBlank()) {
+                                                matriculaEfetiva = meta.matricula();
+                                                log.info("SABESPREV ficha: matrícula obtida do PDF: {}", matriculaEfetiva);
+                                            } else if (!matForm.equals(meta.matricula().replaceAll("\\D", ""))) {
+                                                log.warn(
+                                                        "SABESPREV ficha: matrícula do PDF ({}) diverge da matrícula do cadastro/upload ({})",
+                                                        meta.matricula(), matForm);
+                                            }
+                                        }
+                                    }
+                                }
+                                final String cpfDocumento = cpfEfetivo;
+                                final String nomeDocumento = nomeEfetivo;
+                                final String matriculaDocumento = matriculaEfetiva;
                                 // Garantir que Person existe
-                                return ensurePersonExists(cpf, nome, matricula, tenantId)
+                                return ensurePersonExists(cpfDocumento, nomeDocumento, matriculaDocumento, tenantId)
                                         .flatMap(person -> {
                                             log.info("Person encontrada/criada. CPF: {}", person.getCpf());
                                             // Salvar arquivo no GridFS com deduplicação por hash
@@ -253,7 +320,7 @@ public class DocumentUploadUseCase {
                                                         log.info("Criando PayrollDocument para tenant: {}", tenantId);
                                                         PayrollDocument document = PayrollDocument.builder()
                                                                 .tenantId(tenantId)
-                                                                .cpf(cpf)
+                                                                .cpf(cpfDocumento)
                                                                 .tipo(documentType)
                                                                 .status(DocumentStatus.PENDING)
                                                                 .originalFileId(fileId)
@@ -360,8 +427,7 @@ public class DocumentUploadUseCase {
         
         // Normalizar dados
         String normalizedNome = nome != null && !nome.trim().isEmpty() ? nome.trim().toUpperCase() : null;
-        String normalizedMatricula = matricula != null && !matricula.trim().isEmpty() 
-                ? matricula.replaceAll("[^0-9]", "") : null; // Remove tudo que não é dígito
+        String normalizedMatricula = MatriculaNormalizer.toDigitsOrNull(matricula);
         
         log.info("Dados normalizados - Nome: {}, Matrícula: {}", normalizedNome, normalizedMatricula);
         
@@ -384,21 +450,22 @@ public class DocumentUploadUseCase {
                         }
                     }
                     
-                    // Atualizar matrícula (sempre que fornecida e válida)
-                    if (normalizedMatricula != null && normalizedMatricula.length() == 7) {
-                        // Matrícula válida (7 dígitos) - sempre atualizar se diferente ou null
-                        if (existingPerson.getMatricula() == null || 
-                            !normalizedMatricula.equals(existingPerson.getMatricula())) {
-                            log.info("🔄 Atualizando matrícula: '{}' -> '{}'", 
-                                    existingPerson.getMatricula() != null ? existingPerson.getMatricula() : "null", 
-                                    normalizedMatricula);
+                    // Matrícula: preencher se cadastro vazio; se diverge, só warn (CPF do cadastro é a chave)
+                    if (MatriculaNormalizer.isValid(normalizedMatricula)) {
+                        String matCadastro = MatriculaNormalizer.toDigitsOrNull(existingPerson.getMatricula());
+                        if (matCadastro == null) {
+                            log.info("🔄 Preenchendo matrícula do cadastro: '{}'", normalizedMatricula);
                             existingPerson.setMatricula(normalizedMatricula);
                             needsUpdate = true;
+                        } else if (!normalizedMatricula.equals(matCadastro)) {
+                            log.warn(
+                                    "⚠️ Matrícula do PDF/upload ({}) diverge da matrícula do cadastro ({}). Mantendo cadastro.",
+                                    normalizedMatricula, matCadastro);
                         } else {
                             log.debug("Matrícula já está atualizada: {}", normalizedMatricula);
                         }
-                    } else if (normalizedMatricula != null && normalizedMatricula.length() != 7) {
-                        log.warn("⚠️ Matrícula não tem 7 dígitos após normalização: '{}' (tamanho: {}). Será ignorada.", 
+                    } else if (normalizedMatricula != null) {
+                        log.warn("⚠️ Matrícula inválida após normalização: '{}' (tamanho: {}). Aceito 7–8 dígitos. Será ignorada.", 
                                 normalizedMatricula, normalizedMatricula.length());
                     }
                     
@@ -428,8 +495,7 @@ public class DocumentUploadUseCase {
                                     .tenantId(tenantId)
                                     .cpf(cpf)
                                     .nome(normalizedNome)
-                                    .matricula(normalizedMatricula != null && normalizedMatricula.length() == 7 
-                                            ? normalizedMatricula : null)
+                                    .matricula(MatriculaNormalizer.isValid(normalizedMatricula) ? normalizedMatricula : null)
                                     .createdAt(Instant.now())
                                     .updatedAt(Instant.now())
                                     .build();
@@ -533,6 +599,25 @@ public class DocumentUploadUseCase {
                                         List<String> mesesDetectados = mesesSet.stream()
                                                 .sorted()
                                                 .collect(Collectors.toList());
+
+                                        // Ficha anual SABESPREV: preenche 01–12 a partir do ANO do cabeçalho
+                                        if (documentType == DocumentType.SABESPREV_FICHA) {
+                                            String anoFicha = null;
+                                            for (PageResult result : pageResults) {
+                                                var meta = SabesprevFichaMetadataExtractor.extract(result.pageText);
+                                                if (meta.isPresent() && meta.get().ano() != null) {
+                                                    anoFicha = meta.get().ano();
+                                                    break;
+                                                }
+                                            }
+                                            if (anoFicha != null) {
+                                                anoDetectado = Integer.parseInt(anoFicha);
+                                                mesesDetectados = new ArrayList<>();
+                                                for (int m = 1; m <= 12; m++) {
+                                                    mesesDetectados.add(anoFicha + "-" + String.format("%02d", m));
+                                                }
+                                            }
+                                        }
                                         
                                         return new PageData(mesesDetectados, detectedPages, anoDetectado);
                                     });
@@ -547,6 +632,12 @@ public class DocumentUploadUseCase {
             DocumentType documentType,
             DocumentType pageType,
             String pageText) {
+        if (documentType == DocumentType.SABESP) {
+            return DocumentType.SABESP;
+        }
+        if (documentType == DocumentType.SABESPREV_FICHA) {
+            return DocumentType.SABESPREV_FICHA;
+        }
         if (documentType == DocumentType.FUNCEF
                 && pageType != DocumentType.FUNCEF
                 && pageType != DocumentType.FUNCEF_DEMONSTRATIVO

@@ -171,6 +171,69 @@ Funcef não fornece a referência na mesma linha:
 
 ---
 
+# 5.3 Regex FUNCEF — portal agrupado (multi-ano)
+
+Layout do **portal de autoatendimento** Funcef (PDF digital agrupado, várias competências):
+
+- Cabeçalho: `Mês/Ano Referência: YYYY/MM` + `Nº Benefício INSS`
+- Linha: `2 187 2017/12 PROVENTOS INSS R$ 3.659,69` (código com espaço, ref `YYYY/MM`, valor com `R$` opcional)
+- Competências em 2 páginas (`Página 1 de 2` / `Página 2 de 2`); a **página 2 não tem cabeçalho**
+
+### Regras
+
+| Tema | Comportamento |
+|------|----------------|
+| Tipo | Continua `FUNCEF` (sem novo `DocumentType`) |
+| Detecção | Sinais `Mês/Ano Referência`, `Tipo / Rubrica` + logo Funcef |
+| Mês | Priorizar `Mês/Ano Referência: YYYY/MM` em `MonthYearDetectionServiceImpl` |
+| Parser | `FUNCEF_PATTERN` com `(?:R\$\s*)?`; pré-juntar linhas quebradas até achar valor |
+| Continuação | Pág. 2 de 2: herdar origem `FUNCEF` e `mesPagamento` da página anterior |
+| Totais | Ignorar blocos `Renda Base` / `Bruto` / `Líquido` / rodapé |
+
+Classes: `DocumentTypeDetectionServiceImpl`, `MonthYearDetectionServiceImpl`, `PdfLineParser`, `DocumentUploadUseCase` / `DocumentProcessUseCase`.  
+Regressão: `FuncefPortalAgrupadoParsingTest`.
+
+Plano: **Funcef portal agrupado**. Catálogo: [008 - PLANOS_EXECUTADOS…](../10-planejamento/008%20-%20PLANOS_EXECUTADOS_PDFPROCESSOR.md).
+
+---
+
+# 5.4 SABESP — Demonstrativo de Pagamento (ativa)
+
+Layout SAP da **Companhia de Saneamento Básico do Estado de São Paulo — SABESP**.
+
+- Título: `DEMONSTRATIVO DE PAGAMENTO` + marca/razão `SABESP`
+- Identificação: `PERÍODO` (`MM/YYYY`), `MATRÍC` (7–8 dígitos), `NOME DO EMPREGADO`
+- **CPF:** o vínculo do documento é sempre o **CPF do cadastro do cliente** (upload por `personId` ou form). Layout de referência (Anselmo) **não** traz CPF no PDF. Se o PDF trouxer CPF e divergir do cadastro → `warn` (não bloqueia); só usa CPF do PDF se o form/cadastro estiver sem CPF.
+- **Matrícula (8 dígitos):** chave auxiliar no cadastro (formulário aceita **7–9** dígitos). Extraída do PDF (`MATRÍC`); se o cadastro estiver vazio, preenche; se divergir → `warn` e mantém a matrícula do cadastro.
+- Colunas: `CONTA | DESCRIÇÃO | QTDE. | VALOR UNIT. | VENCIMENTOS | DESCONTOS`
+- Extrai linhas {@code CONTA + descrição + valor} (código 3–4 dígitos); **só persiste** se a rubrica existir e estiver ativa na tabela `rubricas` (mesmo fluxo CAIXA/FUNCEF). Rubricas SABESP (ex.: 3347/3349) = cadastro na UI/API — sem seed e sem lista fixa no parser.
+- `DocumentType.SABESP` / `PayrollEntry.origem = "SABESP"`
+- Totais Excel: soma dos meses (como CAIXA; sem regra Funcef FEV/NOV)
+- **Simulação IRPF / Resumo Geral:** mesmo fluxo `prevCompl` dos demais contracheques — consolidação sem filtro de origem inclui entries `SABESP`; `PrevComplPlanilhaHelper.calcularPrevComplSimulacao` soma 3347+3349 no ano → bloco 2 e Resumo Geral (`ResumoGeralAssemblyService`)
+
+Classes: `DocumentTypeDetectionServiceImpl.isSabespDemonstrativo`, `SabespPayslipMetadataExtractor`, `PdfLineParser` (`SABESP_LINE_PATTERN`), `RubricaValidator`.  
+Regressão: `SabespPayslipParsingTest`, `PrevComplPlanilhaHelperTest` (3347+3349 → 758,75).
+
+---
+
+# 5.5 SABESPREV — Ficha Financeira de Pagamentos (aposentado)
+
+PDF anual da **Fundação SABESP de Seguridade Social — SABESPREV** (substitui o contracheque mensal SABESP quando a pessoa se aposenta).
+
+- Título: `FICHA FINANCEIRA DE PAGAMENTOS` + `SABESPREV`
+- Cabeçalho: `ANO: YYYY`, `MATRÍCULA` (até 9 dígitos), `NOME` — sem CPF no PDF (vínculo = CPF do cadastro)
+- Grade: `RUBRICA | DESCRIÇÃO | P/D | JAN…DEZ | TOTAL`
+- Parser: interpreta layout PDFBox (`…valores TOTAL DEZ` colados + `CÓDIGO P/D` no fim da linha); meses com valor **> 0** → `PayrollEntry` (`referencia`/`mesPagamento` = `YYYY-MM`)
+- **Whitelist:** tabela `rubricas` (cadastro UI/API — sem seed). Códigos típicos: `7400`, `7401`, `7402`, `7404`, `9100`, `9102`, `9111`
+- `DocumentType.SABESPREV_FICHA` / `PayrollEntry.origem = "SABESPREV"`
+- Detecção **antes** do demonstrativo mensal SABESP
+- **Excel (aba do ano):** se o ano for só códigos `7*`/`9*` (ficha) — ou `origem = SABESPREV` — o rodapé não é `TOTAL Mensal`; são 3 linhas — **CONTRIBUIÇÃO** (soma `7*`), **DEVOLUÇÃO** (soma `9*`), **TOTAL** (= CONTRIBUIÇÃO − DEVOLUÇÃO). A decisão é **por ano** (cliente com SABESP ativa + ficha no mesmo Excel continua correto).
+
+Classes: `DocumentTypeDetectionServiceImpl.isSabesprevFichaFinanceira`, `SabesprevFichaMetadataExtractor`, `SabesprevFichaFinanceiraParser`, `SabesprevFichaTotaisHelper`, `RubricaValidator`.  
+Regressão: `SabesprevFichaFinanceiraParsingTest`, `SabesprevFichaTotaisHelperTest` (Anselmo 2021 → 637,02).
+
+---
+
 # 6. NORMALIZAÇÃO
 
 ## 6.1 Números

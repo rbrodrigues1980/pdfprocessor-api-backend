@@ -1,5 +1,11 @@
 # Plano: Automação de Declaração de Imposto de Renda via Programa da Receita Federal
 
+> **Status: HISTÓRICO / NÃO IMPLEMENTADO COMO DESCRITO.**  
+> O Informe de Rendimentos Funcef foi entregue em Jul/2026 como MVP Java + regex  
+> (`INFORME_RENDIMENTOS`), sem Gemini e sem agente desktop.  
+> Doc operacional: [011 - API_INFORME_RENDIMENTOS.md](../04-api-referencia/011%20-%20API_INFORME_RENDIMENTOS.md).  
+> Catálogo: [008 - PLANOS_EXECUTADOS…](./008%20-%20PLANOS_EXECUTADOS_PDFPROCESSOR.md).
+
 ## Índice
 
 - [1. Visão Geral](#1-visão-geral)

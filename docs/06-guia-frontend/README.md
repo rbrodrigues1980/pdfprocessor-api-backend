@@ -11,7 +11,7 @@
 |--------|-----------|---------------|-----------|
 | **QA** | [000 - JORNADA_USUARIO_QA.md](./000%20-%20JORNADA_USUARIO_QA.md) | — | **Jornada completa do usuário** passo a passo, do login à exportação Excel. Roteiro QA com checklist de validação para cada etapa. |
 | Auth | [001 - API_AUTH_FRONTEND.md](./001%20-%20API_AUTH_FRONTEND.md) | `/api/v1/auth` | Fluxo de login, 2FA, refresh token, logout, registro. Proteção de rotas e interceptors HTTP. |
-| Documentos | [002 - API_DOCUMENTS_FRONTEND.md](./002%20-%20API_DOCUMENTS_FRONTEND.md) | `/api/v1/documents` | Upload, processamento, status, entries, paginação e isolamento multi-tenant. Documento extenso (~1.650 linhas). |
+| Documentos | [002 - API_DOCUMENTS_FRONTEND.md](./002%20-%20API_DOCUMENTS_FRONTEND.md) | `/api/v1/documents` | Upload, processamento, status, entries, paginação e isolamento multi-tenant. Inclui tipagem `INFORME_RENDIMENTOS` (ver também API 011). |
 | Pessoas | [003 - API_PERSONS_FRONTEND.md](./003%20-%20API_PERSONS_FRONTEND.md) | `/api/v1/persons` | Listagem, filtros, documentos por CPF, entries, matriz de rubricas, consolidação e Excel. Documento extenso (~2.270 linhas). |
 | Pessoas (CRUD) | [004 - API_PERSONS_CRUD_IMPLEMENTATION.md](./004%20-%20API_PERSONS_CRUD_IMPLEMENTATION.md) | `/api/v1/persons` | Detalhes de implementação backend do CRUD de pessoas. Upload por personId, IR por personId, deleção. |
 | Consolidação | [005 - API_CONSOLIDATION_FRONTEND.md](./005%20-%20API_CONSOLIDATION_FRONTEND.md) | `/api/v1/persons/{cpf}/consolidated` | Matriz consolidada ano/mês por rubrica. Filtros por ano/origem, comparação com endpoint `/rubricas`. |

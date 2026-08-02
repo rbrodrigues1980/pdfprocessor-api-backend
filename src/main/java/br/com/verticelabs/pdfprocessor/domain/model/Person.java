@@ -29,7 +29,8 @@ public class Person {
     
     private String nome; // Nome completo do titular
     
-    private String matricula; // Matrícula (formato pode variar: "0437412" ou "043741-2")
+    /** Matrícula: 7–9 dígitos (CAIXA/FUNCEF/SABESP/SABESPREV). Chave auxiliar; vínculo principal é o CPF do cadastro. */
+    private String matricula;
 
     /** Empresa/entidade associada ao cliente (sempre em maiúsculas). @deprecated substituído por empresaId */
     @Deprecated

@@ -7,6 +7,7 @@ import br.com.verticelabs.pdfprocessor.domain.model.Person;
 import br.com.verticelabs.pdfprocessor.domain.model.PersonStatus;
 import br.com.verticelabs.pdfprocessor.domain.repository.PersonRepository;
 import br.com.verticelabs.pdfprocessor.domain.service.CpfValidationService;
+import br.com.verticelabs.pdfprocessor.domain.service.MatriculaNormalizer;
 import br.com.verticelabs.pdfprocessor.infrastructure.security.ReactiveSecurityContextHelper;
 import br.com.verticelabs.pdfprocessor.interfaces.persons.dto.CreatePersonRequest;
 import lombok.RequiredArgsConstructor;
@@ -34,17 +35,25 @@ public class CreatePersonUseCase {
             return Mono.error(new InvalidCpfException("CPF inválido: " + request.getCpf()));
         }
 
+        final String normalizedMatricula;
+        try {
+            normalizedMatricula = MatriculaNormalizer.normalizeOptional(request.getMatricula());
+        } catch (IllegalArgumentException ex) {
+            return Mono.error(ex);
+        }
+
         return ReactiveSecurityContextHelper.isSuperAdmin()
                 .flatMap(isSuperAdmin -> {
                     if (Boolean.TRUE.equals(isSuperAdmin)) {
-                        return createForTenant("GLOBAL", normalizedCpf, request);
+                        return createForTenant("GLOBAL", normalizedCpf, normalizedMatricula, request);
                     }
                     return ReactiveSecurityContextHelper.getTenantId()
-                            .flatMap(tenantId -> createForTenant(tenantId, normalizedCpf, request));
+                            .flatMap(tenantId -> createForTenant(tenantId, normalizedCpf, normalizedMatricula, request));
                 });
     }
 
-    private Mono<Person> createForTenant(String tenantId, String normalizedCpf, CreatePersonRequest request) {
+    private Mono<Person> createForTenant(
+            String tenantId, String normalizedCpf, String normalizedMatricula, CreatePersonRequest request) {
         return personRepository.existsByTenantIdAndCpf(tenantId, normalizedCpf)
                 .flatMap(exists -> {
                     if (Boolean.TRUE.equals(exists)) {
@@ -55,7 +64,7 @@ public class CreatePersonUseCase {
                             .tenantId(tenantId)
                             .cpf(normalizedCpf)
                             .nome(request.getNome())
-                            .matricula(request.getMatricula())
+                            .matricula(normalizedMatricula)
                             .ativo(true)
                             .status(PersonStatus.EM_PROCESSAMENTO)
                             .createdAt(Instant.now())
@@ -65,7 +74,8 @@ public class CreatePersonUseCase {
                     return personEmpresaVinculoService.validateAndApply(
                                     tenantId, request.getEmpresaId(), request.getPercentualHonorarioId(), person)
                             .then(personRepository.save(person))
-                            .doOnSuccess(p -> log.info("Pessoa criada com sucesso: ID={}, CPF={}", p.getId(), p.getCpf()));
+                            .doOnSuccess(p -> log.info("Pessoa criada com sucesso: ID={}, CPF={}, Matrícula={}",
+                                    p.getId(), p.getCpf(), p.getMatricula()));
                 });
     }
 }

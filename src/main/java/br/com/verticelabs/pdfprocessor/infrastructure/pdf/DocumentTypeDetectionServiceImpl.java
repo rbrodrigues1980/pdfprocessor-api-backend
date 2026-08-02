@@ -22,6 +22,16 @@ public class DocumentTypeDetectionServiceImpl implements DocumentTypeDetectionSe
             return Mono.just(DocumentType.INFORME_RENDIMENTOS);
         }
 
+        // ===== FICHA FINANCEIRA SABESPREV (antes do payslip SABESP) =====
+        if (isSabesprevFichaFinanceira(upperText)) {
+            return Mono.just(DocumentType.SABESPREV_FICHA);
+        }
+
+        // ===== SABESP (antes de CAIXA: ambos usam "DEMONSTRATIVO DE PAGAMENTO") =====
+        if (isSabespDemonstrativo(upperText)) {
+            return Mono.just(DocumentType.SABESP);
+        }
+
         // ===== PADRÕES ESPECÍFICOS DA CAIXA =====
         // 1. Título do documento CAIXA
         boolean hasCaixaTitle = upperText.contains("DEMONSTRATIVO DE PAGAMENTO");
@@ -207,6 +217,32 @@ public class DocumentTypeDetectionServiceImpl implements DocumentTypeDetectionSe
                 || upperText.contains("ECONOMIÁRIOS FEDERAIS")
                 || upperText.contains("00.436.923/0001-90");
         return hasComprovante && (hasSecao7 || hasFuncefFonte);
+    }
+
+    /**
+     * Ficha Financeira de Pagamentos SABESPREV (matriz anual).
+     * Deve ser detectada antes do demonstrativo mensal SABESP.
+     */
+    static boolean isSabesprevFichaFinanceira(String upperText) {
+        boolean hasTitle = upperText.contains("FICHA FINANCEIRA");
+        boolean hasSabesprev = upperText.contains("SABESPREV")
+                || upperText.contains("FUNDACAO SABESP DE SEGURIDADE")
+                || upperText.contains("FUNDAÇÃO SABESP DE SEGURIDADE");
+        return hasTitle && hasSabesprev;
+    }
+
+    /**
+     * Demonstrativo de Pagamento SABESP (ativa). Exige razão social / marca SABESP
+     * para não colidir com CAIXA ("DEMONSTRATIVO DE PAGAMENTO").
+     */
+    static boolean isSabespDemonstrativo(String upperText) {
+        boolean hasTitle = upperText.contains("DEMONSTRATIVO DE PAGAMENTO");
+        boolean hasSabesp = upperText.contains("SABESP")
+                || upperText.contains("COMPANHIA DE SANEAMENTO BASICO")
+                || upperText.contains("COMPANHIA DE SANEAMENTO BÁSICO");
+        boolean hasPeriodoMatric = (upperText.contains("PERÍODO") || upperText.contains("PERIODO"))
+                && (upperText.contains("MATRÍC") || upperText.contains("MATRIC"));
+        return hasTitle && hasSabesp && (hasPeriodoMatric || upperText.contains("SABESPREV"));
     }
 
     private static final java.util.regex.Pattern FUNCEF_RUBRICA_LINE = java.util.regex.Pattern.compile(

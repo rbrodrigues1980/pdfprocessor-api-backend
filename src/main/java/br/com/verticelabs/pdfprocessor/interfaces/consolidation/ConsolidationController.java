@@ -23,7 +23,7 @@ public class ConsolidationController {
      * 
      * Query params opcionais:
      * - ano: consolida apenas 1 ano (ex: "2017")
-     * - origem: filtra CAIXA/FUNCEF
+     * - origem: filtra CAIXA/FUNCEF/SABESP/SABESPREV
      */
     @GetMapping("/{cpf}/consolidated")
     public Mono<ResponseEntity<Object>> getConsolidated(
