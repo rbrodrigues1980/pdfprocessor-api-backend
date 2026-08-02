@@ -13,13 +13,13 @@
 | 01 | [Início Rápido](./01-inicio-rapido/) | Instalação local e configurações iniciais | 2 docs |
 | 02 | [Arquitetura](./02-arquitetura/) | Visão geral, Clean Architecture, diagramas e extrator PDF | 7 docs |
 | 03 | [Banco de Dados](./03-banco-de-dados/) | Modelagem MongoDB, dicionário de dados, troubleshooting | 4 docs |
-| 04 | [API — Referência](./04-api-referencia/) | Endpoints core do sistema (APIs 1-7), especificação | 10 docs |
-| 05 | [Autenticação & Multi-Tenant](./05-autenticacao-multi-tenant/) | JWT, 2FA, RBAC, isolamento por tenant | 7 docs |
-| 06 | [Guia Frontend](./06-guia-frontend/) | Documentação de integração para desenvolvedores frontend | 11 docs |
-| 07 | [Imposto de Renda](./07-imposto-renda/) | IRPF, Taxa SELIC, extração iText8, rubricas IR | 4 docs |
+| 04 | [API — Referência](./04-api-referencia/) | Endpoints core do sistema (APIs 1-7), especificação | 11 docs |
+| 05 | [Autenticação & Multi-Tenant](./05-autenticacao-multi-tenant/) | JWT, 2FA, RBAC, isolamento por tenant | 8 docs |
+| 06 | [Guia Frontend](./06-guia-frontend/) | Documentação de integração para desenvolvedores frontend | 14 docs |
+| 07 | [Imposto de Renda](./07-imposto-renda/) | IRPF, Taxa SELIC, extração iText8, rubricas IR, motor | 5 docs |
 | 08 | [Inteligência Artificial](./08-inteligencia-artificial/) | Integração Gemini AI 2.5, configuração e plano de upgrade | 2 docs |
 | 09 | [Deploy](./09-deploy/) | Deploy no Google Cloud Run | 1 doc |
-| 10 | [Planejamento](./10-planejamento/) | Backlog, sprints, roadmap de funcionalidades | 4 docs |
+| 10 | [Planejamento](./10-planejamento/) | Backlog, sprints, catálogo de planos executados | 8 docs |
 | 11 | [Troubleshooting](./11-troubleshooting/) | Correções, problemas conhecidos, decisões técnicas | 3 docs |
 
 ---
@@ -86,4 +86,6 @@ docs/
 
 ---
 
-> **Última atualização:** Fevereiro 2026
+> **Última atualização:** Julho 2026
+
+Para o histórico de planos Cursor já implementados e a convenção de documentação pós-plano, veja [008 - PLANOS_EXECUTADOS_PDFPROCESSOR.md](./10-planejamento/008%20-%20PLANOS_EXECUTADOS_PDFPROCESSOR.md).

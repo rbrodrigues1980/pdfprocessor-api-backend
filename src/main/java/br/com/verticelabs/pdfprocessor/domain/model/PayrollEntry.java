@@ -36,7 +36,7 @@ public class PayrollEntry {
 
     private BigDecimal valor; // Valor numérico
 
-    private String origem; // CAIXA ou FUNCEF
+    private String origem; // CAIXA, FUNCEF, SABESP ou SABESPREV
 
     private Integer pagina; // Página onde foi extraída (1-indexed)
 }

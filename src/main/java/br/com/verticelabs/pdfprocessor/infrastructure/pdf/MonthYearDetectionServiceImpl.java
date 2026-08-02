@@ -61,6 +61,13 @@ public class MonthYearDetectionServiceImpl implements MonthYearDetectionService 
         }
 
         return Mono.<Optional<String>>fromCallable(() -> {
+            // 0) SABESP — PERÍODO MM/YYYY (antes de padrões genéricos YYYY/MM)
+            Optional<String> sabesp = SabespPayslipMetadataExtractor.detectPeriodoYm(pageText);
+            if (sabesp.isPresent()) {
+                log.debug("Mês/Ano detectado (SABESP PERÍODO): {}", sabesp.get());
+                return sabesp;
+            }
+
             // 1) Portal Funcef — cabeçalho "Mês/Ano Referência"
             Matcher portalMatcher = FUNCEF_PORTAL_MES_ANO_REFERENCIA.matcher(pageText);
             if (portalMatcher.find()) {

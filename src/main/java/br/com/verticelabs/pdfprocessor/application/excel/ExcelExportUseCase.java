@@ -46,7 +46,7 @@ public class ExcelExportUseCase {
      * 
      * @param cpf CPF da pessoa
      * @param ano Ano opcional para filtrar (formato: "2017")
-     * @param origem Origem opcional para filtrar ("CAIXA" ou "FUNCEF")
+     * @param origem Origem opcional para filtrar ("CAIXA", "FUNCEF", "SABESP" ou "SABESPREV")
      * @return Mono com resultado contendo bytes e nome do arquivo
      */
     public Mono<ExcelExportResult> generateExcel(String cpf, String ano, String origem) {
@@ -134,7 +134,7 @@ public class ExcelExportUseCase {
      * 
      * @param personId ID único da pessoa
      * @param ano Ano opcional para filtrar (formato: "2017")
-     * @param origem Origem opcional para filtrar ("CAIXA" ou "FUNCEF")
+     * @param origem Origem opcional para filtrar ("CAIXA", "FUNCEF", "SABESP" ou "SABESPREV")
      * @return Mono com resultado contendo bytes e nome do arquivo
      */
     public Mono<ExcelExportResult> generateExcelById(String personId, String ano, String origem) {
@@ -231,7 +231,7 @@ public class ExcelExportUseCase {
      * @param cpf CPF da pessoa
      * @param tenantId ID do tenant da pessoa
      * @param ano Ano opcional para filtrar (formato: "2017")
-     * @param origem Origem opcional para filtrar ("CAIXA" ou "FUNCEF")
+     * @param origem Origem opcional para filtrar ("CAIXA", "FUNCEF", "SABESP" ou "SABESPREV")
      * @return Mono com resultado contendo bytes e nome do arquivo
      */
     public Mono<ExcelExportResult> generateExcelByCpfAndTenant(String cpf, String tenantId, String ano, String origem) {

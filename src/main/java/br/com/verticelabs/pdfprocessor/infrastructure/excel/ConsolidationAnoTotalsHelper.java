@@ -48,7 +48,7 @@ public final class ConsolidationAnoTotalsHelper {
      * <p>
      * Prefere {@link ConsolidationRow#getTotaisPorAno()} (já com regra Funcef).
      * Fallback FEV+NOV → NOV apenas para origem Funcef / Funcef Demonstrativo.
-     * Em {@code CAIXA} (ou origem mista/ausente no fallback), retorna a soma simples.
+     * Em {@code CAIXA}/{@code SABESP}/{@code SABESPREV} (ou origem mista/ausente no fallback), retorna a soma simples.
      */
     public static BigDecimal calcularTotalRubricaAno(
             ConsolidationRow rubrica, String ano, BigDecimal somaSimples, String origem) {

@@ -56,6 +56,7 @@ public class DocumentProcessUseCase {
     private final MonthYearDetectionService monthYearDetectionService;
     private final ITextIncomeTaxService iTextIncomeTaxService;
     private final PdfLineParser lineParser;
+    private final SabesprevFichaFinanceiraParser sabesprevFichaFinanceiraParser;
     private final PdfNormalizer normalizer;
     private final RubricaValidator rubricaValidator;
     private final IrpfDeclaracaoDataMapper irpfDeclaracaoDataMapper;
@@ -884,7 +885,11 @@ public class DocumentProcessUseCase {
         String origemDetectada = determinePageOrigin(document, pageNumber);
         // Continuação Funcef portal pode ter sido classificada como CAIXA no upload antigo
         final String origem;
-        if (document.getTipo() == DocumentType.FUNCEF
+        if (document.getTipo() == DocumentType.SABESP) {
+            origem = "SABESP";
+        } else if (document.getTipo() == DocumentType.SABESPREV_FICHA) {
+            origem = "SABESPREV";
+        } else if (document.getTipo() == DocumentType.FUNCEF
                 && !"FUNCEF".equals(origemDetectada)
                 && !"FUNCEF_DEMONSTRATIVO".equals(origemDetectada)
                 && DocumentTypeDetectionServiceImpl.looksLikeFuncefPortalContinuation(pageText)) {
@@ -916,7 +921,15 @@ public class DocumentProcessUseCase {
                     log.info("════════════════════════════════════════════════════════════════════════════════");
 
                     List<PdfLineParser.ParsedLine> parsedLines;
-                    if (pageType == DocumentType.FUNCEF) {
+                    if (pageType == DocumentType.SABESPREV_FICHA
+                            || document.getTipo() == DocumentType.SABESPREV_FICHA) {
+                        String ano = document.getAnoDetectado() != null
+                                ? String.valueOf(document.getAnoDetectado())
+                                : SabesprevFichaMetadataExtractor.extract(pageText)
+                                        .map(SabesprevFichaMetadataExtractor.SabesprevFichaMetadata::ano)
+                                        .orElse(null);
+                        parsedLines = sabesprevFichaFinanceiraParser.parse(pageText, ano);
+                    } else if (pageType == DocumentType.FUNCEF) {
                         parsedLines = lineParser.parseLinesFuncef(pageText, referencia);
                     } else {
                         parsedLines = lineParser.parseLines(pageText, pageType);
@@ -944,6 +957,12 @@ public class DocumentProcessUseCase {
                                 ? parsedLine.getReferencia()
                                 : referencia;
 
+                        // Ficha anual: cada linha já traz YYYY-MM — usar também como mesPagamento
+                        String mesPagamentoEntry = (document.getTipo() == DocumentType.SABESPREV_FICHA
+                                || pageType == DocumentType.SABESPREV_FICHA)
+                                ? finalReferencia
+                                : referencia;
+
                         PayrollEntry entry = createEntryFromParsedLine(
                                 document.getId(),
                                 document.getTenantId(),
@@ -951,7 +970,7 @@ public class DocumentProcessUseCase {
                                 finalReferencia,
                                 origem,
                                 pageNumber,
-                                referencia);
+                                mesPagamentoEntry);
 
                         if (entry != null) {
                             entries.add(entry);
@@ -1016,6 +1035,10 @@ public class DocumentProcessUseCase {
             return DocumentType.FUNCEF;
         } else if ("FUNCEF_DEMONSTRATIVO".equals(origem)) {
             return DocumentType.FUNCEF_DEMONSTRATIVO;
+        } else if ("SABESP".equals(origem)) {
+            return DocumentType.SABESP;
+        } else if ("SABESPREV".equals(origem) || "SABESPREV_FICHA".equals(origem)) {
+            return DocumentType.SABESPREV_FICHA;
         } else {
             return document.getTipo();
         }

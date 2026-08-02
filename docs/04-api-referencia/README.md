@@ -16,9 +16,10 @@
 | 3 | [005 - API_3_PROCESS_DOCUMENT.md](./005%20-%20API_3_PROCESS_DOCUMENT.md) | `/api/v1/documents/{id}/process` | Processamento assíncrono de PDFs. Extração página por página com regex CAIXA/FUNCEF, normalização e validação. **Documento mais detalhado (~1.150 linhas).** |
 | 4 | [006 - API_4_ENTRIES.md](./006%20-%20API_4_ENTRIES.md) | `/api/v1/entries` | Consulta de rubricas extraídas (payroll entries). Filtros por documento, CPF, rubrica, ano, mês, origem e valores. Paginação. |
 | 5 | [007 - API_5_CONSOLIDATED.md](./007%20-%20API_5_CONSOLIDATED.md) | `/api/v1/consolidated` | Consolidação por pessoa: transforma entries em matriz ano/mês por rubrica. Calcula totais. Formato para Excel. |
-| 6 | [008 - API_6_EXCEL_EXPORT.md](./008%20-%20API_6_EXCEL_EXPORT.md) | `/api/v1/excel/export` | Exportação Excel com Apache POI. Três abas: Consolidação, Totais Mensais, Metadados. Formatação e estilos. |
+| 6 | [008 - API_6_EXCEL_EXPORT.md](./008%20-%20API_6_EXCEL_EXPORT.md) | `/api/v1/excel/export` | Exportação Excel (abas anuais, simulação IRPF, Resumo Geral Tema 1.224/STJ, depósito judicial §15). |
 | 7 | [009 - API_7_DOCUMENTS_QUERY.md](./009%20-%20API_7_DOCUMENTS_QUERY.md) | `/api/v1/documents` | Consulta e gestão de documentos. Status (PENDING/PROCESSING/PROCESSED/ERROR), resumo de rubricas, reprocessamento. |
 | — | [010 - MATRIZ_EXCEL_EXEMPLO.md](./010%20-%20MATRIZ_EXCEL_EXEMPLO.md) | — | Exemplo da estrutura da matriz Excel consolidada: 39 colunas, 18 linhas de rubricas, mapeamento JSON → planilha. |
+| — | [011 - API_INFORME_RENDIMENTOS.md](./011%20-%20API_INFORME_RENDIMENTOS.md) | `/api/v1/documents/{id}/informe-rendimentos-data` | Informe Funcef (`INFORME_RENDIMENTOS`): detecção, seção 7, persistência e uso do IRRF judicial na simulação/Resumo Geral. |
 
 ---
 

@@ -118,6 +118,25 @@ class PrevComplPlanilhaHelperTest {
         assertFalse(PrevComplPlanilhaHelper.isCnpjIgnorado("03.730.204/0001-76"));
     }
 
+    @Test
+    void sabesp3347e3349_entramNoPrevComplDaSimulacao() {
+        Map<String, BigDecimal> valores3347 = new HashMap<>();
+        valores3347.put("2020-01", new BigDecimal("700.39"));
+        Map<String, BigDecimal> valores3349 = new HashMap<>();
+        valores3349.put("2020-01", new BigDecimal("58.36"));
+
+        ConsolidatedResponse consolidated = ConsolidatedResponse.builder()
+                .origem("SABESP")
+                .rubricas(List.of(
+                        ConsolidationRow.builder().codigo("3347").valores(valores3347).build(),
+                        ConsolidationRow.builder().codigo("3349").valores(valores3349).build()))
+                .build();
+
+        assertEquals(
+                new BigDecimal("758.75"),
+                PrevComplPlanilhaHelper.calcularPrevComplSimulacao(consolidated, "2020", null));
+    }
+
     private static IrpfDeclaracaoData margaridaAc2016Pagamentos() {
         List<PagamentoEfetuadoIrpf> pagamentos = new ArrayList<>();
         pagamentos.add(PagamentoEfetuadoIrpf.builder()

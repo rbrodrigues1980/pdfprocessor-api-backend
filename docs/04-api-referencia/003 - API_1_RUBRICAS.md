@@ -280,7 +280,7 @@ O extrator utiliza rubricas desta forma:
   - criação duplicada
   - atualização correta
   - soft delete
-- Criar seeds iniciais com CommandLineRunner.
+- Criar seeds iniciais com CommandLineRunner. → **Não usar.** Rubricas de qualquer origem (CAIXA, FUNCEF, SABESP, etc.) são cadastradas exclusivamente via API/UI (`POST /api/v1/rubricas`).
 - Permitir importação via JSON no futuro.
 
 --------------------------------------------------------------------------------

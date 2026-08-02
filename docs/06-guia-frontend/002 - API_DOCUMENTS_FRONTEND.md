@@ -1850,6 +1850,22 @@ async function gerenciarDocumento(
 
 ---
 
+## Informe de Rendimentos (Funcef)
+
+Tipo `INFORME_RENDIMENTOS` sobe pelo **mesmo upload de contracheques** (bulk por personId). O backend detecta o tipo automaticamente.
+
+| Item | Detalhe |
+|------|---------|
+| Label UI | Informe de Rendimentos |
+| Botão de upload | **Contracheques e Informes** |
+| Dados | `GET /api/v1/documents/{id}/informe-rendimentos-data` |
+| UI | Modal **Ver Informe** (`persons-page.tsx`) |
+| Uso no Excel | IRRF / IRRF 13º no bloco 2 da simulação (mesmo ano-calendário) |
+
+Documentação completa: [011 - API_INFORME_RENDIMENTOS.md](../04-api-referencia/011%20-%20API_INFORME_RENDIMENTOS.md).
+
+---
+
 ## 🔗 Links Úteis
 
 - [Documentação Completa das APIs](./API_COMPLETA_E_ARQUITETURA.md)
@@ -1857,9 +1873,10 @@ async function gerenciarDocumento(
 - [Documentação de Tenants](./API_TENANTS_FRONTEND.md)
 - [Documentação de Rubricas](./API_RUBRICAS_FRONTEND.md)
 - [Configuração de IA (Gemini)](./API_AI_CONFIG_FRONTEND.md)
+- [Informe de Rendimentos](../04-api-referencia/011%20-%20API_INFORME_RENDIMENTOS.md)
 - Swagger UI: `http://localhost:8081/swagger-ui.html`
 
 ---
 
-**Última atualização**: Fevereiro 2026
+**Última atualização**: Julho 2026
 

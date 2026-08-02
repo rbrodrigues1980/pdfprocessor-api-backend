@@ -56,6 +56,15 @@ Binário do arquivo Excel.
 ✔ Colunas ajustadas automaticamente  
 ✔ Linha superior congelada (freeze pane)  
 
+### Rodapé por origem / ano
+
+| Caso | Rodapé da aba do ano |
+|------|----------------------|
+| CAIXA / FUNCEF / SABESP (holerite) | Linha **TOTAL Mensal** (regras Funcef FEV/NOV só quando aplicável) |
+| Ficha financeira SABESPREV (`7*` / `9*`) | Três linhas: **CONTRIBUIÇÃO** − **DEVOLUÇÃO** = **TOTAL**. A decisão é **por ano** (`SabesprevFichaTotaisHelper`), não só pela `origem` global — cliente com holerite SABESP + ficha no mesmo Excel continua correto. |
+
+Detalhe do parser e regressão: [007 - EXTRATOR.md](../02-arquitetura/007%20-%20EXTRATOR.md) §5.5.
+
 ---
 
 ## Aba 2 — Totais Mensais
@@ -388,6 +397,27 @@ Accept: application/pdf
 Reaproveita a montagem compartilhada (`ResumoGeralUseCase.montarByPersonId` → `ResumoGeralAssemblyService`), então segue exatamente as mesmas regras de colunas B–H (incluindo a regra de impacto financeiro acima). Valores monetários sem prefixo `R$`, como no Excel.
 
 Classes: `ResumoGeralPdfUseCase`, `ResumoGeralPdfGenerator` (iText), `ResumoGeralPdfResult`. Regressão: `ResumoGeralPdfGeneratorTest`.
+
+---
+
+# 15. Depósito judicial (Informe) no bloco de simulação
+
+Quando existe documento `INFORME_RENDIMENTOS` do **mesmo ano-calendário** da aba anual, o bloco **2** (simulação com aproveitamento) acrescenta o IRRF judicial ao imposto pago.
+
+### Comportamento
+
+1. Após o 1º `Total do imposto pago` (DIRPF), linhas:  
+   `Imposto Pago - Através de Depósito Judicial - Processo Jud {n} - {data} - {codigo} - {vara}`  
+   com valores **IRRF** e **IRRF 13º** (não Contr. Extr.).
+2. 2º `Total do imposto pago` = DIRPF + soma dos IRRFs judiciais.
+3. `RESULTADO — ESTUDO…` usa o 2º total.
+4. Bloco 1 (declaração entregue) **não** recebe essas linhas.
+5. Resumo Geral: `calcularResultadoBloco2Simulacao` inclui a mesma soma no `totalPago` (coluna C/D).
+
+Referência Paulo AC 2018: 9.974,48 + 3.470,00 + 523,61 = **13.968,09**.
+
+Doc completo do tipo e da API: [011 - API_INFORME_RENDIMENTOS.md](./011%20-%20API_INFORME_RENDIMENTOS.md).  
+Regressão: `ExcelResumoGeralHelperDepositoJudicialTest`.
 
 ---
 

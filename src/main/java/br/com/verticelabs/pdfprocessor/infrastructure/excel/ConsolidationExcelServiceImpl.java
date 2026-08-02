@@ -121,10 +121,20 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
                                                     numberStyle,
                                                     defaultStyle);
 
-                                            // Linha de totais mensais
-                                            currentRow = addMonthlyTotals(sheet, consolidatedResponse, ano, currentRow,
-                                                    totalStyle,
-                                                    numberStyle);
+                                            // Ficha SABESPREV: CONTRIBUIÇÃO (7*) − DEVOLUÇÃO (9*) = TOTAL
+                                            // Decisão por ano (origem global pode ser mista SABESP+SABESPREV → null)
+                                            boolean rodapeFicha = "SABESPREV".equalsIgnoreCase(
+                                                    consolidatedResponse.getOrigem())
+                                                    || SabesprevFichaTotaisHelper.isAnoFichaFinanceira(
+                                                            consolidatedResponse.getRubricas(), ano);
+                                            if (rodapeFicha) {
+                                                currentRow = addSabesprevFichaSummaryRows(
+                                                        sheet, consolidatedResponse, ano, currentRow,
+                                                        totalStyle, numberStyle);
+                                            } else {
+                                                currentRow = addMonthlyTotals(sheet, consolidatedResponse, ano,
+                                                        currentRow, totalStyle, numberStyle);
+                                            }
 
                                             // Duas simulações IRPF (declaração + contracheques), se houver declaração
                                             BigDecimal prevComplPlanilha = prevComplPorAno.getOrDefault(ano, BigDecimal.ZERO);
@@ -413,7 +423,7 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
         // Linha 3: DEDUÇÕES (Contrib. prev. compl. - Novo cálculo)
         rowNum = addSummaryRow(sheet, rowNum, "DEDUÇÕES (Contribuição à previdência complementar - Novo calculo)",
                 totalContracheques, totalStyle, numberStyle,
-                "Contracheques + pagamentos cód. 36/37 da declaração (exc. CNPJs patronais FUNCEF/CAIXA)");
+                "Contracheques (CAIXA/FUNCEF/SABESP/SABESPREV) + pagamentos cód. 36/37 da declaração (exc. CNPJs patronais FUNCEF/CAIXA)");
 
         // Linha 4: DEDUÇÕES (Total)
         rowNum = addSummaryRow(sheet, rowNum, "DEDUÇÕES (Total)",
@@ -707,6 +717,59 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
     private BigDecimal calcularTotalRubricaAno(
             ConsolidationRow rubrica, String ano, BigDecimal somaSimples, String origem) {
         return ConsolidationAnoTotalsHelper.calcularTotalRubricaAno(rubrica, ano, somaSimples, origem);
+    }
+
+    /**
+     * Rodapé Ficha Financeira SABESPREV: CONTRIBUIÇÃO (7*), DEVOLUÇÃO (9*), TOTAL líquido.
+     */
+    private int addSabesprevFichaSummaryRows(
+            Sheet sheet,
+            ConsolidatedResponse consolidatedResponse,
+            String ano,
+            int startRow,
+            CellStyle totalStyle,
+            CellStyle numberStyle) {
+
+        SabesprevFichaTotaisHelper.ResumoFicha resumo = SabesprevFichaTotaisHelper.calcular(
+                consolidatedResponse.getRubricas(), ano);
+
+        int row = startRow;
+        row = writeSabesprevSummaryRow(sheet, row, "CONTRIBUIÇÃO", resumo.contribuicao(), totalStyle, numberStyle);
+        row = writeSabesprevSummaryRow(sheet, row, "DEVOLUÇÃO", resumo.devolucao(), totalStyle, numberStyle);
+        row = writeSabesprevSummaryRow(sheet, row, "TOTAL", resumo.totalLiquido(), totalStyle, numberStyle);
+        return row;
+    }
+
+    private int writeSabesprevSummaryRow(
+            Sheet sheet,
+            int rowNum,
+            String label,
+            SabesprevFichaTotaisHelper.TotaisLinha linha,
+            CellStyle totalStyle,
+            CellStyle numberStyle) {
+
+        Row row = sheet.createRow(rowNum);
+        int col = 0;
+
+        Cell codigoCell = row.createCell(col++);
+        codigoCell.setCellValue(label);
+        codigoCell.setCellStyle(totalStyle);
+
+        Cell rubricaCell = row.createCell(col++);
+        rubricaCell.setCellValue("");
+        rubricaCell.setCellStyle(totalStyle);
+
+        for (int mes = 0; mes < 12; mes++) {
+            Cell cell = row.createCell(col++);
+            cell.setCellValue(linha.porMes()[mes].doubleValue());
+            cell.setCellStyle(totalStyle);
+        }
+
+        Cell totalCell = row.createCell(col);
+        totalCell.setCellValue(linha.totalAno().doubleValue());
+        totalCell.setCellStyle(totalStyle);
+
+        return rowNum + 1;
     }
 
     /**

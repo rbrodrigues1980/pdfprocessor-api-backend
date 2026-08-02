@@ -14,7 +14,7 @@
 | [004 - DIAGRAMS.md](./004%20-%20DIAGRAMS.md) | Coleção de diagramas Mermaid: fluxo geral, sequência de upload/processamento, máquina de estados de documentos, ERD MongoDB, pipeline de extração e fluxo de consolidação Excel. |
 | [005 - FLOWCHARTS.md](./005%20-%20FLOWCHARTS.md) | Fluxogramas focados no processamento: upload e identificação de documentos, processamento PDF e consolidação por CPF. |
 | [006 - ERD.md](./006%20-%20ERD.md) | Diagrama de Entidade-Relacionamento (Mermaid) mostrando Person, PayrollDocument, PayrollEntry e Rubrica com seus campos. |
-| [007 - EXTRATOR.md](./007%20-%20EXTRATOR.md) | **Manual técnico do extrator de PDF.** Padrões regex para CAIXA e FUNCEF, heurísticas de detecção, normalização (datas, valores, descrições), pipeline completo (página → linhas → entries), regras especiais e tratamento de edge cases. Referência essencial para manutenção do extrator. |
+| [007 - EXTRATOR.md](./007%20-%20EXTRATOR.md) | **Manual técnico do extrator de PDF.** CAIXA/FUNCEF (§5.3 portal agrupado), **SABESP holerite** §5.4, **SABESPREV ficha financeira** §5.5 (parser + totais Excel), heurísticas, normalização e pipeline. |
 
 ---
 

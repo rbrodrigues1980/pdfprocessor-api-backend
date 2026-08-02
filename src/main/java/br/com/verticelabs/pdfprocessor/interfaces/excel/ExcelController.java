@@ -76,7 +76,7 @@ public class ExcelController {
      * 
      * Query params opcionais:
      * - ano: gera Excel apenas de 1 ano (ex: "2017")
-     * - origem: filtra CAIXA/FUNCEF
+     * - origem: filtra CAIXA/FUNCEF/SABESP/SABESPREV
      * 
      * ⚠️ NOTA: Se você tem o personId disponível, use o endpoint /{personId}/excel-by-id
      * para evitar problemas com múltiplas pessoas com o mesmo CPF em diferentes tenants.
@@ -156,7 +156,7 @@ public class ExcelController {
      * 
      * Query params opcionais:
      * - ano: gera Excel apenas de 1 ano (ex: "2017")
-     * - origem: filtra CAIXA/FUNCEF
+     * - origem: filtra CAIXA/FUNCEF/SABESP/SABESPREV
      */
     @GetMapping(value = "/{personId}/excel-by-id", produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
     public Mono<ResponseEntity<byte[]>> generateExcelById(
@@ -236,7 +236,7 @@ public class ExcelController {
      * 
      * Query params opcionais:
      * - ano: gera Excel apenas de 1 ano (ex: "2017")
-     * - origem: filtra CAIXA/FUNCEF
+     * - origem: filtra CAIXA/FUNCEF/SABESP/SABESPREV
      */
     @GetMapping(value = "/{cpf}/excel-by-tenant", produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
     public Mono<ResponseEntity<byte[]>> generateExcelByCpfAndTenant(
