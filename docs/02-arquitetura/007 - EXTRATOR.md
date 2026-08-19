@@ -224,13 +224,17 @@ PDF anual da **Fundação SABESP de Seguridade Social — SABESPREV** (substitui
 - Cabeçalho: `ANO: YYYY`, `MATRÍCULA` (até 9 dígitos), `NOME` — sem CPF no PDF (vínculo = CPF do cadastro)
 - Grade: `RUBRICA | DESCRIÇÃO | P/D | JAN…DEZ | TOTAL`
 - Parser: interpreta layout PDFBox (`…valores TOTAL DEZ` colados + `CÓDIGO P/D` no fim da linha); meses com valor **> 0** → `PayrollEntry` (`referencia`/`mesPagamento` = `YYYY-MM`)
-- **Whitelist:** tabela `rubricas` (cadastro UI/API — sem seed). Códigos típicos: `7400`, `7401`, `7402`, `7404`, `9100`, `9102`, `9111`
+- **Whitelist:** tabela `rubricas` (cadastro UI/API — sem seed). Códigos típicos de rodapé: `7400`, `7401`, `7402`, `7404`, `9100`, `9102`, `9105`, `9106`, `9112`, `9115` (outras rubricas da ficha, ex. `1090`/`9001`/`9607`, entram na matriz se cadastradas, mas **não** no rodapé)
 - `DocumentType.SABESPREV_FICHA` / `PayrollEntry.origem = "SABESPREV"`
 - Detecção **antes** do demonstrativo mensal SABESP
-- **Excel (aba do ano):** se o ano for só códigos `7*`/`9*` (ficha) — ou `origem = SABESPREV` — o rodapé não é `TOTAL Mensal`; são 3 linhas — **CONTRIBUIÇÃO** (soma `7*`), **DEVOLUÇÃO** (soma `9*`), **TOTAL** (= CONTRIBUIÇÃO − DEVOLUÇÃO). A decisão é **por ano** (cliente com SABESP ativa + ficha no mesmo Excel continua correto).
+- **Excel (aba do ano):** se `origem = SABESPREV` **ou** o ano tem ≥1 código da lista fechada do rodapé e nenhum holerite SABESP (`3347`/`3349`) — rodapé com 3 linhas:
+  - **CONTRIBUIÇÃO** = soma de `7400`, `7401`, `7402`, `9105`, `9106`
+  - **DEVOLUÇÃO** = soma de `7404`, `9100`, `9102`, `9112`, `9115`
+  - **TOTAL** = CONTRIBUIÇÃO − DEVOLUÇÃO  
+  A decisão é **por ano** (cliente com SABESP ativa + ficha no mesmo Excel continua correto).
 
 Classes: `DocumentTypeDetectionServiceImpl.isSabesprevFichaFinanceira`, `SabesprevFichaMetadataExtractor`, `SabesprevFichaFinanceiraParser`, `SabesprevFichaTotaisHelper`, `RubricaValidator`.  
-Regressão: `SabesprevFichaFinanceiraParsingTest`, `SabesprevFichaTotaisHelperTest` (Anselmo 2021 → 637,02).
+Regressão: `SabesprevFichaFinanceiraParsingTest`, `SabesprevFichaTotaisHelperTest` (Anselmo 2021 → líquido **333,16** com lista fechada).
 
 ---
 

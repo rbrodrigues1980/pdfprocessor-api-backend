@@ -7,38 +7,62 @@ import java.math.RoundingMode;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Totais da Ficha Financeira SABESPREV na matriz Excel:
- * CONTRIBUIÇÃO (códigos 7*) − DEVOLUÇÃO (códigos 9*) = TOTAL líquido.
+ * CONTRIBUIÇÃO (lista fechada soma) − DEVOLUÇÃO (lista fechada subtrai) = TOTAL líquido.
+ * <p>
+ * Códigos fora das listas (ex. 1090, 9001, 9111) podem aparecer na matriz, mas não entram no rodapé.
  */
 public final class SabesprevFichaTotaisHelper {
 
     private static final RoundingMode RM = RoundingMode.HALF_UP;
 
+    /** Rubricas que somam no rodapé (CONTRIBUIÇÃO). */
+    public static final Set<String> CODIGOS_SOMA = Set.of(
+            "7400", "7401", "7402", "9105", "9106");
+
+    /** Rubricas que subtraem no rodapé (DEVOLUÇÃO). */
+    public static final Set<String> CODIGOS_SUBTRAI = Set.of(
+            "7404", "9100", "9102", "9112", "9115");
+
+    private static final Set<String> CODIGOS_RODAPE;
+
+    static {
+        java.util.HashSet<String> all = new java.util.HashSet<>(CODIGOS_SOMA);
+        all.addAll(CODIGOS_SUBTRAI);
+        CODIGOS_RODAPE = Set.copyOf(all);
+    }
+
+    /** Holerite SABESP ativa — se presente no mesmo ano, não usa rodapé de ficha. */
+    private static final Set<String> CODIGOS_HOLERITE_SABESP = Set.of("3347", "3349");
+
     private SabesprevFichaTotaisHelper() {
     }
 
     /**
-     * Ano da ficha: todas as rubricas com valor no ano começam com 7 ou 9
-     * (permite rodapé certo mesmo com origem global mista SABESP+SABESPREV).
+     * Ano com ficha (origem global pode ser mista SABESP+SABESPREV → null):
+     * há pelo menos um código da lista fechada do rodapé e nenhum holerite SABESP (3347/3349).
      */
     public static boolean isAnoFichaFinanceira(List<ConsolidationRow> rubricas, String ano) {
         if (rubricas == null || ano == null || ano.isBlank()) {
             return false;
         }
-        boolean alguma = false;
+        boolean temCodigoRodape = false;
         for (ConsolidationRow rubrica : rubricas) {
             if (rubrica == null || rubrica.getCodigo() == null || !temValorNoAno(rubrica, ano)) {
                 continue;
             }
-            alguma = true;
             String codigo = rubrica.getCodigo().trim();
-            if (!codigo.startsWith("7") && !codigo.startsWith("9")) {
+            if (CODIGOS_HOLERITE_SABESP.contains(codigo)) {
                 return false;
             }
+            if (CODIGOS_RODAPE.contains(codigo)) {
+                temCodigoRodape = true;
+            }
         }
-        return alguma;
+        return temCodigoRodape;
     }
 
     private static boolean temValorNoAno(ConsolidationRow rubrica, String ano) {
@@ -68,8 +92,8 @@ public final class SabesprevFichaTotaisHelper {
     }
 
     public static ResumoFicha calcular(List<ConsolidationRow> rubricas, String ano) {
-        TotaisLinha contrib = somarPorPrefixo(rubricas, ano, "7");
-        TotaisLinha devol = somarPorPrefixo(rubricas, ano, "9");
+        TotaisLinha contrib = somarPorCodigos(rubricas, ano, CODIGOS_SOMA);
+        TotaisLinha devol = somarPorCodigos(rubricas, ano, CODIGOS_SUBTRAI);
         BigDecimal[] liquidoMes = new BigDecimal[12];
         for (int i = 0; i < 12; i++) {
             liquidoMes[i] = scale(contrib.porMes()[i].subtract(devol.porMes()[i]));
@@ -78,18 +102,18 @@ public final class SabesprevFichaTotaisHelper {
         return new ResumoFicha(contrib, devol, new TotaisLinha(liquidoMes, liquidoAno));
     }
 
-    public static TotaisLinha somarPorPrefixo(List<ConsolidationRow> rubricas, String ano, String prefixo) {
+    public static TotaisLinha somarPorCodigos(List<ConsolidationRow> rubricas, String ano, Set<String> codigos) {
         BigDecimal[] porMes = new BigDecimal[12];
         for (int i = 0; i < 12; i++) {
             porMes[i] = BigDecimal.ZERO;
         }
-        if (rubricas == null || ano == null || prefixo == null) {
+        if (rubricas == null || ano == null || codigos == null || codigos.isEmpty()) {
             return new TotaisLinha(porMes, BigDecimal.ZERO.setScale(2, RM));
         }
 
         for (ConsolidationRow rubrica : rubricas) {
             if (rubrica == null || rubrica.getCodigo() == null
-                    || !rubrica.getCodigo().startsWith(prefixo)) {
+                    || !codigos.contains(rubrica.getCodigo().trim())) {
                 continue;
             }
             Map<String, BigDecimal> valores = rubrica.getValores() != null
