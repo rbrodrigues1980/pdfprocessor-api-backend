@@ -121,7 +121,7 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
                                                     numberStyle,
                                                     defaultStyle);
 
-                                            // Ficha SABESPREV: CONTRIBUIÇÃO (7*) − DEVOLUÇÃO (9*) = TOTAL
+                                            // Ficha SABESPREV: CONTRIBUIÇÃO (lista soma) − DEVOLUÇÃO (lista subtrai) = TOTAL
                                             // Decisão por ano (origem global pode ser mista SABESP+SABESPREV → null)
                                             boolean rodapeFicha = "SABESPREV".equalsIgnoreCase(
                                                     consolidatedResponse.getOrigem())
@@ -720,7 +720,8 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
     }
 
     /**
-     * Rodapé Ficha Financeira SABESPREV: CONTRIBUIÇÃO (7*), DEVOLUÇÃO (9*), TOTAL líquido.
+     * Rodapé Ficha Financeira SABESPREV: CONTRIBUIÇÃO (7400/7401/7402/9105/9106),
+     * DEVOLUÇÃO (7404/9100/9102/9112/9115), TOTAL = CONTRIBUIÇÃO − DEVOLUÇÃO.
      */
     private int addSabesprevFichaSummaryRows(
             Sheet sheet,

@@ -61,7 +61,7 @@ Binário do arquivo Excel.
 | Caso | Rodapé da aba do ano |
 |------|----------------------|
 | CAIXA / FUNCEF / SABESP (holerite) | Linha **TOTAL Mensal** (regras Funcef FEV/NOV só quando aplicável) |
-| Ficha financeira SABESPREV (`7*` / `9*`) | Três linhas: **CONTRIBUIÇÃO** − **DEVOLUÇÃO** = **TOTAL**. A decisão é **por ano** (`SabesprevFichaTotaisHelper`), não só pela `origem` global — cliente com holerite SABESP + ficha no mesmo Excel continua correto. |
+| Ficha financeira SABESPREV (lista fechada) | Três linhas: **CONTRIBUIÇÃO** (`7400`/`7401`/`7402`/`9105`/`9106`) − **DEVOLUÇÃO** (`7404`/`9100`/`9102`/`9112`/`9115`) = **TOTAL**. A decisão é **por ano** (`SabesprevFichaTotaisHelper`), não só pela `origem` global — cliente com holerite SABESP + ficha no mesmo Excel continua correto. Códigos fora da lista (ex. `1090`, `9111`) ficam na matriz e não entram no rodapé. |
 
 Detalhe do parser e regressão: [007 - EXTRATOR.md](../02-arquitetura/007%20-%20EXTRATOR.md) §5.5.
 

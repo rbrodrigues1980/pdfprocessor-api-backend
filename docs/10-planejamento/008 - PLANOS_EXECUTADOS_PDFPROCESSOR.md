@@ -33,7 +33,8 @@ Entregas recentes na ordem de implementação. Arquivos de plano em `%USERPROFIL
 | 3 | *(follow-up no chat)* Parser SABESP genérico | ✅ | Removidos regex fixos `3347\|3349`; validação via Mongo `RubricaValidator`; removidos `SabespRubricaInitializer` / seed vazio | [007](../02-arquitetura/007%20-%20EXTRATOR.md) §5.4 |
 | 4 | *(follow-up)* Matrícula SABESP | ✅ | Normalização de matrícula **7–9** dígitos (`MatriculaNormalizer`) | [007](../02-arquitetura/007%20-%20EXTRATOR.md) §5.4 |
 | 5 | `ficha_financeira_sabesprev_d0e39e56.plan.md` | ✅ | `DocumentType.SABESPREV_FICHA`, origem `SABESPREV`, detecção antes do holerite SABESP, metadata + parser matriz PDFBox (código+P/D no fim da linha), meses 11+TOTAL+DEZ; rubricas só via UI | [007](../02-arquitetura/007%20-%20EXTRATOR.md) §5.5 |
-| 6 | `sabesprev_totais_excel_fbd29265.plan.md` | ✅ | Rodapé Excel por ano: CONTRIBUIÇÃO (`7*`) − DEVOLUÇÃO (`9*`) = TOTAL; detecção **por ano** (`SabesprevFichaTotaisHelper`) quando o cliente mistura SABESP + ficha | [007](../02-arquitetura/007%20-%20EXTRATOR.md) §5.5 · [008 Excel](../04-api-referencia/008%20-%20API_6_EXCEL_EXPORT.md) |
+| 6 | `sabesprev_totais_excel_fbd29265.plan.md` | ✅ | Rodapé Excel por ano: CONTRIBUIÇÃO − DEVOLUÇÃO = TOTAL; detecção **por ano** (`SabesprevFichaTotaisHelper`) quando o cliente mistura SABESP + ficha | [007](../02-arquitetura/007%20-%20EXTRATOR.md) §5.5 · [008 Excel](../04-api-referencia/008%20-%20API_6_EXCEL_EXPORT.md) |
+| 7 | Totais SABESPREV lista fechada | ✅ | Rodapé deixa de usar prefixos `7*`/`9*`: **soma** `7400`/`7401`/`7402`/`9105`/`9106`; **subtrai** `7404`/`9100`/`9102`/`9112`/`9115`; demais códigos só na matriz | [007](../02-arquitetura/007%20-%20EXTRATOR.md) §5.5 · [008 Excel](../04-api-referencia/008%20-%20API_6_EXCEL_EXPORT.md) |
 
 **Decisões de produto nesta onda**
 
@@ -76,6 +77,7 @@ Entregas recentes na ordem de implementação. Arquivos de plano em `%USERPROFIL
 | SABESP simulação + CPF | ✅ | [007](../02-arquitetura/007%20-%20EXTRATOR.md) §5.4 |
 | Ficha Financeira SABESPREV | ✅ | [007](../02-arquitetura/007%20-%20EXTRATOR.md) §5.5 |
 | Totais SABESPREV no Excel | ✅ | [007](../02-arquitetura/007%20-%20EXTRATOR.md) §5.5 · [008 Excel](../04-api-referencia/008%20-%20API_6_EXCEL_EXPORT.md) |
+| Totais SABESPREV lista fechada (soma/subtrai) | ✅ | [007](../02-arquitetura/007%20-%20EXTRATOR.md) §5.5 |
 | Fix multi-page PDF extraction | ✅ | Extrator / Gemini (docs 02 e 08) |
 
 ## IRPF — extração e motor
