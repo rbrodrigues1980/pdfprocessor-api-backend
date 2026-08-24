@@ -423,7 +423,7 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
         // Linha 3: DEDUÇÕES (Contrib. prev. compl. - Novo cálculo)
         rowNum = addSummaryRow(sheet, rowNum, "DEDUÇÕES (Contribuição à previdência complementar - Novo calculo)",
                 totalContracheques, totalStyle, numberStyle,
-                "Contracheques (CAIXA/FUNCEF/SABESP/SABESPREV) + pagamentos cód. 36/37 da declaração (exc. CNPJs patronais FUNCEF/CAIXA)");
+                "Contracheques (CAIXA/FUNCEF/SABESP/SABESPREV) + pagamentos cód. 36/37/38 da declaração (exc. CNPJs patronais FUNCEF/CAIXA/SABESPREV)");
 
         // Linha 4: DEDUÇÕES (Total)
         rowNum = addSummaryRow(sheet, rowNum, "DEDUÇÕES (Total)",

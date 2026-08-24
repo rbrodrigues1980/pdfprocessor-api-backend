@@ -233,7 +233,7 @@ Quando existe declaração IRPF importada para o ano-calendário da aba, `Consol
 - Imposto devido, pago (valores da declaração) e resultado (saldo = total devido − total pago)
 - Prev. complementar da planilha destacada em verde
 
-**Prev. complementar (Simulação 2):** `PrevComplPlanilhaHelper.calcularPrevComplSimulacao` = total dos contracheques **+** pagamentos cód. **36/37** da declaração (`pagamentosEfetuados[]`) cujo CNPJ **não** seja patronal (`00.436.923/0001-90` FUNCEF ou `00.360.305/0001-04` CAIXA). Ex.: Margarida AC 2016 — planilha 22.238,28 + CAIXA E VIDA 1.724,48 = **23.962,76** na linha verde. CNPJs patronais já constam nos contracheques e são ignorados na soma extra.
+**Prev. complementar (Simulação 2):** `PrevComplPlanilhaHelper.calcularPrevComplSimulacao` = **planilha** (contracheques/ficha extraídos) **+** pagamentos cód. **36/37/38** da declaração (`pagamentosEfetuados[]`) cujo CNPJ **não** seja patronal (`00.436.923/0001-90` FUNCEF, `00.360.305/0001-04` CAIXA ou `65.471.914/0001-86` SABESPREV). **Não** soma a linha Fapi da declaração com a planilha quando o pagamento é da mesma entidade patronal. Ex.: Margarida AC 2016 — planilha 22.238,28 + CAIXA E VIDA 1.724,48 = **23.962,76**. Antônio SABESP AC 2020 — só planilha **14.620,50** (ignora cód. 36 SABESPREV 15.205,21 da DIRPF).
 
 **Deduções:** `ExcelIrpfDeducoesResumoHelper` centraliza linhas do RESUMO; `ExcelIrpfSimulacaoMapper` com `preferirPrevidenciaPlanilha=true`; `IrpfPrevidenciaOficialResolver` soma prev. oficial das fontes pagadoras PJ.
 
@@ -246,7 +246,7 @@ Classes envolvidas:
 - `ConsolidationExcelServiceImpl` — `addBlocoConformeDeclaracaoSimplificada`, `addBlocoConformeDeclaracaoCompleta`, `addBlocoSimulacaoCompletaPlanilha`
 - `ExcelIrpfDeducoesResumoHelper` / `ExcelIrpfDeducoesResumoDTO` — `montarConformeDeclaracao` (espelho) e `montar` (simulação planilha)
 - `ExcelIrpfSimulacaoMapper` — mapeamento declaração → request
-- `PrevComplPlanilhaHelper` — contracheques + pagamentos cód. 36/37 externos (Simulação 2 / `prevComplPorAno`)
+- `PrevComplPlanilhaHelper` — planilha + pagamentos cód. 36/37/38 externos (Simulação 2 / `prevComplPorAno`)
 - `ModoSimulacaoExcel` — `ESPELHO_ENTREGUE` | `SIMULACAO_COMPLETA_PLANILHA`
 - `IrSimuladorMotorService` — cálculo progressivo + crédito INSS doméstico
 
