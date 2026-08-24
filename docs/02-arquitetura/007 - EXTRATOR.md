@@ -209,7 +209,7 @@ Layout SAP da **Companhia de Saneamento Básico do Estado de São Paulo — SABE
 - Extrai linhas {@code CONTA + descrição + valor} (código 3–4 dígitos); **só persiste** se a rubrica existir e estiver ativa na tabela `rubricas` (mesmo fluxo CAIXA/FUNCEF). Rubricas SABESP (ex.: 3347/3349) = cadastro na UI/API — sem seed e sem lista fixa no parser.
 - `DocumentType.SABESP` / `PayrollEntry.origem = "SABESP"`
 - Totais Excel: soma dos meses (como CAIXA; sem regra Funcef FEV/NOV)
-- **Simulação IRPF / Resumo Geral:** mesmo fluxo `prevCompl` dos demais contracheques — consolidação sem filtro de origem inclui entries `SABESP`; `PrevComplPlanilhaHelper.calcularPrevComplSimulacao` soma 3347+3349 no ano → bloco 2 e Resumo Geral (`ResumoGeralAssemblyService`)
+- **Simulação IRPF / Resumo Geral (Simulação 2):** base = planilha (`3347`/`3349` no ano); **não** somar de novo pagamento cód. **36** da DIRPF com CNPJ patronal **65.471.914/0001-86** (FUND. SABESP DE SEGURIDADE SOCIAL). Somar extras cód. **36/37/38** de **outro** CNPJ. Regressão Antônio AC 2020: **14.620,50** (não 29.825,71).
 
 Classes: `DocumentTypeDetectionServiceImpl.isSabespDemonstrativo`, `SabespPayslipMetadataExtractor`, `PdfLineParser` (`SABESP_LINE_PATTERN`), `RubricaValidator`.  
 Regressão: `SabespPayslipParsingTest`, `PrevComplPlanilhaHelperTest` (3347+3349 → 758,75).
@@ -232,9 +232,10 @@ PDF anual da **Fundação SABESP de Seguridade Social — SABESPREV** (substitui
   - **DEVOLUÇÃO** = soma de `7404`, `9100`, `9102`, `9112`, `9115`
   - **TOTAL** = CONTRIBUIÇÃO − DEVOLUÇÃO  
   A decisão é **por ano** (cliente com SABESP ativa + ficha no mesmo Excel continua correto).
+- **Simulação IR / Resumo Geral (prevCompl):** usa o **TOTAL líquido** do rodapé (`SabesprevFichaTotaisHelper` via `PrevComplPlanilhaHelper`), **não** a soma bruta de todas as rubricas (que somaria DEVOLUÇÃO a favor). Ignora cód. **36** patronal **65.471.914/0001-86** nos extras da DIRPF (como FUNCEF/CAIXA). APCEF/CAIXA/FUNCEF e holerite SABESP (`3347`/`3349`) continuam com a soma das rubricas. Regressão Heitor 2017: **3.637,19** (não 3.763,05).
 
-Classes: `DocumentTypeDetectionServiceImpl.isSabesprevFichaFinanceira`, `SabesprevFichaMetadataExtractor`, `SabesprevFichaFinanceiraParser`, `SabesprevFichaTotaisHelper`, `RubricaValidator`.  
-Regressão: `SabesprevFichaFinanceiraParsingTest`, `SabesprevFichaTotaisHelperTest` (Anselmo 2021 → líquido **333,16** com lista fechada).
+Classes: `DocumentTypeDetectionServiceImpl.isSabesprevFichaFinanceira`, `SabesprevFichaMetadataExtractor`, `SabesprevFichaFinanceiraParser`, `SabesprevFichaTotaisHelper`, `PrevComplPlanilhaHelper`, `RubricaValidator`.  
+Regressão: `SabesprevFichaFinanceiraParsingTest`, `SabesprevFichaTotaisHelperTest` (Anselmo 2021 → líquido **333,16** com lista fechada), `PrevComplPlanilhaHelperTest` (Heitor 2017).
 
 ---
 
