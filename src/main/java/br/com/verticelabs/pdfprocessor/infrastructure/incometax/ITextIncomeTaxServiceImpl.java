@@ -19,6 +19,7 @@ import br.com.verticelabs.pdfprocessor.domain.service.IncomeTaxDeclarationServic
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -405,6 +406,16 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
             "(?:([\\d]{3}\\.[\\d]{5}\\.[\\d]{2}-[\\d]|\\d{11})\\s*\\n)?" +
             "([\\d]{1,3}(?:[.]\\d{3})*,\\d{2})(?:\\n([\\d]{1,3}(?:[.]\\d{3})*,\\d{2}))?",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE | Pattern.MULTILINE);
+
+    /** Doação ECA inline: "DF - BRASILIA 15.558.339/0001-85 1.198,00Municipal" */
+    private static final Pattern ECA_DIRETA_INLINE_PATTERN = Pattern.compile(
+            "(?m)^\\s*(.+?)\\s+" +
+            "([\\d]{2,3}\\.[\\d]{3}\\.[\\d]{3}/[\\d]{4}-[\\d]{2})\\s+" +
+            "([\\d]{1,3}(?:[.]\\d{3})*,\\d{2})\\s*" +
+            "([A-Za-zÀ-ú\\-]+)?\\s*$",
+            Pattern.UNICODE_CASE | Pattern.MULTILINE);
+
+    private static final String CODIGO_DOACAO_ECA = "40";
 
     // Linha inline (SERPRO): "50 NOME CPF/CNPJ [NIT] VALOR [PARC]"
     private static final Pattern PAGAMENTO_INLINE_PATTERN = Pattern.compile(
@@ -795,7 +806,13 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
 
         // Doações efetuadas — extrair da seção DOAÇÕES EFETUADAS em todas as páginas
         List<DoacaoEfetuada> doacoesEfetuadas = extractDoacoesEfetuadas(allPagesText);
+        doacoesEfetuadas.addAll(extractDoacoesDiretamenteNaDeclaracaoEca(allPagesText));
         log.info("🎁 Doações efetuadas: {} encontradas", doacoesEfetuadas.size());
+
+        deducaoIncentivo = reconciliarDeducaoIncentivoDoacoes(deducaoIncentivo, doacoesEfetuadas);
+        if (deducaoIncentivo != null && deducaoIncentivo.compareTo(BigDecimal.ZERO) > 0) {
+            log.info("💰 Dedução de incentivo (final): {}", deducaoIncentivo);
+        }
 
         // Fontes pagadoras — extrair de todas as páginas (seção PJ pode continuar após a 1ª)
         List<FontePagadora> fontesPagadoras = extractFontesPagadoras(allPagesText);
@@ -1110,6 +1127,160 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
         }
 
         return doacoes;
+    }
+
+    /**
+     * Extrai doações informadas diretamente na declaração — seção ECA (distinta de DOAÇÕES EFETUADAS).
+     * Mapeadas como código 40 (ECA) para o motor de simulação.
+     */
+    private List<DoacaoEfetuada> extractDoacoesDiretamenteNaDeclaracaoEca(String allPagesText) {
+        List<DoacaoEfetuada> doacoes = new ArrayList<>();
+        if (allPagesText == null) {
+            return doacoes;
+        }
+
+        String upper = allPagesText.toUpperCase();
+        int idx = -1;
+        for (int searchFrom = 0; searchFrom < upper.length(); ) {
+            int d = upper.indexOf("DOA", searchFrom);
+            if (d < 0) {
+                break;
+            }
+            String snippet = upper.substring(d, Math.min(d + 80, upper.length()));
+            if (snippet.contains("DIRETAMENTE") && snippet.contains("ECA")) {
+                idx = d;
+                break;
+            }
+            searchFrom = d + 1;
+        }
+        if (idx < 0) {
+            return doacoes;
+        }
+
+        String section = allPagesText.substring(idx);
+        String sectionUpper = section.toUpperCase();
+
+        if (sectionUpper.substring(0, Math.min(200, sectionUpper.length())).contains("SEM INFORMA")) {
+            log.debug("🎁 DOAÇÕES DIRETAMENTE NA DECLARAÇÃO - ECA: Sem Informações");
+            return doacoes;
+        }
+
+        int endIdx = -1;
+        String[] endMarkers = {
+                "RESUMO", "DECLARACAO DE BENS", "DECLARAÇÃO DE BENS",
+                "DOAÇÕES A PARTIDOS", "DOACOES A PARTIDOS", "PAGINA ", "PÁGINA "
+        };
+        for (String marker : endMarkers) {
+            int pos = sectionUpper.indexOf(marker, 50);
+            if (pos > 0 && (endIdx < 0 || pos < endIdx)) {
+                endIdx = pos;
+            }
+        }
+        if (endIdx > 0) {
+            section = section.substring(0, endIdx);
+        }
+
+        log.debug("🎁 Seção DOAÇÕES ECA direta ({} chars): {}", section.length(),
+                section.substring(0, Math.min(300, section.length())).replace("\n", "\\n"));
+
+        Matcher inline = ECA_DIRETA_INLINE_PATTERN.matcher(section);
+        while (inline.find()) {
+            String fundo = inline.group(1).trim();
+            String cnpj = inline.group(2).trim();
+            BigDecimal valor = parseMonetaryString(inline.group(3));
+            String tipo = inline.group(4) != null ? inline.group(4).trim() : "";
+            if (valor == null || fundo.isBlank()) {
+                continue;
+            }
+            String nome = tipo.isEmpty() ? fundo : tipo + " - " + fundo;
+            doacoes.add(new DoacaoEfetuada(CODIGO_DOACAO_ECA, nome, cnpj, valor));
+            log.info("🎁 Doação ECA direta: nome={}, cnpj={}, valor={}", nome, cnpj, valor);
+        }
+
+        if (doacoes.isEmpty()) {
+            String[] lines = section.split("\\r?\\n");
+            Pattern cnpjLine = Pattern.compile(
+                    "^\\s*([\\d]{2,3}\\.[\\d]{3}\\.[\\d]{3}/[\\d]{4}-[\\d]{2})\\s*$");
+            Pattern valorLine = Pattern.compile("^\\s*([\\d]{1,3}(?:[.]\\d{3})*,\\d{2})\\s*$");
+            Pattern tipoLine = Pattern.compile("^(Municipal|Estadual|Federal|Distrital)$", Pattern.CASE_INSENSITIVE);
+
+            for (int i = 0; i < lines.length; i++) {
+                Matcher cnpjM = cnpjLine.matcher(lines[i]);
+                if (!cnpjM.matches()) {
+                    continue;
+                }
+                String cnpj = cnpjM.group(1);
+                String fundo = "";
+                String tipo = "";
+                for (int j = i - 1; j >= Math.max(0, i - 4); j--) {
+                    String line = lines[j].trim();
+                    if (line.isEmpty() || line.toUpperCase().contains("FUNDO")
+                            || line.toUpperCase().contains("CNPJ") || line.toUpperCase().contains("VALOR")
+                            || line.toUpperCase().contains("TIPO")) {
+                        continue;
+                    }
+                    if (tipoLine.matcher(line).matches()) {
+                        tipo = line;
+                    } else if (fundo.isEmpty()) {
+                        fundo = line;
+                    }
+                }
+                BigDecimal valor = null;
+                for (int k = i + 1; k < Math.min(lines.length, i + 4); k++) {
+                    Matcher valorM = valorLine.matcher(lines[k]);
+                    if (valorM.matches()) {
+                        valor = parseMonetaryString(valorM.group(1));
+                        break;
+                    }
+                }
+                if (valor == null) {
+                    Matcher inlineCnpj = Pattern.compile(
+                            cnpj + "\\s+([\\d]{1,3}(?:[.]\\d{3})*,\\d{2})").matcher(lines[i]);
+                    if (inlineCnpj.find()) {
+                        valor = parseMonetaryString(inlineCnpj.group(1));
+                    }
+                }
+                if (valor != null) {
+                    String nome = tipo.isEmpty() ? fundo : tipo + " - " + fundo;
+                    doacoes.add(new DoacaoEfetuada(CODIGO_DOACAO_ECA, nome, cnpj, valor));
+                    log.info("🎁 Doação ECA direta (posicional): nome={}, cnpj={}, valor={}", nome, cnpj, valor);
+                }
+            }
+        }
+
+        return doacoes;
+    }
+
+    /**
+     * Preenche deducaoIncentivo a partir da soma das doações cód. 40–43 quando o RESUMO não capturou.
+     */
+    private BigDecimal reconciliarDeducaoIncentivoDoacoes(
+            BigDecimal deducaoIncentivo, List<DoacaoEfetuada> doacoes) {
+        if (nvlBigDecimal(deducaoIncentivo).compareTo(BigDecimal.ZERO) > 0) {
+            return deducaoIncentivo;
+        }
+        if (doacoes == null || doacoes.isEmpty()) {
+            return deducaoIncentivo;
+        }
+        BigDecimal soma = BigDecimal.ZERO;
+        for (DoacaoEfetuada d : doacoes) {
+            String cod = d.getCodigo();
+            if (cod == null) {
+                continue;
+            }
+            String codNorm = cod.trim();
+            if ("40".equals(codNorm) || "41".equals(codNorm) || "42".equals(codNorm) || "43".equals(codNorm)) {
+                if (d.getValorDoado() != null) {
+                    soma = soma.add(d.getValorDoado());
+                }
+            }
+        }
+        if (soma.compareTo(BigDecimal.ZERO) > 0) {
+            BigDecimal reconciliado = soma.setScale(2, RoundingMode.HALF_UP);
+            log.info("✅ Dedução de incentivo reconciliada a partir das doações: {}", reconciliado);
+            return reconciliado;
+        }
+        return deducaoIncentivo;
     }
 
     /**
@@ -1778,8 +1949,19 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
             boolean plausivel = incentivoDerivado.compareTo(BigDecimal.ZERO) > 0
                     && incentivoDerivado.compareTo(impostoDevido) < 0;
             if (plausivel && nvlBigDecimal(deducaoIncentivo).compareTo(BigDecimal.ZERO) == 0) {
-                deducaoIncentivo = incentivoDerivado.setScale(2, java.math.RoundingMode.HALF_UP);
-                impostoDevidoI = impostoIDerivado.setScale(2, java.math.RoundingMode.HALF_UP);
+                deducaoIncentivo = incentivoDerivado.setScale(2, RoundingMode.HALF_UP);
+                impostoDevidoI = impostoIDerivado.setScale(2, RoundingMode.HALF_UP);
+                log.info("✅ Dedução de incentivo derivada (impostoDevido − total): {}", deducaoIncentivo);
+            }
+        }
+
+        // Derivação via impostoDevido e impostoDevidoI quando INSS doméstico impede a derivação acima.
+        if (impostoDevido != null && impostoDevidoI != null
+                && nvlBigDecimal(deducaoIncentivo).compareTo(BigDecimal.ZERO) == 0) {
+            BigDecimal incentivoDerivado = impostoDevido.subtract(impostoDevidoI);
+            if (incentivoDerivado.compareTo(BigDecimal.ZERO) > 0
+                    && incentivoDerivado.compareTo(impostoDevido) < 0) {
+                deducaoIncentivo = incentivoDerivado.setScale(2, RoundingMode.HALF_UP);
                 log.info("✅ Dedução de incentivo derivada (impostoDevido − impostoDevidoI): {}", deducaoIncentivo);
             }
         }
