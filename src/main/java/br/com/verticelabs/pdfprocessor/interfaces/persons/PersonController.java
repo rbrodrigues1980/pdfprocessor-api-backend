@@ -320,7 +320,7 @@ public class PersonController {
                                 .<ResponseEntity<Object>>map(response -> {
                                         log.debug("✓ Documento enviado com sucesso: DocumentId={}, Status={}",
                                                         response.getDocumentId(), response.getStatus());
-                                        return ResponseEntity.status(HttpStatus.CREATED).body((Object) response);
+                                        return ResponseEntity.status(HttpStatus.ACCEPTED).body((Object) response);
                                 });
         }
 
@@ -342,7 +342,7 @@ public class PersonController {
                                         log.debug("✓ BulkUpload concluído: Total={}, Sucessos={}, Falhas={}",
                                                         response.getTotalArquivos(), response.getSucessos(),
                                                         response.getFalhas());
-                                        return ResponseEntity.status(HttpStatus.CREATED).body((Object) response);
+                                        return ResponseEntity.status(HttpStatus.ACCEPTED).body((Object) response);
                                 });
         }
 
@@ -361,7 +361,7 @@ public class PersonController {
                                 .<ResponseEntity<Object>>map(response -> {
                                         log.debug("✓ Declaração de IR enviada com sucesso: DocumentId={}, Status={}",
                                                         response.getDocumentId(), response.getStatus());
-                                        return ResponseEntity.status(HttpStatus.CREATED).body((Object) response);
+                                        return ResponseEntity.status(HttpStatus.ACCEPTED).body((Object) response);
                                 });
         }
 
@@ -471,7 +471,7 @@ public class PersonController {
                                         log.debug("✓ BulkUpload de declarações de IR concluído: Total={}, Sucessos={}, Falhas={}",
                                                         response.getTotalArquivos(), response.getSucessos(),
                                                         response.getFalhas());
-                                        return ResponseEntity.status(HttpStatus.CREATED).body((Object) response);
+                                        return ResponseEntity.status(HttpStatus.ACCEPTED).body((Object) response);
                                 });
         }
 

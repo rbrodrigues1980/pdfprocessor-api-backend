@@ -41,6 +41,7 @@ public class IncomeTaxUploadUseCase {
         private final DocumentProcessUseCase documentProcessUseCase;
         private final GetPersonByIdUseCase getPersonByIdUseCase;
 
+        private static final long MAX_FILE_SIZE = 10 * 1024 * 1024;
         private static final String PDF_CONTENT_TYPE = "application/pdf";
 
         /**
@@ -109,6 +110,11 @@ public class IncomeTaxUploadUseCase {
                                                                                                                 fileBytes.length);
                                                                                         }
 
+                                                                                        if (fileBytes.length > MAX_FILE_SIZE) {
+                                                                                                return Mono.error(new InvalidPdfException(
+                                                                                                                "Arquivo excede o limite de 10 MB."));
+                                                                                        }
+
                                                                                         // 4. Calcular hash do arquivo
                                                                                         return calculateFileHash(
                                                                                                         fileBytes)
@@ -132,96 +138,13 @@ public class IncomeTaxUploadUseCase {
                                                                                                                                                                         existingDoc.getId()));
                                                                                                                                 })
                                                                                                                                 .switchIfEmpty(
-                                                                                                                                                // 6.
-                                                                                                                                                // Salvar
-                                                                                                                                                // arquivo
-                                                                                                                                                // no
-                                                                                                                                                // GridFS
-                                                                                                                                                gridFsService.storeFileWithHash(
-                                                                                                                                                                new java.io.ByteArrayInputStream(
-                                                                                                                                                                                fileBytes),
+                                                                                                                                                saveIncomeTaxDocumentFast(
+                                                                                                                                                                fileBytes,
                                                                                                                                                                 filePart.filename(),
-                                                                                                                                                                PDF_CONTENT_TYPE,
-                                                                                                                                                                fileHash)
-                                                                                                                                                                .flatMap(fileId -> {
-                                                                                                                                                                        log.info(
-                                                                                                                                                                                        "Arquivo salvo no GridFS com ID: {}",
-                                                                                                                                                                                        fileId);
-
-                                                                                                                                                                        // 7.
-                                                                                                                                                                        // Extrair
-                                                                                                                                                                        // informações
-                                                                                                                                                                        // da
-                                                                                                                                                                        // declaração
-                                                                                                                                                                        // (opcional,
-                                                                                                                                                                        // para
-                                                                                                                                                                        // metadata)
-                                                                                                                                                                        return extractIncomeTaxMetadata(
-                                                                                                                                                                                        new java.io.ByteArrayInputStream(
-                                                                                                                                                                                                        fileBytes))
-                                                                                                                                                                                        .flatMap(metadata -> {
-                                                                                                                                                                                                // 8.
-                                                                                                                                                                                                // Criar
-                                                                                                                                                                                                // PayrollDocument
-                                                                                                                                                                                                // com
-                                                                                                                                                                                                // metadata
-                                                                                                                                                                                                PayrollDocument document = PayrollDocument
-                                                                                                                                                                                                                .builder()
-                                                                                                                                                                                                                .tenantId(
-                                                                                                                                                                                                                                tenantId)
-                                                                                                                                                                                                                .cpf(normalizedCpf)
-                                                                                                                                                                                                                .tipo(DocumentType.INCOME_TAX)
-                                                                                                                                                                                                                .status(DocumentStatus.PENDING)
-                                                                                                                                                                                                                .originalFileId(
-                                                                                                                                                                                                                                fileId)
-                                                                                                                                                                                                                .fileHash(
-                                                                                                                                                                                                                                fileHash)
-                                                                                                                                                                                                                .fileHash(
-                                                                                                                                                                                                                                fileHash)
-                                                                                                                                                                                                                .anoDetectado(
-                                                                                                                                                                                                                                parseAnoCalendario(
-                                                                                                                                                                                                                                                metadata.anoCalendario))
-                                                                                                                                                                                                                .dataUpload(
-                                                                                                                                                                                                                                Instant.now())
-                                                                                                                                                                                                                .build();
-
-                                                                                                                                                                                                return saveDocumentAndUpdatePerson(
-                                                                                                                                                                                                                document,
-                                                                                                                                                                                                                person);
-                                                                                                                                                                                        })
-                                                                                                                                                                                        .switchIfEmpty(
-                                                                                                                                                                                                        // Se
-                                                                                                                                                                                                        // não
-                                                                                                                                                                                                        // conseguir
-                                                                                                                                                                                                        // extrair
-                                                                                                                                                                                                        // metadata,
-                                                                                                                                                                                                        // salvar
-                                                                                                                                                                                                        // documento
-                                                                                                                                                                                                        // mesmo
-                                                                                                                                                                                                        // assim
-                                                                                                                                                                                                        Mono.defer(() -> {
-                                                                                                                                                                                                                log.debug(
-                                                                                                                                                                                                                                "Metadata não extraída, salvando documento sem ano detectado");
-                                                                                                                                                                                                                PayrollDocument document = PayrollDocument
-                                                                                                                                                                                                                                .builder()
-                                                                                                                                                                                                                                .tenantId(
-                                                                                                                                                                                                                                                tenantId)
-                                                                                                                                                                                                                                .cpf(normalizedCpf)
-                                                                                                                                                                                                                                .tipo(DocumentType.INCOME_TAX)
-                                                                                                                                                                                                                                .status(DocumentStatus.PENDING)
-                                                                                                                                                                                                                                .originalFileId(
-                                                                                                                                                                                                                                                fileId)
-                                                                                                                                                                                                                                .fileHash(
-                                                                                                                                                                                                                                                fileHash)
-                                                                                                                                                                                                                                .dataUpload(
-                                                                                                                                                                                                                                                Instant.now())
-                                                                                                                                                                                                                                .build();
-
-                                                                                                                                                                                                                return saveDocumentAndUpdatePerson(
-                                                                                                                                                                                                                                document,
-                                                                                                                                                                                                                                person);
-                                                                                                                                                                                                        }));
-                                                                                                                                                                }));
+                                                                                                                                                                fileHash,
+                                                                                                                                                                tenantId,
+                                                                                                                                                                normalizedCpf,
+                                                                                                                                                                person));
                                                                                                         });
                                                                                 });
                                                         });
@@ -245,44 +168,57 @@ public class IncomeTaxUploadUseCase {
                                         }
                                         return Mono.just(savedDoc);
                                 })
-                                .flatMap(savedDoc -> {
-                                        log.info("=== UPLOAD CONCLUÍDO COM SUCESSO ===");
+                                .map(savedDoc -> {
+                                        log.info("=== UPLOAD RÁPIDO CONCLUÍDO (IR) ===");
                                         log.info("DocumentId: {}, Tipo: {}, Status: {}",
                                                         savedDoc.getId(), savedDoc.getTipo(), savedDoc.getStatus());
 
-                                        // Iniciar processamento automático do documento
-                                        // IMPORTANTE: Propagar o contexto do tenant para o processamento
-                                        log.info("Iniciando processamento automático do documento de IR: {}",
-                                                        savedDoc.getId());
                                         String docTenantId = savedDoc.getTenantId();
-
-                                        return ReactiveTenantContext.withTenant(
+                                        log.info("Disparando processamento automático do documento de IR: {}",
+                                                        savedDoc.getId());
+                                        ReactiveTenantContext.withTenant(
                                                         documentProcessUseCase.processDocument(savedDoc.getId()),
-                                                        docTenantId)
-                                                        .map(processResponse -> {
-                                                                log.info("✓ Processamento iniciado. DocumentId: {}, Status: {}",
-                                                                                savedDoc.getId(),
-                                                                                processResponse.getStatus());
-                                                                return UploadDocumentResponse.builder()
-                                                                                .documentId(savedDoc.getId())
-                                                                                .status(processResponse.getStatus()) // PROCESSING
-                                                                                                                     // após
-                                                                                                                     // iniciar
-                                                                                                                     // processamento
-                                                                                .tipoDetectado(savedDoc.getTipo())
-                                                                                .build();
-                                                        })
-                                                        .onErrorResume(processError -> {
-                                                                log.warn("⚠ Upload bem-sucedido, mas falha ao iniciar processamento: {}",
-                                                                                processError.getMessage());
-                                                                // Upload foi bem-sucedido, mas processamento falhou -
-                                                                // retornar status PENDING
-                                                                return Mono.just(UploadDocumentResponse.builder()
-                                                                                .documentId(savedDoc.getId())
-                                                                                .status(DocumentStatus.PENDING)
-                                                                                .tipoDetectado(savedDoc.getTipo())
-                                                                                .build());
-                                                        });
+                                                        docTenantId
+                                        ).subscribe(
+                                                        processResponse -> log.info(
+                                                                        "✓ Processamento iniciado. DocumentId: {}, Status: {}",
+                                                                        savedDoc.getId(), processResponse.getStatus()),
+                                                        processError -> log.warn(
+                                                                        "⚠ Upload bem-sucedido, mas falha ao iniciar processamento: {}",
+                                                                        processError.getMessage()));
+
+                                        return UploadDocumentResponse.builder()
+                                                        .documentId(savedDoc.getId())
+                                                        .status(DocumentStatus.PROCESSING)
+                                                        .tipoDetectado(savedDoc.getTipo())
+                                                        .build();
+                                });
+        }
+
+        private Mono<UploadDocumentResponse> saveIncomeTaxDocumentFast(
+                        byte[] fileBytes,
+                        String filename,
+                        String fileHash,
+                        String tenantId,
+                        String normalizedCpf,
+                        Person person) {
+                return gridFsService.storeFileWithHash(
+                                new java.io.ByteArrayInputStream(fileBytes),
+                                filename,
+                                PDF_CONTENT_TYPE,
+                                fileHash)
+                                .flatMap(fileId -> {
+                                        log.info("Arquivo IR salvo no GridFS com ID: {} (upload rápido)", fileId);
+                                        PayrollDocument document = PayrollDocument.builder()
+                                                        .tenantId(tenantId)
+                                                        .cpf(normalizedCpf)
+                                                        .tipo(DocumentType.INCOME_TAX)
+                                                        .status(DocumentStatus.PENDING)
+                                                        .originalFileId(fileId)
+                                                        .fileHash(fileHash)
+                                                        .dataUpload(Instant.now())
+                                                        .build();
+                                        return saveDocumentAndUpdatePerson(document, person);
                                 });
         }
 

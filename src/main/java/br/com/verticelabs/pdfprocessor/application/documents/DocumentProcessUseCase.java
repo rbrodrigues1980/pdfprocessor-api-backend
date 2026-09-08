@@ -1,6 +1,7 @@
 package br.com.verticelabs.pdfprocessor.application.documents;
 
 import br.com.verticelabs.pdfprocessor.application.incometax.IrpfDeclaracaoDataMapper;
+import br.com.verticelabs.pdfprocessor.domain.exceptions.DeclaracaoCpfMismatchException;
 import br.com.verticelabs.pdfprocessor.domain.exceptions.InvalidPdfException;
 import br.com.verticelabs.pdfprocessor.domain.model.*;
 import br.com.verticelabs.pdfprocessor.domain.repository.PayrollDocumentRepository;
@@ -61,6 +62,7 @@ public class DocumentProcessUseCase {
     private final RubricaValidator rubricaValidator;
     private final IrpfDeclaracaoDataMapper irpfDeclaracaoDataMapper;
     private final InformeRendimentosFuncefExtractor informeRendimentosFuncefExtractor;
+    private final DocumentUploadPreparationService documentUploadPreparationService;
 
     // Limite mínimo de caracteres para considerar que o PDF tem texto suficiente
     // PDFs abaixo deste limite são considerados escaneados e usarão Gemini AI
@@ -151,8 +153,18 @@ public class DocumentProcessUseCase {
 
         final long startTime = System.currentTimeMillis();
         addInfoEvent(document, null, ProcessingEventType.PROCESSING_STARTED,
-                "Processamento iniciado. Tipo: " + document.getTipo());
+                "Processamento iniciado. Tipo: " + document.getTipo().getLogLabel());
 
+        Mono<PayrollDocument> preparedDocument = document.getTipo() == DocumentType.UNKNOWN
+                ? documentUploadPreparationService.prepareUnknownDocument(document)
+                        .doOnSuccess(doc -> addInfoEvent(doc, null, ProcessingEventType.TEXT_EXTRACTED,
+                                "Tipo detectado: " + doc.getTipo().getLogLabel()))
+                : Mono.just(document);
+
+        return preparedDocument.flatMap(doc -> processDocumentAsyncPrepared(doc, startTime));
+    }
+
+    private Mono<Long> processDocumentAsyncPrepared(PayrollDocument document, long startTime) {
         // Documentos de declaração de IR têm informações específicas que precisam ser
         // extraídas
         if (document.getTipo() == DocumentType.INCOME_TAX) {
@@ -1722,6 +1734,15 @@ public class DocumentProcessUseCase {
             PayrollDocument document,
             String tenantId,
             br.com.verticelabs.pdfprocessor.domain.service.IncomeTaxDeclarationService.IncomeTaxInfo incomeTaxInfo) {
+                    if (incomeTaxInfo.getCpf() != null && document.getCpf() != null) {
+                        String cpfPdf = incomeTaxInfo.getCpf().replaceAll("\\D", "");
+                        String cpfDoc = document.getCpf().replaceAll("\\D", "");
+                        if (!cpfPdf.isBlank() && !cpfPdf.equals(cpfDoc)) {
+                            return Mono.error(new DeclaracaoCpfMismatchException(
+                                    document.getCpf(), incomeTaxInfo.getCpf()));
+                        }
+                    }
+
                     log.info("Informações extraídas da declaração de IR:");
                     log.info("  Nome: {}, CPF: {}, Exercício: {}, Ano-Calendário: {}",
                             incomeTaxInfo.getNome(), incomeTaxInfo.getCpf(),

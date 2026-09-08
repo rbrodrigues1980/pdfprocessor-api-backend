@@ -4,7 +4,6 @@ import br.com.verticelabs.pdfprocessor.domain.exceptions.DocumentoDuplicadoExcep
 import br.com.verticelabs.pdfprocessor.domain.exceptions.InvalidCpfException;
 import br.com.verticelabs.pdfprocessor.domain.exceptions.InvalidPdfException;
 import br.com.verticelabs.pdfprocessor.domain.exceptions.PersonNotFoundException;
-import br.com.verticelabs.pdfprocessor.domain.model.DetectedPage;
 import br.com.verticelabs.pdfprocessor.domain.model.DocumentStatus;
 import br.com.verticelabs.pdfprocessor.domain.model.DocumentType;
 import br.com.verticelabs.pdfprocessor.domain.model.PayrollDocument;
@@ -12,14 +11,8 @@ import br.com.verticelabs.pdfprocessor.domain.model.Person;
 import br.com.verticelabs.pdfprocessor.domain.repository.PayrollDocumentRepository;
 import br.com.verticelabs.pdfprocessor.domain.repository.PersonRepository;
 import br.com.verticelabs.pdfprocessor.domain.service.CpfValidationService;
-import br.com.verticelabs.pdfprocessor.domain.service.DocumentTypeDetectionService;
 import br.com.verticelabs.pdfprocessor.domain.service.GridFsService;
 import br.com.verticelabs.pdfprocessor.domain.service.MatriculaNormalizer;
-import br.com.verticelabs.pdfprocessor.domain.service.MonthYearDetectionService;
-import br.com.verticelabs.pdfprocessor.domain.service.PdfService;
-import br.com.verticelabs.pdfprocessor.infrastructure.pdf.DocumentTypeDetectionServiceImpl;
-import br.com.verticelabs.pdfprocessor.infrastructure.pdf.SabespPayslipMetadataExtractor;
-import br.com.verticelabs.pdfprocessor.infrastructure.pdf.SabesprevFichaMetadataExtractor;
 import br.com.verticelabs.pdfprocessor.infrastructure.security.ReactiveSecurityContextHelper;
 import br.com.verticelabs.pdfprocessor.infrastructure.tenant.ReactiveTenantContext;
 import br.com.verticelabs.pdfprocessor.interfaces.documents.dto.UploadDocumentResponse;
@@ -27,18 +20,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.codec.multipart.FilePart;
 import org.springframework.stereotype.Service;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -46,9 +35,6 @@ import java.util.stream.Collectors;
 public class DocumentUploadUseCase {
 
     private final GridFsService gridFsService;
-    private final PdfService pdfService;
-    private final DocumentTypeDetectionService typeDetectionService;
-    private final MonthYearDetectionService monthYearDetectionService;
     private final CpfValidationService cpfValidationService;
     private final PersonRepository personRepository;
     private final PayrollDocumentRepository documentRepository;
@@ -110,31 +96,14 @@ public class DocumentUploadUseCase {
                                 log.info("✓ Upload concluído. DocumentId: {}, Status: {}", 
                                         uploadResponse.getDocumentId(), uploadResponse.getStatus());
                                 
-                                // Iniciar processamento automático do documento
-                                log.info("Iniciando processamento automático do documento: {}", uploadResponse.getDocumentId());
-                                return documentProcessUseCase.processDocument(uploadResponse.getDocumentId())
-                                        .map(processResponse -> {
-                                            log.info("✓ Processamento iniciado. DocumentId: {}, Status: {}", 
-                                                    uploadResponse.getDocumentId(), processResponse.getStatus());
-                                            
-                                            // Retornar resposta com status PROCESSING (após iniciar processamento)
-                                            return UploadDocumentResponse.builder()
-                                                    .documentId(uploadResponse.getDocumentId())
-                                                    .status(processResponse.getStatus()) // PROCESSING
-                                                    .tipoDetectado(uploadResponse.getTipoDetectado())
-                                                    .build();
-                                        })
-                                        .onErrorResume(processError -> {
-                                            log.warn("⚠ Upload bem-sucedido, mas falha ao iniciar processamento: {}", 
-                                                    processError.getMessage());
-                                            // Upload foi bem-sucedido, mas processamento falhou
-                                            // Retornar resposta com status PENDING
-                                            return Mono.just(UploadDocumentResponse.builder()
-                                                    .documentId(uploadResponse.getDocumentId())
-                                                    .status(uploadResponse.getStatus()) // PENDING
-                                                    .tipoDetectado(uploadResponse.getTipoDetectado())
-                                                    .build());
-                                        });
+                                // Disparar processamento sem bloquear a resposta HTTP
+                                triggerProcessingAsync(uploadResponse.getDocumentId(), person.getTenantId());
+
+                                return Mono.just(UploadDocumentResponse.builder()
+                                        .documentId(uploadResponse.getDocumentId())
+                                        .status(DocumentStatus.PROCESSING)
+                                        .tipoDetectado(uploadResponse.getTipoDetectado())
+                                        .build());
                             });
                 });
     }
@@ -161,8 +130,30 @@ public class DocumentUploadUseCase {
                     }
                     log.info("CPF validado: {}", normalizedCpf);
 
-                    return processUpload(filePart, normalizedCpf, nome, matricula, tenantId, replaceIfDuplicate);
+                    return processUpload(filePart, normalizedCpf, nome, matricula, tenantId, replaceIfDuplicate)
+                            .map(uploadResponse -> {
+                                triggerProcessingAsync(uploadResponse.getDocumentId(), tenantId);
+                                return UploadDocumentResponse.builder()
+                                        .documentId(uploadResponse.getDocumentId())
+                                        .status(DocumentStatus.PROCESSING)
+                                        .tipoDetectado(uploadResponse.getTipoDetectado())
+                                        .build();
+                            });
                 });
+    }
+
+    private void triggerProcessingAsync(String documentId, String tenantId) {
+        log.info("Iniciando processamento automático do documento: {}", documentId);
+        ReactiveTenantContext.withTenant(
+                documentProcessUseCase.processDocument(documentId),
+                tenantId
+        ).subscribe(
+                processResponse -> log.info(
+                        "✓ Processamento iniciado. DocumentId: {}, Status: {}",
+                        documentId, processResponse.getStatus()),
+                processError -> log.warn(
+                        "⚠ Upload bem-sucedido, mas falha ao iniciar processamento: {}",
+                        processError.getMessage()));
     }
 
     private Mono<UploadDocumentResponse> processUpload(FilePart filePart, String cpf, String nome, String matricula,
@@ -191,6 +182,10 @@ public class DocumentUploadUseCase {
                 })
                 .flatMap(fileBytes -> {
                     log.info("Arquivo lido em memória. Tamanho: {} bytes", fileBytes.length);
+                    if (fileBytes.length > MAX_FILE_SIZE) {
+                        return Mono.error(new InvalidPdfException(
+                                "Arquivo excede o limite de 10 MB."));
+                    }
                     // Calcular hash dos bytes
                     log.info("Calculando hash SHA-256 do arquivo...");
                     return calculateFileHashFromBytes(fileBytes)
@@ -212,165 +207,53 @@ public class DocumentUploadUseCase {
     }
 
     private Mono<UploadDocumentResponse> processNewDocument(byte[] fileBytes, String cpf, String nome, String matricula, String fileHash, String filename, String tenantId) {
-        log.info("Processando novo documento para tenant: {}", tenantId);
+        log.info("Upload rápido: salvando documento sem extração de texto (tenant: {})", tenantId);
         log.info("Arquivo em memória. Tamanho: {} bytes", fileBytes.length);
-        
-        // Extrair texto do PDF completo
-        log.info("Extraindo texto do PDF...");
-        return pdfService.extractText(new java.io.ByteArrayInputStream(fileBytes))
-                            .flatMap(pdfText -> {
-                                log.info("Texto extraído. Tamanho: {} caracteres", pdfText != null ? pdfText.length() : 0);
-                                return typeDetectionService.detectType(pdfText)
-                                        .map(documentType -> new Object() {
-                                            final DocumentType tipo = documentType;
-                                            final String text = pdfText;
-                                        });
-                            })
-                            .flatMap(ctx -> {
-                                DocumentType documentType = ctx.tipo;
-                                log.info("Tipo detectado: {}", documentType);
-                                String nomeEfetivo = nome;
-                                String matriculaEfetiva = matricula;
-                                String cpfEfetivo = cpf;
-                                if (documentType == DocumentType.SABESP) {
-                                    var metaOpt = SabespPayslipMetadataExtractor.extract(ctx.text);
-                                    if (metaOpt.isPresent()) {
-                                        var meta = metaOpt.get();
-                                        if ((nomeEfetivo == null || nomeEfetivo.isBlank())
-                                                && meta.nome() != null) {
-                                            nomeEfetivo = meta.nome();
-                                        }
-                                        if (meta.matricula() != null) {
-                                            String matForm = matriculaEfetiva != null
-                                                    ? matriculaEfetiva.replaceAll("\\D", "") : "";
-                                            if (matForm.isBlank()) {
-                                                matriculaEfetiva = meta.matricula();
-                                                log.info("SABESP: matrícula obtida do PDF: {}", matriculaEfetiva);
-                                            } else if (!matForm.equals(meta.matricula().replaceAll("\\D", ""))) {
-                                                log.warn(
-                                                        "SABESP: matrícula do PDF ({}) diverge da matrícula do cadastro/upload ({})",
-                                                        meta.matricula(), matForm);
-                                            }
-                                        }
-                                        if (meta.cpf() != null) {
-                                            String cpfForm = cpf != null ? cpf.replaceAll("\\D", "") : "";
-                                            if (cpfForm.isBlank()) {
-                                                cpfEfetivo = meta.cpf();
-                                                log.info("SABESP: CPF obtido do PDF: {}", cpfEfetivo);
-                                            } else if (!cpfForm.equals(meta.cpf())) {
-                                                log.warn(
-                                                        "SABESP: CPF do PDF ({}) diverge do CPF do upload/cliente ({})",
-                                                        meta.cpf(), cpfForm);
-                                            }
-                                        }
-                                    }
-                                } else if (documentType == DocumentType.SABESPREV_FICHA) {
-                                    var metaOpt = SabesprevFichaMetadataExtractor.extract(ctx.text);
-                                    if (metaOpt.isPresent()) {
-                                        var meta = metaOpt.get();
-                                        if ((nomeEfetivo == null || nomeEfetivo.isBlank())
-                                                && meta.nome() != null) {
-                                            nomeEfetivo = meta.nome();
-                                        }
-                                        if (meta.matricula() != null) {
-                                            String matForm = matriculaEfetiva != null
-                                                    ? matriculaEfetiva.replaceAll("\\D", "") : "";
-                                            if (matForm.isBlank()) {
-                                                matriculaEfetiva = meta.matricula();
-                                                log.info("SABESPREV ficha: matrícula obtida do PDF: {}", matriculaEfetiva);
-                                            } else if (!matForm.equals(meta.matricula().replaceAll("\\D", ""))) {
-                                                log.warn(
-                                                        "SABESPREV ficha: matrícula do PDF ({}) diverge da matrícula do cadastro/upload ({})",
-                                                        meta.matricula(), matForm);
-                                            }
-                                        }
-                                    }
-                                }
-                                final String cpfDocumento = cpfEfetivo;
-                                final String nomeDocumento = nomeEfetivo;
-                                final String matriculaDocumento = matriculaEfetiva;
-                                // Garantir que Person existe
-                                return ensurePersonExists(cpfDocumento, nomeDocumento, matriculaDocumento, tenantId)
-                                        .flatMap(person -> {
-                                            log.info("Person encontrada/criada. CPF: {}", person.getCpf());
-                                            // Salvar arquivo no GridFS com deduplicação por hash
-                                            log.info("Salvando arquivo no GridFS com deduplicação (hash: {})...", 
-                                                    fileHash.substring(0, 16) + "...");
-                                            return gridFsService.storeFileWithHash(
-                                                    new java.io.ByteArrayInputStream(fileBytes),
-                                                    filename,
-                                                    PDF_CONTENT_TYPE,
-                                                    fileHash
-                                            )
-                                            .flatMap(fileId -> {
-                                                log.info("Arquivo salvo no GridFS com ID: {}", fileId);
-                                                // Processar páginas para detectar meses/anos
-                                                log.info("Processando páginas do PDF para detectar meses/anos...");
-                                                return processPages(fileBytes, documentType)
-                                                    .flatMap(pageData -> {
-                                                        List<String> mesesDetectados = pageData.mesesDetectados;
-                                                        List<DetectedPage> detectedPages = pageData.detectedPages;
-                                                        Integer anoDetectado = pageData.anoDetectado;
-                                                        
-                                                        log.info("Páginas processadas: {} páginas, {} meses detectados", 
-                                                                detectedPages.size(), mesesDetectados.size());
-                                                        log.info("Meses detectados: {}", mesesDetectados);
-                                                        
-                                                        // Criar PayrollDocument
-                                                        log.info("Criando PayrollDocument para tenant: {}", tenantId);
-                                                        PayrollDocument document = PayrollDocument.builder()
-                                                                .tenantId(tenantId)
-                                                                .cpf(cpfDocumento)
-                                                                .tipo(documentType)
-                                                                .status(DocumentStatus.PENDING)
-                                                                .originalFileId(fileId)
-                                                                .fileHash(fileHash)
-                                                                .anoDetectado(anoDetectado)
-                                                                .mesesDetectados(mesesDetectados)
-                                                                .detectedPages(detectedPages)
-                                                                .dataUpload(Instant.now())
-                                                                .build();
 
-                                                        return documentRepository.save(document)
-                                                                .flatMap(savedDoc -> {
-                                                                    log.info("PayrollDocument salvo. ID: {}", savedDoc.getId());
-                                                                    // Apenas adicionar o documento à lista de documentos da Person
-                                                                    // Nome, CPF e matrícula já foram salvos no ensurePersonExists()
-                                                                    if (!person.getDocumentos().contains(savedDoc.getId())) {
-                                                                        person.getDocumentos().add(savedDoc.getId());
-                                                                        person.setUpdatedAt(Instant.now());
-                                                                        log.info("Adicionando documento {} à lista de documentos da Person (CPF: {})",
-                                                                                savedDoc.getId(), person.getCpf());
-                                                                        log.info("Person atual - Nome: {}, Matrícula: {}", 
-                                                                                person.getNome(), person.getMatricula());
-                                                                        // Salvar apenas para atualizar a lista de documentos
-                                                                        return personRepository.save(person)
-                                                                                .doOnNext(savedPerson -> {
-                                                                                    log.info("✅ Person atualizada com novo documento. ID: {}, Nome: {}, Matrícula: {}, Total de documentos: {}", 
-                                                                                            savedPerson.getId(), savedPerson.getNome(), savedPerson.getMatricula(), 
-                                                                                            savedPerson.getDocumentos().size());
-                                                                                })
-                                                                                .thenReturn(savedDoc);
-                                                                    } else {
-                                                                        log.debug("Documento {} já está na lista de documentos da Person", savedDoc.getId());
-                                                                        return Mono.just(savedDoc);
-                                                                    }
-                                                                })
-                                                                // Construir resposta
-                                                                .map(savedDoc -> {
-                                                                    log.info("=== UPLOAD CONCLUÍDO COM SUCESSO ===");
-                                                                    log.info("DocumentId: {}, Tipo: {}, Status: {}", 
-                                                                            savedDoc.getId(), savedDoc.getTipo(), savedDoc.getStatus());
-                                                                    return UploadDocumentResponse.builder()
-                                                                            .documentId(savedDoc.getId())
-                                                                            .status(savedDoc.getStatus())
-                                                                            .tipoDetectado(savedDoc.getTipo())
-                                                                            .build();
-                                                                });
-                                                    });
-                                            });
-                                    });
-                            });
+        return ensurePersonExists(cpf, nome, matricula, tenantId)
+                .flatMap(person -> {
+                    log.info("Person encontrada/criada. CPF: {}", person.getCpf());
+                    log.info("Salvando arquivo no GridFS (hash: {})...", fileHash.substring(0, 16) + "...");
+                    return gridFsService.storeFileWithHash(
+                            new java.io.ByteArrayInputStream(fileBytes),
+                            filename,
+                            PDF_CONTENT_TYPE,
+                            fileHash
+                    ).flatMap(fileId -> {
+                        log.info("Arquivo salvo no GridFS com ID: {}", fileId);
+                        PayrollDocument document = PayrollDocument.builder()
+                                .tenantId(tenantId)
+                                .cpf(cpf)
+                                .tipo(DocumentType.UNKNOWN)
+                                .status(DocumentStatus.PENDING)
+                                .originalFileId(fileId)
+                                .fileHash(fileHash)
+                                .mesesDetectados(new ArrayList<>())
+                                .detectedPages(new ArrayList<>())
+                                .dataUpload(Instant.now())
+                                .build();
+
+                        return documentRepository.save(document)
+                                .flatMap(savedDoc -> {
+                                    if (!person.getDocumentos().contains(savedDoc.getId())) {
+                                        person.getDocumentos().add(savedDoc.getId());
+                                        person.setUpdatedAt(Instant.now());
+                                        return personRepository.save(person).thenReturn(savedDoc);
+                                    }
+                                    return Mono.just(savedDoc);
+                                })
+                                .map(savedDoc -> {
+                                    log.info("=== UPLOAD RÁPIDO CONCLUÍDO ===");
+                                    log.info("DocumentId: {}, Tipo: {}, Status: {}",
+                                            savedDoc.getId(), savedDoc.getTipo(), savedDoc.getStatus());
+                                    return UploadDocumentResponse.builder()
+                                            .documentId(savedDoc.getId())
+                                            .status(savedDoc.getStatus())
+                                            .tipoDetectado(savedDoc.getTipo())
+                                            .build();
+                                });
+                    });
+                });
     }
 
     private Mono<String> calculateFileHashFromBytes(byte[] fileBytes) {
@@ -512,141 +395,6 @@ public class DocumentUploadUseCase {
                 );
     }
 
-    private static class PageData {
-        List<String> mesesDetectados;
-        List<DetectedPage> detectedPages;
-        Integer anoDetectado;
-        
-        PageData(List<String> mesesDetectados, List<DetectedPage> detectedPages, Integer anoDetectado) {
-            this.mesesDetectados = mesesDetectados;
-            this.detectedPages = detectedPages;
-            this.anoDetectado = anoDetectado;
-        }
-    }
-
-    private Mono<PageData> processPages(byte[] fileBytes, br.com.verticelabs.pdfprocessor.domain.model.DocumentType documentType) {
-        return pdfService.getTotalPages(new java.io.ByteArrayInputStream(fileBytes))
-                .flatMap(totalPages -> {
-                    log.info("PDF possui {} páginas. Processando cada página...", totalPages);
-                    
-                    if (totalPages == 0) {
-                        return Mono.just(new PageData(new ArrayList<>(), new ArrayList<>(), null));
-                    }
-                    
-                    // Processar cada página
-                    return Flux.range(1, totalPages)
-                            .flatMap(pageNumber -> {
-                                log.debug("Processando página {}/{}", pageNumber, totalPages);
-                                return pdfService.extractTextFromPage(new java.io.ByteArrayInputStream(fileBytes), pageNumber)
-                                                .flatMap(pageText -> {
-                                                    // Detectar mês/ano
-                                                    return monthYearDetectionService.detectMonthYear(pageText)
-                                                            .flatMap(monthYearOpt -> {
-                                                                // Detectar origem da página
-                                                                return typeDetectionService.detectType(pageText)
-                                                                        .map(pageType -> {
-                                                                            DocumentType resolvedType = resolvePageTypeForFuncefPortal(
-                                                                                    documentType, pageType, pageText);
-                                                                            DetectedPage detectedPage = DetectedPage.builder()
-                                                                                    .page(pageNumber)
-                                                                                    .origem(resolvedType.name())
-                                                                                    .build();
-                                                                            
-                                                                            return new PageResult(pageNumber, monthYearOpt, detectedPage, pageText);
-                                                                        });
-                                                            });
-                                                });
-                                    })
-                                    .collectList()
-                                    .map(pageResults -> {
-                                        pageResults.sort(java.util.Comparator.comparingInt(r -> r.pageNumber));
-
-                                        Set<String> mesesSet = new HashSet<>();
-                                        List<DetectedPage> detectedPages = new ArrayList<>();
-                                        Integer anoDetectado = null;
-                                        String lastMonthYear = null;
-                                        
-                                        for (PageResult result : pageResults) {
-                                            java.util.Optional<String> monthYear = result.monthYear;
-                                            // Continuação Funcef portal: herda mês da página anterior
-                                            if (monthYear.isEmpty()
-                                                    && "FUNCEF".equals(result.detectedPage.getOrigem())
-                                                    && lastMonthYear != null
-                                                    && DocumentTypeDetectionServiceImpl.looksLikeFuncefPortalContinuation(result.pageText)) {
-                                                monthYear = java.util.Optional.of(lastMonthYear);
-                                                log.info("Página {}: herdando mês/ano {} da página anterior (continuação Funcef portal)",
-                                                        result.pageNumber, lastMonthYear);
-                                            }
-
-                                            detectedPages.add(result.detectedPage);
-                                            
-                                            if (monthYear.isPresent()) {
-                                                String my = monthYear.get();
-                                                mesesSet.add(my);
-                                                lastMonthYear = my;
-                                                
-                                                try {
-                                                    int ano = Integer.parseInt(my.substring(0, 4));
-                                                    if (anoDetectado == null || ano > anoDetectado) {
-                                                        anoDetectado = ano;
-                                                    }
-                                                } catch (NumberFormatException e) {
-                                                    log.warn("Erro ao extrair ano de: {}", my);
-                                                }
-                                            }
-                                        }
-                                        
-                                        List<String> mesesDetectados = mesesSet.stream()
-                                                .sorted()
-                                                .collect(Collectors.toList());
-
-                                        // Ficha anual SABESPREV: preenche 01–12 a partir do ANO do cabeçalho
-                                        if (documentType == DocumentType.SABESPREV_FICHA) {
-                                            String anoFicha = null;
-                                            for (PageResult result : pageResults) {
-                                                var meta = SabesprevFichaMetadataExtractor.extract(result.pageText);
-                                                if (meta.isPresent() && meta.get().ano() != null) {
-                                                    anoFicha = meta.get().ano();
-                                                    break;
-                                                }
-                                            }
-                                            if (anoFicha != null) {
-                                                anoDetectado = Integer.parseInt(anoFicha);
-                                                mesesDetectados = new ArrayList<>();
-                                                for (int m = 1; m <= 12; m++) {
-                                                    mesesDetectados.add(anoFicha + "-" + String.format("%02d", m));
-                                                }
-                                            }
-                                        }
-                                        
-                                        return new PageData(mesesDetectados, detectedPages, anoDetectado);
-                                    });
-                });
-    }
-
-    /**
-     * Páginas 2+ de um contracheque Funcef portal sem cabeçalho: força origem FUNCEF
-     * quando o documento já foi classificado como FUNCEF.
-     */
-    private static DocumentType resolvePageTypeForFuncefPortal(
-            DocumentType documentType,
-            DocumentType pageType,
-            String pageText) {
-        if (documentType == DocumentType.SABESP) {
-            return DocumentType.SABESP;
-        }
-        if (documentType == DocumentType.SABESPREV_FICHA) {
-            return DocumentType.SABESPREV_FICHA;
-        }
-        if (documentType == DocumentType.FUNCEF
-                && pageType != DocumentType.FUNCEF
-                && pageType != DocumentType.FUNCEF_DEMONSTRATIVO
-                && DocumentTypeDetectionServiceImpl.looksLikeFuncefPortalContinuation(pageText)) {
-            return DocumentType.FUNCEF;
-        }
-        return pageType;
-    }
-
     /**
      * Trata arquivo duplicado: substitui (exclui + novo upload) ou retorna 409 com ID do documento existente.
      */
@@ -662,19 +410,5 @@ public class DocumentUploadUseCase {
                     .then(Mono.defer(createNewDocument));
         }
         return Mono.error(new DocumentoDuplicadoException(existingDocumentId));
-    }
-
-    private static class PageResult {
-        int pageNumber;
-        java.util.Optional<String> monthYear;
-        DetectedPage detectedPage;
-        String pageText;
-        
-        PageResult(int pageNumber, java.util.Optional<String> monthYear, DetectedPage detectedPage, String pageText) {
-            this.pageNumber = pageNumber;
-            this.monthYear = monthYear;
-            this.detectedPage = detectedPage;
-            this.pageText = pageText;
-        }
     }
 }

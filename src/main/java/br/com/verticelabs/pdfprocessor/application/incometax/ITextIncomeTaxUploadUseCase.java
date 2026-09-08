@@ -2,7 +2,6 @@ package br.com.verticelabs.pdfprocessor.application.incometax;
 
 import br.com.verticelabs.pdfprocessor.application.documents.DocumentProcessUseCase;
 import br.com.verticelabs.pdfprocessor.application.persons.GetPersonByIdUseCase;
-import br.com.verticelabs.pdfprocessor.domain.exceptions.DeclaracaoCpfMismatchException;
 import br.com.verticelabs.pdfprocessor.domain.exceptions.DocumentoDuplicadoException;
 import br.com.verticelabs.pdfprocessor.domain.exceptions.InvalidCpfException;
 import br.com.verticelabs.pdfprocessor.domain.exceptions.InvalidPdfException;
@@ -115,6 +114,11 @@ public class ITextIncomeTaxUploadUseCase {
                                                                                                                 fileBytes.length);
                                                                                         }
 
+                                                                                        if (fileBytes.length > MAX_FILE_SIZE) {
+                                                                                                return Mono.error(new InvalidPdfException(
+                                                                                                                "Arquivo excede o limite de 10 MB."));
+                                                                                        }
+
                                                                                         // 4. Calcular hash do arquivo
                                                                                         return calculateFileHash(
                                                                                                         fileBytes)
@@ -138,74 +142,13 @@ public class ITextIncomeTaxUploadUseCase {
                                                                                                                                                                         existingDoc.getId()));
                                                                                                                                 })
                                                                                                                                 .switchIfEmpty(
-                                                                                                                                                // 6. Extrair metadata do PDF (CPF + ano)
-                                                                                                                                                // ANTES de salvar no GridFS para validar o CPF
-                                                                                                                                                extractIncomeTaxMetadata(
-                                                                                                                                                                new ByteArrayInputStream(fileBytes))
-                                                                                                                                                                .flatMap(metadata -> {
-                                                                                                                                                                        // 6a. Validar CPF do PDF contra CPF da pessoa
-                                                                                                                                                                        if (metadata.cpf != null && !metadata.cpf.isBlank()) {
-                                                                                                                                                                                String cpfNoPdf = normalizeCpfForComparison(metadata.cpf);
-                                                                                                                                                                                String cpfNoPessoa = normalizeCpfForComparison(normalizedCpf);
-                                                                                                                                                                                if (!cpfNoPdf.equals(cpfNoPessoa)) {
-                                                                                                                                                                                        log.error(
-                                                                                                                                                                                                        "❌ CPF divergente! Pessoa: {} | PDF: {}",
-                                                                                                                                                                                                        normalizedCpf, metadata.cpf);
-                                                                                                                                                                                        return Mono.error(new DeclaracaoCpfMismatchException(
-                                                                                                                                                                                                        normalizedCpf, metadata.cpf));
-                                                                                                                                                                                }
-                                                                                                                                                                                log.info("✅ CPF validado: PDF ({}) confere com a pessoa ({})",
-                                                                                                                                                                                                metadata.cpf, normalizedCpf);
-                                                                                                                                                                        } else {
-                                                                                                                                                                                log.warn("⚠️ CPF não encontrado no PDF — prosseguindo sem validação de CPF");
-                                                                                                                                                                        }
-
-                                                                                                                                                                        // 7. Salvar arquivo no GridFS
-                                                                                                                                                                        return gridFsService.storeFileWithHash(
-                                                                                                                                                                                        new ByteArrayInputStream(fileBytes),
-                                                                                                                                                                                        filePart.filename(),
-                                                                                                                                                                                        PDF_CONTENT_TYPE,
-                                                                                                                                                                                        fileHash)
-                                                                                                                                                                                        .flatMap(fileId -> {
-                                                                                                                                                                                                log.info("Arquivo salvo no GridFS com ID: {}", fileId);
-                                                                                                                                                                                                // 8. Criar PayrollDocument com metadata
-                                                                                                                                                                                                PayrollDocument document = PayrollDocument
-                                                                                                                                                                                                                .builder()
-                                                                                                                                                                                                                .tenantId(tenantId)
-                                                                                                                                                                                                                .cpf(normalizedCpf)
-                                                                                                                                                                                                                .tipo(DocumentType.INCOME_TAX)
-                                                                                                                                                                                                                .status(DocumentStatus.PENDING)
-                                                                                                                                                                                                                .originalFileId(fileId)
-                                                                                                                                                                                                                .fileHash(fileHash)
-                                                                                                                                                                                                                .anoDetectado(parseAnoCalendario(metadata.anoCalendario))
-                                                                                                                                                                                                                .irpfData(metadata.irpfData)
-                                                                                                                                                                                                                .dataUpload(Instant.now())
-                                                                                                                                                                                                                .build();
-                                                                                                                                                                                                return saveDocumentAndUpdatePerson(document, person);
-                                                                                                                                                                                        });
-                                                                                                                                                                })
-                                                                                                                                                                .switchIfEmpty(Mono.defer(() -> {
-                                                                                                                                                                        // Metadata não extraída — salvar sem ano detectado
-                                                                                                                                                                        log.warn("⚠️ Metadata não extraída do PDF. Salvando sem validação de CPF e sem ano detectado.");
-                                                                                                                                                                        return gridFsService.storeFileWithHash(
-                                                                                                                                                                                        new ByteArrayInputStream(fileBytes),
-                                                                                                                                                                                        filePart.filename(),
-                                                                                                                                                                                        PDF_CONTENT_TYPE,
-                                                                                                                                                                                        fileHash)
-                                                                                                                                                                                        .flatMap(fileId -> {
-                                                                                                                                                                                                PayrollDocument document = PayrollDocument
-                                                                                                                                                                                                                .builder()
-                                                                                                                                                                                                                .tenantId(tenantId)
-                                                                                                                                                                                                                .cpf(normalizedCpf)
-                                                                                                                                                                                                                .tipo(DocumentType.INCOME_TAX)
-                                                                                                                                                                                                                .status(DocumentStatus.PENDING)
-                                                                                                                                                                                                                .originalFileId(fileId)
-                                                                                                                                                                                                                .fileHash(fileHash)
-                                                                                                                                                                                                                .dataUpload(Instant.now())
-                                                                                                                                                                                                                .build();
-                                                                                                                                                                                                return saveDocumentAndUpdatePerson(document, person);
-                                                                                                                                                                                        });
-                                                                                                                                                                })));
+                                                                                                                                                saveIncomeTaxDocumentFast(
+                                                                                                                                                                fileBytes,
+                                                                                                                                                                filePart.filename(),
+                                                                                                                                                                fileHash,
+                                                                                                                                                                tenantId,
+                                                                                                                                                                normalizedCpf,
+                                                                                                                                                                person));
                                                                                                         });
                                                                                 });
                                                         });
@@ -221,7 +164,6 @@ public class ITextIncomeTaxUploadUseCase {
                                 .flatMap(savedDoc -> {
                                         log.info("PayrollDocument salvo. ID: {}", savedDoc.getId());
 
-                                        // Adicionar documento à lista da Person
                                         if (!person.getDocumentos().contains(savedDoc.getId())) {
                                                 person.getDocumentos().add(savedDoc.getId());
                                                 return personRepository.save(person)
@@ -229,45 +171,68 @@ public class ITextIncomeTaxUploadUseCase {
                                         }
                                         return Mono.just(savedDoc);
                                 })
-                                .flatMap(savedDoc -> {
-                                        log.info("=== UPLOAD CONCLUÍDO COM SUCESSO (iText 8) ===");
+                                .map(savedDoc -> {
+                                        log.info("=== UPLOAD RÁPIDO CONCLUÍDO (iText 8) ===");
                                         log.info("DocumentId: {}, Tipo: {}, Status: {}",
                                                         savedDoc.getId(), savedDoc.getTipo(), savedDoc.getStatus());
 
-                                        // Iniciar processamento automático do documento
-                                        log.info("Iniciando processamento automático do documento de IR: {}",
-                                                        savedDoc.getId());
                                         String docTenantId = savedDoc.getTenantId();
-
-                                        return ReactiveTenantContext.withTenant(
+                                        log.info("Disparando processamento automático do documento de IR: {}",
+                                                        savedDoc.getId());
+                                        ReactiveTenantContext.withTenant(
                                                         documentProcessUseCase.processDocument(savedDoc.getId()),
-                                                        docTenantId)
-                                                        .map(processResponse -> {
-                                                                log.info("✓ Processamento iniciado. DocumentId: {}, Status: {}",
-                                                                                savedDoc.getId(),
-                                                                                processResponse.getStatus());
-                                                                return UploadDocumentResponse.builder()
-                                                                                .documentId(savedDoc.getId())
-                                                                                .status(processResponse.getStatus())
-                                                                                .tipoDetectado(savedDoc.getTipo())
-                                                                                .build();
-                                                        })
-                                                        .onErrorResume(processError -> {
-                                                                log.warn("⚠ Upload bem-sucedido, mas falha ao iniciar processamento: {}",
-                                                                                processError.getMessage());
-                                                                return Mono.just(UploadDocumentResponse.builder()
-                                                                                .documentId(savedDoc.getId())
-                                                                                .status(DocumentStatus.PENDING)
-                                                                                .tipoDetectado(savedDoc.getTipo())
-                                                                                .build());
-                                                        });
+                                                        docTenantId
+                                        ).subscribe(
+                                                        processResponse -> log.info(
+                                                                        "✓ Processamento iniciado. DocumentId: {}, Status: {}",
+                                                                        savedDoc.getId(), processResponse.getStatus()),
+                                                        processError -> log.warn(
+                                                                        "⚠ Upload bem-sucedido, mas falha ao iniciar processamento: {}",
+                                                                        processError.getMessage()));
+
+                                        return UploadDocumentResponse.builder()
+                                                        .documentId(savedDoc.getId())
+                                                        .status(DocumentStatus.PROCESSING)
+                                                        .tipoDetectado(savedDoc.getTipo())
+                                                        .build();
+                                });
+        }
+
+        private static final long MAX_FILE_SIZE = 10 * 1024 * 1024;
+
+        private Mono<UploadDocumentResponse> saveIncomeTaxDocumentFast(
+                        byte[] fileBytes,
+                        String filename,
+                        String fileHash,
+                        String tenantId,
+                        String normalizedCpf,
+                        Person person) {
+                return gridFsService.storeFileWithHash(
+                                new ByteArrayInputStream(fileBytes),
+                                filename,
+                                PDF_CONTENT_TYPE,
+                                fileHash)
+                                .flatMap(fileId -> {
+                                        log.info("Arquivo IR salvo no GridFS com ID: {} (upload rápido)", fileId);
+                                        PayrollDocument document = PayrollDocument.builder()
+                                                        .tenantId(tenantId)
+                                                        .cpf(normalizedCpf)
+                                                        .tipo(DocumentType.INCOME_TAX)
+                                                        .status(DocumentStatus.PENDING)
+                                                        .originalFileId(fileId)
+                                                        .fileHash(fileHash)
+                                                        .dataUpload(Instant.now())
+                                                        .build();
+                                        return saveDocumentAndUpdatePerson(document, person);
                                 });
         }
 
         /**
          * Extrai metadata da declaração de IR usando iText 8.
          * Retorna Mono.empty() se não conseguir extrair (não é crítico).
+         * @deprecated Extração ocorre no processamento assíncrono ({@link br.com.verticelabs.pdfprocessor.application.documents.DocumentProcessUseCase}).
          */
+        @Deprecated
         private Mono<IncomeTaxMetadata> extractIncomeTaxMetadata(InputStream inputStream) {
                 return iTextIncomeTaxService.extractIncomeTaxInfo(inputStream)
                                 .map(info -> {
@@ -290,7 +255,9 @@ public class ITextIncomeTaxUploadUseCase {
 
         /**
          * Normaliza CPF removendo pontos e traço para comparação.
+         * @deprecated Validação de CPF ocorre no processamento assíncrono.
          */
+        @Deprecated
         private String normalizeCpfForComparison(String cpf) {
                 if (cpf == null) return null;
                 return cpf.replaceAll("[^\\d]", "");
