@@ -1,6 +1,10 @@
 package br.com.verticelabs.pdfprocessor.domain.model;
 
 public enum DocumentType {
+    /**
+     * Tipo ainda não detectado — classificação e metadados de páginas ocorrem no processamento assíncrono.
+     */
+    UNKNOWN,
     CAIXA,
     FUNCEF,
     CAIXA_FUNCEF,
@@ -27,6 +31,22 @@ public enum DocumentType {
      * Ficha Financeira de Pagamentos SABESPREV (aposentado) — matriz anual rubrica × JAN–DEZ.
      * Identificação: FICHA FINANCEIRA + SABESPREV + ANO. Origem das entries: {@code SABESPREV}.
      */
-    SABESPREV_FICHA
-}
+    SABESPREV_FICHA;
 
+    /**
+     * Rótulo legível para logs de processamento e UI (evita expor enum cru, ex.: UNKNOWN).
+     */
+    public String getLogLabel() {
+        return switch (this) {
+            case UNKNOWN -> "Detectando tipo...";
+            case CAIXA -> "CAIXA";
+            case FUNCEF -> "FUNCEF";
+            case CAIXA_FUNCEF -> "CAIXA + FUNCEF";
+            case INCOME_TAX -> "IRPF";
+            case FUNCEF_DEMONSTRATIVO -> "FUNCEF Demonstrativo";
+            case INFORME_RENDIMENTOS -> "Informe de Rendimentos";
+            case SABESP -> "Contracheque SABESP";
+            case SABESPREV_FICHA -> "Ficha Financeira SABESPREV";
+        };
+    }
+}

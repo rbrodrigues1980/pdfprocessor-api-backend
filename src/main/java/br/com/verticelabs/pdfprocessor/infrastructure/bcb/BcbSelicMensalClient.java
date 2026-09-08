@@ -2,47 +2,88 @@ package br.com.verticelabs.pdfprocessor.infrastructure.bcb;
 
 import br.com.verticelabs.pdfprocessor.domain.model.SelicMensalEntity;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.util.UriComponentsBuilder;
 import reactor.core.publisher.Flux;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 /**
  * Client para API SGS do BCB que retorna taxas SELIC mensais.
  * Série 4390: Taxa de juros - Selic acumulada no mês.
- * 
- * Esta é a taxa utilizada pela Receita Federal para correção monetária.
+ *
+ * <p>O BCB exige {@code dataInicial} e {@code dataFinal}; sem elas a API responde
+ * {@code Content-Type: text/html} mesmo com corpo JSON, o que quebra o decoder do WebClient.</p>
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class BcbSelicMensalClient {
 
-    // Série 4390: Taxa de juros - Selic acumulada no mês
-    private static final String BCB_SGS_URL = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.4390/dados?formato=json";
+    private static final String BCB_SGS_BASE_URL = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.4390/dados";
+    private static final DateTimeFormatter BCB_DATE = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+    private static final LocalDate SERIE_INICIO = LocalDate.of(1986, 1, 1);
 
     private final WebClient.Builder webClientBuilder;
+    private final ObjectMapper objectMapper;
 
     /**
-     * Busca todas as taxas SELIC mensais do BCB.
+     * Busca taxas SELIC mensais do BCB (série 4390) de 1986 até a data atual.
      */
     public Flux<SelicMensalEntity> fetchSelicMensal() {
-        log.info("Buscando taxas SELIC mensais do BCB SGS (série 4390)...");
+        String dataInicial = SERIE_INICIO.format(BCB_DATE);
+        String dataFinal = LocalDate.now().format(BCB_DATE);
+        String url = UriComponentsBuilder.fromHttpUrl(BCB_SGS_BASE_URL)
+                .queryParam("formato", "json")
+                .queryParam("dataInicial", dataInicial)
+                .queryParam("dataFinal", dataFinal)
+                .build()
+                .toUriString();
+
+        log.info("Buscando taxas SELIC mensais do BCB SGS (série 4390) de {} a {}...",
+                dataInicial, dataFinal);
 
         WebClient client = webClientBuilder.build();
 
         return client.get()
-                .uri(BCB_SGS_URL)
+                .uri(url)
                 .retrieve()
-                .bodyToFlux(BcbSgsItem.class)
-                .map(this::mapToEntity)
+                .bodyToMono(String.class)
+                .flatMapMany(this::parseResponse)
                 .doOnComplete(() -> log.info("Taxas SELIC mensais carregadas com sucesso"))
                 .doOnError(e -> log.error("Erro ao buscar SELIC mensal: {}", e.getMessage()));
+    }
+
+    private Flux<SelicMensalEntity> parseResponse(String body) {
+        if (body == null || body.isBlank()) {
+            log.warn("Resposta vazia do BCB SGS (série 4390)");
+            return Flux.empty();
+        }
+
+        String trimmed = body.stripLeading();
+        if (!trimmed.startsWith("[")) {
+            log.error("Resposta inesperada do BCB SGS (esperado JSON array): {}",
+                    trimmed.length() > 200 ? trimmed.substring(0, 200) + "..." : trimmed);
+            return Flux.error(new IllegalStateException(
+                    "BCB SGS retornou conteúdo inválido (não é JSON array)"));
+        }
+
+        try {
+            List<BcbSgsItem> items = objectMapper.readValue(body, new TypeReference<>() {});
+            return Flux.fromIterable(items).map(this::mapToEntity);
+        } catch (Exception e) {
+            return Flux.error(new IllegalStateException("Falha ao parsear JSON do BCB SGS", e));
+        }
     }
 
     /**

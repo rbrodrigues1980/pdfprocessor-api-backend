@@ -48,7 +48,7 @@ public class DocumentController {
                         @RequestPart(value = "nome", required = false) String nome,
                         @RequestParam(value = "replace", defaultValue = "false") boolean replace) {
                 return documentUploadUseCase.upload(file, cpf, nome, replace)
-                                .<ResponseEntity<Object>>map(response -> ResponseEntity.status(HttpStatus.CREATED)
+                                .<ResponseEntity<Object>>map(response -> ResponseEntity.status(HttpStatus.ACCEPTED)
                                                 .body((Object) response));
         }
 
@@ -280,7 +280,7 @@ public class DocumentController {
                                         log.debug("DocumentId: {}, Tipo: {}, Status: {}",
                                                         response.getDocumentId(), response.getTipoDetectado(),
                                                         response.getStatus());
-                                        return ResponseEntity.status(HttpStatus.CREATED).body((Object) response);
+                                        return ResponseEntity.status(HttpStatus.ACCEPTED).body((Object) response);
                                 });
         }
 

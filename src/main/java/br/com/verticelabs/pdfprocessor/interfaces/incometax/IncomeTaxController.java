@@ -71,7 +71,7 @@ public class IncomeTaxController {
                 .<ResponseEntity<UploadDocumentResponse>>map(response -> {
                     log.debug("✅ Upload concluído: documentId={}, status={}",
                             response.getDocumentId(), response.getStatus());
-                    return ResponseEntity.status(HttpStatus.CREATED).body(response);
+                    return ResponseEntity.status(HttpStatus.ACCEPTED).body(response);
                 })
                 .onErrorResume(e -> {
                     log.error("❌ Erro no upload: {}", e.getMessage());
@@ -107,7 +107,7 @@ public class IncomeTaxController {
                 .<ResponseEntity<UploadDocumentResponse>>map(response -> {
                     log.debug("✅ Upload concluído: documentId={}, status={}",
                             response.getDocumentId(), response.getStatus());
-                    return ResponseEntity.status(HttpStatus.CREATED).body(response);
+                    return ResponseEntity.status(HttpStatus.ACCEPTED).body(response);
                 })
                 .onErrorResume(e -> {
                     log.error("❌ Erro no upload: {}", e.getMessage());

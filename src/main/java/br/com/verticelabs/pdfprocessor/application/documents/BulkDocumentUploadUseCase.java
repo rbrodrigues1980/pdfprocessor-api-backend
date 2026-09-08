@@ -24,7 +24,6 @@ import java.util.List;
 public class BulkDocumentUploadUseCase {
 
     private final DocumentUploadUseCase documentUploadUseCase;
-    private final DocumentProcessUseCase documentProcessUseCase;
     private final CpfValidationService cpfValidationService;
     private final PersonRepository personRepository;
 
@@ -81,10 +80,9 @@ public class BulkDocumentUploadUseCase {
 
         log.info("✓ Parâmetros validados. CPF normalizado: {}", normalizedCpf);
 
-        // Processar cada arquivo em paralelo (ou sequencialmente para evitar sobrecarga)
-        // Usando concatMap para processar sequencialmente e evitar sobrecarga do sistema
+        // Processar cada arquivo sequencialmente para evitar sobrecarga do sistema
         return Flux.fromIterable(files)
-                .index() // Adiciona índice para rastreamento
+                .index()
                 .concatMap(tuple -> {
                     long index = tuple.getT1();
                     FilePart file = tuple.getT2();
@@ -92,40 +90,18 @@ public class BulkDocumentUploadUseCase {
                     
                     log.info("Processando arquivo {}/{}: {}", index + 1, files.size(), filename);
                     
-                    // 1. Fazer upload do arquivo
                     return documentUploadUseCase.upload(file, normalizedCpf, nome, matricula, replaceIfDuplicate)
-                            .flatMap(uploadResponse -> {
+                            .map(uploadResponse -> {
                                 log.info("✓ Upload concluído para arquivo {}. DocumentId: {}, Status: {}", 
                                         filename, uploadResponse.getDocumentId(), uploadResponse.getStatus());
-                                
-                                // 2. Iniciar processamento automático do documento
-                                log.info("Iniciando processamento automático do documento: {}", uploadResponse.getDocumentId());
-                                return documentProcessUseCase.processDocument(uploadResponse.getDocumentId())
-                                        .map(processResponse -> {
-                                            log.info("✓ Processamento iniciado para arquivo {}. DocumentId: {}, Status: {}", 
-                                                    filename, uploadResponse.getDocumentId(), processResponse.getStatus());
-                                            
-                                            return BulkUploadItemResponse.builder()
-                                                    .filename(filename)
-                                                    .documentId(uploadResponse.getDocumentId())
-                                                    .status(processResponse.getStatus()) // Status após iniciar processamento (PROCESSING)
-                                                    .tipoDetectado(uploadResponse.getTipoDetectado())
-                                                    .sucesso(true)
-                                                    .build();
-                                        })
-                                        .onErrorResume(processError -> {
-                                            log.warn("⚠ Upload bem-sucedido, mas falha ao iniciar processamento para arquivo {}: {}", 
-                                                    filename, processError.getMessage());
-                                            // Upload foi bem-sucedido, mas processamento falhou
-                                            return Mono.just(BulkUploadItemResponse.builder()
-                                                    .filename(filename)
-                                                    .documentId(uploadResponse.getDocumentId())
-                                                    .status(uploadResponse.getStatus()) // Status do upload (PENDING)
-                                                    .tipoDetectado(uploadResponse.getTipoDetectado())
-                                                    .sucesso(true) // Upload foi bem-sucedido
-                                                    .erro("Upload concluído, mas processamento não pôde ser iniciado: " + processError.getMessage())
-                                                    .build());
-                                        });
+
+                                return BulkUploadItemResponse.builder()
+                                        .filename(filename)
+                                        .documentId(uploadResponse.getDocumentId())
+                                        .status(uploadResponse.getStatus())
+                                        .tipoDetectado(uploadResponse.getTipoDetectado())
+                                        .sucesso(true)
+                                        .build();
                             })
                             .onErrorResume(DocumentoDuplicadoException.class, dup -> {
                                 log.warn("✗ Arquivo duplicado {}: documento existente {}", filename, dup.getExistingDocumentId());
