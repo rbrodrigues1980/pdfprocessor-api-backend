@@ -51,6 +51,8 @@ public class DocumentProcessUseCaseTest {
     @Mock
     private PdfLineParser lineParser;
     @Mock
+    private br.com.verticelabs.pdfprocessor.infrastructure.pdf.SabesprevFichaFinanceiraParser sabesprevFichaFinanceiraParser;
+    @Mock
     private PdfNormalizer normalizer;
     @Mock
     private RubricaValidator rubricaValidator;
@@ -58,6 +60,8 @@ public class DocumentProcessUseCaseTest {
     private br.com.verticelabs.pdfprocessor.application.incometax.IrpfDeclaracaoDataMapper irpfDeclaracaoDataMapper;
     @Mock
     private br.com.verticelabs.pdfprocessor.infrastructure.pdf.InformeRendimentosFuncefExtractor informeRendimentosFuncefExtractor;
+    @Mock
+    private DocumentUploadPreparationService documentUploadPreparationService;
 
     @InjectMocks
     private DocumentProcessUseCase useCase;
@@ -126,7 +130,7 @@ public class DocumentProcessUseCaseTest {
         when(validationService.validatePayrollExtraction(anyList(), any(BigDecimal.class), any(BigDecimal.class), any(BigDecimal.class), anyString(), any()))
                 .thenReturn(validationResult);
 
-        // Mock Gemini Enabled & Extraction
+        // Mock Gemini Enabled & Extraction — retorna vazio; regex deve ser preservado
         when(aiPdfExtractionService.isEnabled()).thenReturn(true);
         when(aiPdfExtractionService.getPrimaryModelName()).thenReturn("gemini-1.5-flash");
         when(aiPdfExtractionService.extractPayrollData(any(byte[].class), eq(1)))
@@ -135,9 +139,12 @@ public class DocumentProcessUseCaseTest {
         // Act
         DocumentProcessUseCase.PageResult result = useCase.processPageWithMetadata(document, pdfBytes, 1, 1).block();
 
-        // Assert
+        // Assert: Gemini foi chamado, mas regex foi mantido (não zera o mês)
         verify(aiPdfExtractionService, times(1)).extractPayrollData(any(byte[].class), eq(1));
         Assertions.assertNotNull(result);
+        Assertions.assertEquals(1, result.getPageNumber());
+        Assertions.assertFalse(result.getEntries().isEmpty(),
+                "Regex válido deve ser mantido quando Gemini retorna vazio");
     }
 
     @Test

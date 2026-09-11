@@ -292,9 +292,8 @@ public class DocumentProcessUseCase {
                                 log.info(
                                         "════════════════════════════════════════════════════════════════════════════════");
 
-                                for (int i = 0; i < pageResults.size(); i++) {
-                                    PageResult pageResult = pageResults.get(i);
-                                    int pageNum = i + 1;
+                                for (PageResult pageResult : pageResults) {
+                                    int pageNum = pageResult.getPageNumber();
                                     int pageEntriesCount = pageResult.getEntries().size();
                                     log.info("Página {} contribuiu com {} entries", pageNum, pageEntriesCount);
                                     allEntries.addAll(pageResult.getEntries());
@@ -463,17 +462,24 @@ public class DocumentProcessUseCase {
     }
 
     /**
-     * Resultado do processamento de uma página (apenas entries).
+     * Resultado do processamento de uma página (entries + número real da página).
+     * O pageNumber é obrigatório para retry após flatMap paralelo (ordem da lista ≠ ordem das páginas).
      */
     static class PageResult {
         final List<PayrollEntry> entries;
+        final int pageNumber;
 
-        PageResult(List<PayrollEntry> entries) {
-            this.entries = entries;
+        PageResult(List<PayrollEntry> entries, int pageNumber) {
+            this.entries = entries != null ? entries : new ArrayList<>();
+            this.pageNumber = pageNumber;
         }
 
         List<PayrollEntry> getEntries() {
             return entries;
+        }
+
+        int getPageNumber() {
+            return pageNumber;
         }
     }
 
@@ -754,7 +760,7 @@ public class DocumentProcessUseCase {
                                         "Página %d é continuação Funcef (Página 2 de N) sem rubricas — Gemini não necessário.",
                                         pageNumber),
                                 Map.of("textLength", textLen, "skippedGemini", true));
-                        return Mono.just(new PageResult(new ArrayList<>()));
+                        return Mono.just(new PageResult(new ArrayList<>(), pageNumber));
                     }
 
                     // Se o texto extraído for ilegível (muito curto OU com fontes sem Unicode mapping),
@@ -858,7 +864,9 @@ public class DocumentProcessUseCase {
                                                 String.format("Validação da extração por regex reprovada na página %d (score: %s). Acionando fallback para Gemini AI...", pageNumber, scoreStr),
                                                 valDetails);
                                         return saveIntermediateProgress(document)
-                                                .then(processPageWithGemini(document, pdfBytes, pageNumber));
+                                                .then(processPageWithGeminiKeepingRegexFallback(
+                                                        document, pdfBytes, pageNumber, parserResult, score,
+                                                        bruto, descontos, liquido, cpf));
                                     } else {
                                         log.warn("\u26A0\uFE0F Validação reprovada para parser regex na página {} (score: {}), mas Gemini AI está desabilitado.", pageNumber, scoreStr);
                                         addWarnEvent(document, pageNumber, ProcessingEventType.VALIDATION_FAILED,
@@ -879,7 +887,7 @@ public class DocumentProcessUseCase {
                 .onErrorResume(error -> {
                     log.error("Erro ao processar página {}", pageNumber, error);
                     // Continuar processamento mesmo com erro em uma página
-                    return Mono.just(new PageResult(new ArrayList<>()));
+                    return Mono.just(new PageResult(new ArrayList<>(), pageNumber));
                 });
     }
 
@@ -890,7 +898,7 @@ public class DocumentProcessUseCase {
     private Mono<PageResult> processPageTextWithParser(PayrollDocument document, String pageText, int pageNumber) {
         // Se texto vazio, retornar resultado vazio
         if (pageText == null || pageText.isEmpty()) {
-            return Mono.just(new PageResult(new ArrayList<>()));
+            return Mono.just(new PageResult(new ArrayList<>(), pageNumber));
         }
 
         // Determinar origem da página
@@ -992,7 +1000,7 @@ public class DocumentProcessUseCase {
                     log.info("📊 Página {} - {} rubricas extraídas (parser), {} entries criadas",
                             pageNumber, parsedLines.size(), entries.size());
 
-                    return new PageResult(entries);
+                    return new PageResult(entries, pageNumber);
                 });
     }
 
@@ -2124,10 +2132,98 @@ public class DocumentProcessUseCase {
                 .build();
     }
 
+    /**
+     * Após validação do regex falhar, tenta Gemini mas NÃO descarta o regex se a IA
+     * retornar vazio, erro ou score pior — evita meses zerados na planilha (ex.: FUNCEF 4534).
+     */
+    private Mono<PageResult> processPageWithGeminiKeepingRegexFallback(
+            PayrollDocument document,
+            byte[] pdfBytes,
+            int pageNumber,
+            PageResult regexFallback,
+            double regexScore,
+            BigDecimal bruto,
+            BigDecimal descontos,
+            BigDecimal liquido,
+            String cpf) {
+
+        return processPageWithGemini(document, pdfBytes, pageNumber)
+                .map(geminiResult -> chooseBetterOrKeepRegex(
+                        regexFallback, regexScore, geminiResult, pageNumber,
+                        bruto, descontos, liquido, cpf, document))
+                .onErrorResume(error -> {
+                    log.warn(
+                            "\u26A0\uFE0F Gemini falhou na página {} após validação regex — mantendo {} rubricas do parser: {}",
+                            pageNumber, regexFallback.getEntries().size(), error.getMessage());
+                    addWarnEvent(document, pageNumber, ProcessingEventType.GEMINI_EXTRACTION_FAILED,
+                            String.format(
+                                    "Gemini falhou na página %d. Mantendo extração por regex (%d rubricas).",
+                                    pageNumber, regexFallback.getEntries().size()),
+                            Map.of("rubricasCount", regexFallback.getEntries().size(),
+                                    "errorMessage", error.getMessage() != null ? error.getMessage() : "unknown"));
+                    return Mono.just(regexFallback);
+                });
+    }
+
+    private PageResult chooseBetterOrKeepRegex(
+            PageResult regexFallback,
+            double regexScore,
+            PageResult geminiResult,
+            int pageNumber,
+            BigDecimal bruto,
+            BigDecimal descontos,
+            BigDecimal liquido,
+            String cpf,
+            PayrollDocument document) {
+
+        if (geminiResult == null || geminiResult.getEntries() == null || geminiResult.getEntries().isEmpty()) {
+            log.warn(
+                    "\u26A0\uFE0F Gemini retornou 0 rubricas na página {} — mantendo regex ({} rubricas, score={})",
+                    pageNumber, regexFallback.getEntries().size(), String.format("%.2f", regexScore));
+            addWarnEvent(document, pageNumber, ProcessingEventType.GEMINI_EXTRACTION_COMPLETED,
+                    String.format(
+                            "Gemini vazio na página %d. Mantendo extração por regex (%d rubricas).",
+                            pageNumber, regexFallback.getEntries().size()),
+                    Map.of("rubricasCount", regexFallback.getEntries().size(),
+                            "regexScore", regexScore));
+            return regexFallback;
+        }
+
+        ValidationResult geminiValidation = validationService.validatePayrollExtraction(
+                geminiResult.getEntries(),
+                bruto,
+                descontos,
+                liquido,
+                cpf,
+                null);
+        double geminiScore = geminiValidation.confidenceScore();
+
+        if (geminiScore < regexScore) {
+            log.warn(
+                    "\u26A0\uFE0F Gemini score {} < regex score {} na página {} — mantendo regex ({} rubricas)",
+                    String.format("%.2f", geminiScore), String.format("%.2f", regexScore),
+                    pageNumber, regexFallback.getEntries().size());
+            addWarnEvent(document, pageNumber, ProcessingEventType.VALIDATION_FAILED,
+                    String.format(
+                            "Gemini score (%.2f) pior que regex (%.2f) na página %d. Mantendo extração por regex.",
+                            geminiScore, regexScore, pageNumber),
+                    Map.of("geminiScore", geminiScore, "regexScore", regexScore,
+                            "regexRubricas", regexFallback.getEntries().size(),
+                            "geminiRubricas", geminiResult.getEntries().size()));
+            return regexFallback;
+        }
+
+        log.info(
+                "\u2705 Gemini preferido na página {} (score {} >= regex {}). Rubricas: {}",
+                pageNumber, String.format("%.2f", geminiScore), String.format("%.2f", regexScore),
+                geminiResult.getEntries().size());
+        return geminiResult;
+    }
+
     private Mono<PageResult> processPageWithGemini(PayrollDocument document, byte[] pdfBytes, int pageNumber) {
         if (!aiPdfExtractionService.isEnabled()) {
             log.warn("\u26A0\uFE0F Gemini AI desabilitado. Página {} será ignorada.", pageNumber);
-            return Mono.just(new PageResult(new ArrayList<>()));
+            return Mono.just(new PageResult(new ArrayList<>(), pageNumber));
         }
 
         String modelName = aiPdfExtractionService.getPrimaryModelName();
@@ -2149,7 +2245,7 @@ public class DocumentProcessUseCase {
                         addWarnEvent(document, pageNumber, ProcessingEventType.GEMINI_EXTRACTION_COMPLETED,
                                 String.format("Gemini não retornou dados (%dms).", geminiElapsed),
                                 Map.of("processingTimeMs", geminiElapsed, "rubricasCount", 0));
-                        return Mono.just(new PageResult(new ArrayList<>()));
+                        return Mono.just(new PageResult(new ArrayList<>(), pageNumber));
                     }
 
                     log.info("\u2705 Gemini retornou {} chars de JSON estruturado da página {}",
@@ -2171,7 +2267,7 @@ public class DocumentProcessUseCase {
                                 String.format("Gemini retornou JSON mas sem rubricas válidas (%dms).", geminiElapsed),
                                 Map.of("processingTimeMs", geminiElapsed, "rubricasCount", 0,
                                         "responseLength", jsonResponse.length()));
-                        return Mono.just(new PageResult(new ArrayList<>()));
+                        return Mono.just(new PageResult(new ArrayList<>(), pageNumber));
                     }
 
                     int rubricasCount = parsedData.getEntries().size();
@@ -2332,7 +2428,7 @@ public class DocumentProcessUseCase {
                                                         addWarnEvent(document, pageNumber, ProcessingEventType.ESCALATION_FAILED,
                                                                 String.format("Gemini Pro não retornou dados (%dms). Usando cross-validation.", proElapsed),
                                                                 Map.of("processingTimeMs", proElapsed));
-                                                        return new PageResult(crossResult.consolidatedEntries());
+                                                        return new PageResult(crossResult.consolidatedEntries(), pageNumber);
                                                     }
 
                                                     log.info("\u2705 Gemini Pro retornou {} chars de JSON da página {}",
@@ -2380,7 +2476,7 @@ public class DocumentProcessUseCase {
                                                                         proData.getNome(), proData.getCompetencia(),
                                                                         proData.getSalarioBruto(), proData.getTotalDescontos(), proData.getSalarioLiquido()),
                                                                 proDetails);
-                                                        return new PageResult(proData.getEntries());
+                                                        return new PageResult(proData.getEntries(), pageNumber);
                                                     }
 
                                                     log.warn("\u26A0\uFE0F Gemini Pro não extraiu rubricas da página {}. Usando cross-validation.",
@@ -2388,7 +2484,7 @@ public class DocumentProcessUseCase {
                                                     addWarnEvent(document, pageNumber, ProcessingEventType.ESCALATION_FAILED,
                                                             String.format("Gemini Pro retornou JSON mas sem rubricas (%dms). Usando cross-validation.", proElapsed),
                                                             Map.of("processingTimeMs", proElapsed));
-                                                    return new PageResult(crossResult.consolidatedEntries());
+                                                    return new PageResult(crossResult.consolidatedEntries(), pageNumber);
                                                 })
                                                 .onErrorResume(proError -> {
                                                     long proElapsed = System.currentTimeMillis() - proStart;
@@ -2399,17 +2495,17 @@ public class DocumentProcessUseCase {
                                                                     proElapsed, proError.getMessage()),
                                                             Map.of("processingTimeMs", proElapsed,
                                                                     "errorMessage", proError.getMessage()));
-                                                    return Mono.just(new PageResult(crossResult.consolidatedEntries()));
+                                                    return Mono.just(new PageResult(crossResult.consolidatedEntries(), pageNumber));
                                                 });
                                     }
 
                                     // Cross-validation OK — usar entries consolidadas
-                                    return Mono.just(new PageResult(crossResult.consolidatedEntries()));
+                                    return Mono.just(new PageResult(crossResult.consolidatedEntries(), pageNumber));
                                 });
                     }
 
                     // Score >= 0.85 — dados confiáveis, usar direto
-                    return Mono.just(new PageResult(parsedData.getEntries()));
+                    return Mono.just(new PageResult(parsedData.getEntries(), pageNumber));
                 })
                 .onErrorResume(error -> {
                     long geminiElapsed = System.currentTimeMillis() - geminiStart;
@@ -2435,7 +2531,7 @@ public class DocumentProcessUseCase {
                             .flatMap(text -> processPageTextWithParser(document, text, pageNumber))
                             .onErrorResume(err -> {
                                 log.error("\u274C Fallback também falhou na página {}: {}", pageNumber, err.getMessage());
-                                return Mono.just(new PageResult(new ArrayList<>()));
+                                return Mono.just(new PageResult(new ArrayList<>(), pageNumber));
                             });
                 });
     }
