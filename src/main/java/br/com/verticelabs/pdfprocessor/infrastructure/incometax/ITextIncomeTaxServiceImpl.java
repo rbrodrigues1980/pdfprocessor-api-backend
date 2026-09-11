@@ -70,8 +70,12 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
             "(?i)dedu[çc][ãa]o\\s+de\\s+incentivo[\\s\\S]*?([\\d]{1,3}(?:[.]\\d{3})*,\\d{2})",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
+    /**
+     * Imposto devido I na mesma linha do rótulo (não cruzar newline — evita falso
+     * positivo com o "I" de "IMPOSTO A RESTITUIR" após o cabeçalho "IMPOSTO DEVIDO").
+     */
     private static final Pattern IMPOSTO_DEVIDO_I_PATTERN = Pattern.compile(
-            "(?i)imposto\\s+devido\\s+I(?![I])[\\s\\S]*?([\\d]{1,3}(?:[.]\\d{3})*,\\d{2})",
+            "(?i)imposto\\s+devido\\s+I(?![I\\w])[ \\t]*([\\d]{1,3}(?:[.]\\d{3})*,\\d{2})",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
     private static final Pattern CONTRIBUICAO_PREV_EMPREGADOR_DOMESTICO_PATTERN = Pattern.compile(
@@ -574,7 +578,7 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
         BigDecimal baseCalculoImposto = extractValorMonetario(resumoPageText, BASE_CALCULO_IMPOSTO_PATTERN);
         BigDecimal impostoDevido = extractValorMonetario(resumoPageText, IMPOSTO_DEVIDO_PATTERN);
         BigDecimal deducaoIncentivo = extractValorMonetario(resumoPageText, DEDUCAO_INCENTIVO_PATTERN);
-        BigDecimal impostoDevidoI = extractValorMonetario(resumoPageText, IMPOSTO_DEVIDO_I_PATTERN);
+        BigDecimal impostoDevidoI = extractImpostoDevidoI(resumoPageText);
         BigDecimal contribuicaoPrevEmpregadorDomestico = extractValorMonetario(resumoPageText,
                 CONTRIBUICAO_PREV_EMPREGADOR_DOMESTICO_PATTERN);
         BigDecimal impostoDevidoII = extractValorMonetario(resumoPageText, IMPOSTO_DEVIDO_II_PATTERN);
@@ -1937,32 +1941,49 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
                 impostoDevidoI, impostoDevido, deducaoIncentivo, impostoDevidoRRA,
                 contribuicaoPrevEmpregadorDomestico, impostoDevidoII, totalImpostoDevido);
 
-        // Reconstrução aritmética para layouts com colunas embaralhadas: quando a dedução
-        // de incentivo não foi capturada (0) mas o imposto devido bruto supera o total,
-        // deriva deducaoIncentivo = impostoDevido − (total − RRA) e impostoDevidoI = total − RRA.
-        // Ex.: doações ECA/Idoso que abatem o "Total do imposto devido".
+        // Se total ≈ imposto devido, não há dedução de incentivo real — não inventar a partir de I errado.
         if (impostoDevido != null && totalImpostoDevido != null
-                && (impostoDevidoII == null || impostoDevidoII.compareTo(BigDecimal.ZERO) == 0)) {
-            BigDecimal rra = nvlBigDecimal(impostoDevidoRRA);
-            BigDecimal impostoIDerivado = totalImpostoDevido.subtract(rra);
-            BigDecimal incentivoDerivado = impostoDevido.subtract(impostoIDerivado);
-            boolean plausivel = incentivoDerivado.compareTo(BigDecimal.ZERO) > 0
-                    && incentivoDerivado.compareTo(impostoDevido) < 0;
-            if (plausivel && nvlBigDecimal(deducaoIncentivo).compareTo(BigDecimal.ZERO) == 0) {
-                deducaoIncentivo = incentivoDerivado.setScale(2, RoundingMode.HALF_UP);
-                impostoDevidoI = impostoIDerivado.setScale(2, RoundingMode.HALF_UP);
-                log.info("✅ Dedução de incentivo derivada (impostoDevido − total): {}", deducaoIncentivo);
+                && withinOneCent(impostoDevido, totalImpostoDevido)) {
+            if (nvlBigDecimal(deducaoIncentivo).compareTo(BigDecimal.ZERO) > 0) {
+                log.warn("⚠️ Dedução de incentivo descartada (total ≈ imposto devido): era {}", deducaoIncentivo);
             }
-        }
+            deducaoIncentivo = BigDecimal.ZERO;
+            BigDecimal rra = nvlBigDecimal(impostoDevidoRRA);
+            BigDecimal impostoIEsperado = totalImpostoDevido.subtract(rra).setScale(2, RoundingMode.HALF_UP);
+            if (impostoDevidoI == null || !withinOneCent(impostoDevidoI, impostoIEsperado)) {
+                log.info("✅ Imposto devido I alinhado ao total − RRA: {}", impostoIEsperado);
+                impostoDevidoI = impostoIEsperado;
+            }
+        } else {
+            // Reconstrução aritmética para layouts com colunas embaralhadas: quando a dedução
+            // de incentivo não foi capturada (0) mas o imposto devido bruto supera o total,
+            // deriva deducaoIncentivo = impostoDevido − (total − RRA) e impostoDevidoI = total − RRA.
+            // Ex.: doações ECA/Idoso que abatem o "Total do imposto devido".
+            if (impostoDevido != null && totalImpostoDevido != null
+                    && (impostoDevidoII == null || impostoDevidoII.compareTo(BigDecimal.ZERO) == 0)) {
+                BigDecimal rra = nvlBigDecimal(impostoDevidoRRA);
+                BigDecimal impostoIDerivado = totalImpostoDevido.subtract(rra);
+                BigDecimal incentivoDerivado = impostoDevido.subtract(impostoIDerivado);
+                boolean plausivel = incentivoDerivado.compareTo(BigDecimal.ZERO) > 0
+                        && incentivoDerivado.compareTo(impostoDevido) < 0;
+                if (plausivel && nvlBigDecimal(deducaoIncentivo).compareTo(BigDecimal.ZERO) == 0) {
+                    deducaoIncentivo = incentivoDerivado.setScale(2, RoundingMode.HALF_UP);
+                    impostoDevidoI = impostoIDerivado.setScale(2, RoundingMode.HALF_UP);
+                    log.info("✅ Dedução de incentivo derivada (impostoDevido − total): {}", deducaoIncentivo);
+                }
+            }
 
-        // Derivação via impostoDevido e impostoDevidoI quando INSS doméstico impede a derivação acima.
-        if (impostoDevido != null && impostoDevidoI != null
-                && nvlBigDecimal(deducaoIncentivo).compareTo(BigDecimal.ZERO) == 0) {
-            BigDecimal incentivoDerivado = impostoDevido.subtract(impostoDevidoI);
-            if (incentivoDerivado.compareTo(BigDecimal.ZERO) > 0
-                    && incentivoDerivado.compareTo(impostoDevido) < 0) {
-                deducaoIncentivo = incentivoDerivado.setScale(2, RoundingMode.HALF_UP);
-                log.info("✅ Dedução de incentivo derivada (impostoDevido − impostoDevidoI): {}", deducaoIncentivo);
+            // Derivação via impostoDevido e impostoDevidoI somente se I for consistente com total − RRA
+            // (evita inventar dedução quando I capturou "Imposto a restituir" por falso positivo).
+            if (impostoDevido != null && impostoDevidoI != null
+                    && nvlBigDecimal(deducaoIncentivo).compareTo(BigDecimal.ZERO) == 0
+                    && isImpostoDevidoIConsistenteComTotal(impostoDevidoI, totalImpostoDevido, impostoDevidoRRA)) {
+                BigDecimal incentivoDerivado = impostoDevido.subtract(impostoDevidoI);
+                if (incentivoDerivado.compareTo(BigDecimal.ZERO) > 0
+                        && incentivoDerivado.compareTo(impostoDevido) < 0) {
+                    deducaoIncentivo = incentivoDerivado.setScale(2, RoundingMode.HALF_UP);
+                    log.info("✅ Dedução de incentivo derivada (impostoDevido − impostoDevidoI): {}", deducaoIncentivo);
+                }
             }
         }
 
@@ -2005,6 +2026,44 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
             last = parseMonetaryString(valueMatcher.group(1));
         }
         return last;
+    }
+
+    /**
+     * Extrai Imposto devido I: valor na mesma linha do rótulo, ou imediatamente antes
+     * (layout de duas colunas). Não usa {@code [\\s\\S]*?} para não capturar
+     * "IMPOSTO A RESTITUIR".
+     */
+    private BigDecimal extractImpostoDevidoI(String resumoPageText) {
+        BigDecimal sameLine = extractValorMonetario(resumoPageText, IMPOSTO_DEVIDO_I_PATTERN);
+        if (sameLine != null) {
+            return sameLine;
+        }
+        BigDecimal beforeLabel = extractValorMonetarioAntesRotulo(resumoPageText, "Imposto devido I");
+        if (beforeLabel != null) {
+            log.info("✅ Imposto devido I extraído antes do rótulo: {}", beforeLabel);
+        }
+        return beforeLabel;
+    }
+
+    private static boolean withinOneCent(BigDecimal a, BigDecimal b) {
+        if (a == null || b == null) {
+            return false;
+        }
+        return a.subtract(b).abs().compareTo(new BigDecimal("0.01")) <= 0;
+    }
+
+    /**
+     * Imposto devido I só pode alimentar a derivação de dedução se coincidir com total − RRA.
+     */
+    private boolean isImpostoDevidoIConsistenteComTotal(
+            BigDecimal impostoDevidoI,
+            BigDecimal totalImpostoDevido,
+            BigDecimal impostoDevidoRRA) {
+        if (impostoDevidoI == null || totalImpostoDevido == null) {
+            return false;
+        }
+        BigDecimal esperado = totalImpostoDevido.subtract(nvlBigDecimal(impostoDevidoRRA));
+        return withinOneCent(impostoDevidoI, esperado);
     }
 
     /**
