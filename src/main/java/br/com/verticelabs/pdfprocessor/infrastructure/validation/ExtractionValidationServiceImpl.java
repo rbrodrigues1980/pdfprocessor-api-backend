@@ -59,14 +59,16 @@ public class ExtractionValidationServiceImpl implements ExtractionValidationServ
         double totalWeight = 0.0;
         double passedWeight = 0.0;
 
+        boolean codeBased = shouldUseCodeBasedProventoDesconto(entries);
+        if (codeBased) {
+            log.info("Validação FUNCEF: classificando proventos/descontos por faixa de código (valores sem sinal)");
+        }
+
         // Regra 1: Soma dos proventos = salário bruto (peso 20%)
         double weight1 = 0.20;
         totalWeight += weight1;
         if (salarioBruto != null && entries != null && !entries.isEmpty()) {
-            BigDecimal somaProventos = entries.stream()
-                    .filter(e -> e.getValor() != null && e.getValor().compareTo(BigDecimal.ZERO) > 0)
-                    .map(PayrollEntry::getValor)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal somaProventos = sumProventos(entries, codeBased);
 
             if (isWithinTolerance(somaProventos, salarioBruto)) {
                 passedWeight += weight1;
@@ -89,10 +91,7 @@ public class ExtractionValidationServiceImpl implements ExtractionValidationServ
         double weight2 = 0.20;
         totalWeight += weight2;
         if (totalDescontos != null && entries != null && !entries.isEmpty()) {
-            BigDecimal somaDescontos = entries.stream()
-                    .filter(e -> e.getValor() != null && e.getValor().compareTo(BigDecimal.ZERO) < 0)
-                    .map(e -> e.getValor().abs())
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal somaDescontos = sumDescontos(entries, codeBased);
 
             if (isWithinTolerance(somaDescontos, totalDescontos)) {
                 passedWeight += weight2;
@@ -361,6 +360,85 @@ public class ExtractionValidationServiceImpl implements ExtractionValidationServ
     // ==========================================
     // UTILITÁRIOS
     // ==========================================
+
+    /**
+     * FUNCEF (e similares) trazem proventos e descontos com valor positivo.
+     * Nesse caso, classifica por faixa de código: 1xxx/2xxx = provento; 3xxx/4xxx = desconto.
+     */
+    static boolean shouldUseCodeBasedProventoDesconto(List<PayrollEntry> entries) {
+        if (entries == null || entries.isEmpty()) {
+            return false;
+        }
+        boolean allNonNegative = entries.stream()
+                .allMatch(e -> e.getValor() == null || e.getValor().signum() >= 0);
+        if (!allNonNegative) {
+            return false;
+        }
+        boolean hasProventoCode = false;
+        boolean hasDescontoCode = false;
+        for (PayrollEntry e : entries) {
+            char bucket = funcefCodeBucket(e.getRubricaCodigo());
+            if (bucket == '1' || bucket == '2') {
+                hasProventoCode = true;
+            } else if (bucket == '3' || bucket == '4') {
+                hasDescontoCode = true;
+            }
+        }
+        return hasProventoCode && hasDescontoCode;
+    }
+
+    private static BigDecimal sumProventos(List<PayrollEntry> entries, boolean codeBased) {
+        return entries.stream()
+                .filter(e -> isProventoEntry(e, codeBased))
+                .map(PayrollEntry::getValor)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private static BigDecimal sumDescontos(List<PayrollEntry> entries, boolean codeBased) {
+        return entries.stream()
+                .filter(e -> isDescontoEntry(e, codeBased))
+                .map(e -> e.getValor().abs())
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    static boolean isProventoEntry(PayrollEntry entry, boolean codeBased) {
+        if (entry == null || entry.getValor() == null || entry.getValor().signum() <= 0) {
+            return false;
+        }
+        if (!codeBased) {
+            return true;
+        }
+        char bucket = funcefCodeBucket(entry.getRubricaCodigo());
+        return bucket == '1' || bucket == '2';
+    }
+
+    static boolean isDescontoEntry(PayrollEntry entry, boolean codeBased) {
+        if (entry == null || entry.getValor() == null) {
+            return false;
+        }
+        if (entry.getValor().signum() < 0) {
+            return true;
+        }
+        if (!codeBased || entry.getValor().signum() <= 0) {
+            return false;
+        }
+        char bucket = funcefCodeBucket(entry.getRubricaCodigo());
+        return bucket == '3' || bucket == '4';
+    }
+
+    /**
+     * Primeiro dígito do código da rubrica (após remover espaços). Retorna 0 se inválido.
+     */
+    static char funcefCodeBucket(String codigo) {
+        if (codigo == null) {
+            return '0';
+        }
+        String digits = codigo.replaceAll("\\D", "");
+        if (digits.isEmpty()) {
+            return '0';
+        }
+        return digits.charAt(0);
+    }
 
     /**
      * Verifica se dois valores estão dentro da tolerância de 1%.
