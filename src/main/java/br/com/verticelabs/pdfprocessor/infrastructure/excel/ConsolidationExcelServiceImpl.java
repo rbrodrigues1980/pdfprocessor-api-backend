@@ -220,6 +220,18 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
                                         // Congelar linha de cabeçalho
                                         consolidatedSheet.createFreezePane(0, 2);
 
+                                        if (IrJudicialExcelHelper.deveGerarAba(consolidatedResponse.getRubricas())) {
+                                            log.info("Criando aba {}", IrJudicialExcelHelper.NOME_ABA);
+                                            Sheet irJudicialSheet = workbook.createSheet(IrJudicialExcelHelper.NOME_ABA);
+                                            IrJudicialExcelHelper.preencher(
+                                                    irJudicialSheet,
+                                                    consolidatedResponse.getRubricas(),
+                                                    anosOrdenados,
+                                                    headerStyle,
+                                                    numberStyle,
+                                                    defaultStyle);
+                                        }
+
                                         workbook.write(out);
                                         log.info("Workbook Excel gerado com sucesso. Tamanho: {} bytes", out.size());
                                         return out.toByteArray();
