@@ -10,6 +10,7 @@ O Excel contém:
 - Formatação idêntica ao modelo fornecido
 - Separação por rubricas válidas
 - Conversão automática para valores numéricos
+- Aba **IR Judicial** (4326 / 4426 somados por ano), quando houver valor
 
 ---
 
@@ -418,6 +419,27 @@ Referência Paulo AC 2018: 9.974,48 + 3.470,00 + 523,61 = **13.968,09**.
 
 Doc completo do tipo e da API: [011 - API_INFORME_RENDIMENTOS.md](./011%20-%20API_INFORME_RENDIMENTOS.md).  
 Regressão: `ExcelResumoGeralHelperDepositoJudicialTest`.
+
+---
+
+# 16. Aba "IR Judicial"
+
+Gerada **depois da aba Consolidação**, somente se a consolidação tiver valor diferente de zero em **4326** (`IMPOSTO RENDA ACAO JUDICIAL`) e/ou **4426** (`IR AB. AN. FUNCEF AC. JUDIC`).
+
+Nos demonstrativos FUNCEF/CAIXA o código vem com 6 dígitos (`432604`, `442604`) e é normalizado para 4. As rubricas precisam estar **cadastradas e ativas**; senão o parser descarta a linha e a aba não aparece.
+
+### Layout
+
+| Coluna | Conteúdo |
+|--------|----------|
+| A — CÓDIGO | `4326` / `4426` (sempre as duas linhas, nessa ordem) |
+| B — DESCRIÇÃO | Descrição da consolidação ou o rótulo padrão acima |
+| C… — anos | Um ano por coluna, na mesma ordem das abas anuais (`anosOrdenados`) |
+
+Cada célula de ano é a **soma simples** de `YYYY-01` … `YYYY-12`. Não aplica a regra Funcef de 13º/FEV+NOV. Ano sem movimento fica **em branco** (não `0,00`).
+
+Implementação: `IrJudicialExcelHelper` + `ConsolidationExcelServiceImpl`.  
+Regressão: `IrJudicialExcelHelperTest`.
 
 ---
 
