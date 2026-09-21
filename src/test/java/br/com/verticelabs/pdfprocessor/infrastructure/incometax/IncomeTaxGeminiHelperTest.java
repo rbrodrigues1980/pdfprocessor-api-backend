@@ -151,6 +151,101 @@ class IncomeTaxGeminiHelperTest {
 
         assertEquals(new BigDecimal("49137.81"), result.deducoesTotal());
         assertEquals(new BigDecimal("34964.17"), result.prevComplementar());
+        assertEquals(0, new BigDecimal("242230.35").compareTo(result.baseCalculo()));
+    }
+
+    @Test
+    void reconcileNaoMoveResidualDeDependentesParaFapi_euripedes2019() {
+        var result = IncomeTaxGeminiHelper.reconcileDeducoes(
+                new BigDecimal("170373.24"),
+                new BigDecimal("151048.72"),
+                new BigDecimal("19324.52"),
+                BigDecimal.ZERO, null, new BigDecimal("897.00"),
+                null, null, new BigDecimal("13877.36"),
+                null, null, null, null, null);
+
+        assertEquals(new BigDecimal("897.00"), result.prevComplementar());
+        assertEquals(new BigDecimal("19324.52"), result.deducoesTotal());
+        assertEquals(0, new BigDecimal("151048.72").compareTo(result.baseCalculo()));
+    }
+
+    @Test
+    void reconcileBaseSempreRendimentosMenosTotal_miguel2016() {
+        var result = IncomeTaxGeminiHelper.reconcileDeducoes(
+                new BigDecimal("234487.34"),
+                new BigDecimal("184878.98"),
+                new BigDecimal("56433.60"),
+                new BigDecimal("6850.56"), null, new BigDecimal("27215.17"),
+                new BigDecimal("6825.24"), new BigDecimal("10684.50"), new BigDecimal("4858.13"),
+                null, null, null, null, null);
+
+        assertEquals(new BigDecimal("56433.60"), result.deducoesTotal());
+        assertEquals(0, new BigDecimal("178053.74").compareTo(result.baseCalculo()));
+    }
+
+    @Test
+    void withDependentesCorrigeFapiInfladoQuandoResumoZerouDependentes_euripedes2019() {
+        IncomeTaxInfo aposEnrich = IncomeTaxGeminiHelper.enrich(new IncomeTaxInfo(
+                "EURIPEDES MESSIAS RODRIGUES", "350.443.906-82", "2019", "2020",
+                new BigDecimal("151048.72"), null, null, null,
+                null, null, null,
+                null, null,
+                new BigDecimal("170373.24"), new BigDecimal("19324.52"),
+                null, null, null,
+                BigDecimal.ZERO, null, new BigDecimal("4550.16"), BigDecimal.ZERO, null,
+                new BigDecimal("13874.36"), null, null, null, null,
+                null, null, null, null, null, null, null,
+                null, null,
+                null, null, null, null, null,
+                null, null, null, null,
+                null, null,
+                Collections.emptyList(), Collections.emptyList(),
+                null, Collections.emptyList(), null, Collections.emptyList(),
+                null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null, null, null,
+                Collections.emptyList()));
+
+        assertEquals(0, new BigDecimal("5450.16").compareTo(aposEnrich.getDeducoesContribPrevCompl()));
+
+        IncomeTaxInfo corrigido = IncomeTaxGeminiHelper.withDependentes(
+                aposEnrich, Collections.emptyList(), new BigDecimal("4550.16"));
+
+        assertEquals(0, new BigDecimal("4550.16").compareTo(corrigido.getDeducoesDependentes()));
+        assertEquals(0, new BigDecimal("4550.16").compareTo(corrigido.getTotalDeducaoDependentes()));
+        assertEquals(0, new BigDecimal("900.00").compareTo(corrigido.getDeducoesContribPrevCompl()));
+    }
+
+    @Test
+    void withDependentesPreservaFapiQuandoJaEstavaCorreto_euripedes2019() {
+        IncomeTaxInfo resumo = new IncomeTaxInfo(
+                "EURIPEDES MESSIAS RODRIGUES", "350.443.906-82", "2019", "2020",
+                new BigDecimal("151048.72"), null, null, null,
+                null, null, null,
+                null, null,
+                new BigDecimal("170373.24"), new BigDecimal("19324.52"),
+                null, null, null,
+                BigDecimal.ZERO, null, new BigDecimal("897.00"),
+                BigDecimal.ZERO, null, new BigDecimal("13877.36"),
+                null, null, null, null,
+                null, null, null, null, null, null, null,
+                null, null,
+                "COMPLETO", null, null, null, null,
+                null, null, null, null,
+                null, null,
+                Collections.emptyList(), Collections.emptyList(),
+                null, Collections.emptyList(), null, Collections.emptyList(),
+                null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null, null, null,
+                Collections.emptyList());
+
+        IncomeTaxInfo aposEnrich = IncomeTaxGeminiHelper.enrich(resumo);
+        assertEquals(0, new BigDecimal("897.00").compareTo(aposEnrich.getDeducoesContribPrevCompl()));
+
+        IncomeTaxInfo corrigido = IncomeTaxGeminiHelper.withDependentes(
+                aposEnrich, Collections.emptyList(), new BigDecimal("4550.16"));
+
+        assertEquals(0, new BigDecimal("897.00").compareTo(corrigido.getDeducoesContribPrevCompl()));
+        assertEquals(0, new BigDecimal("4550.16").compareTo(corrigido.getDeducoesDependentes()));
     }
 
     @Test
@@ -263,5 +358,35 @@ class IncomeTaxGeminiHelperTest {
         assertTrue(IncomeTaxGeminiHelper.isIncomeTaxInfoSufficient(info));
         assertEquals(0, new BigDecimal("28033.36").compareTo(info.getImpostoDevidoRRA()));
         assertEquals(0, new BigDecimal("80195.26").compareTo(info.getTotalImpostoDevido()));
+    }
+
+    @Test
+    void enrichDerivaIncentivoEImpostoDevidoIQuandoGeminiZeraAsLinhas_ilka2017() {
+        IncomeTaxInfo parcial = new IncomeTaxInfo(
+                "ILKA ELIANE GONCALVES CAMPELO", "341.535.784-87", "2017", "2018",
+                new BigDecimal("104232.27"), new BigDecimal("18231.55"), BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                null, new BigDecimal("17684.61"), BigDecimal.ZERO,
+                new BigDecimal("17684.61"), new BigDecimal("4954.17"),
+                new BigDecimal("121205.83"), new BigDecimal("16973.56"),
+                new BigDecimal("12730.44"), new BigDecimal("12730.44"), BigDecimal.ZERO,
+                new BigDecimal("1435.73"), null, new BigDecimal("2796.68"),
+                new BigDecimal("2275.08"), new BigDecimal("3561.50"),
+                new BigDecimal("6904.57"), null, null, null, null,
+                null, null, null, null, null, null, null,
+                null, null,
+                "COMPLETO", null, null, null, null,
+                null, null, null, null,
+                null, null,
+                Collections.emptyList(), Collections.emptyList(),
+                null, Collections.emptyList(), new BigDecimal("2275.08"), Collections.emptyList(),
+                null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null, null, null,
+                Collections.emptyList());
+
+        IncomeTaxInfo enriched = IncomeTaxGeminiHelper.enrich(parcial);
+
+        assertEquals(0, new BigDecimal("546.94").compareTo(enriched.getDeducaoIncentivo()));
+        assertEquals(0, new BigDecimal("17684.61").compareTo(enriched.getImpostoDevidoI()));
     }
 }

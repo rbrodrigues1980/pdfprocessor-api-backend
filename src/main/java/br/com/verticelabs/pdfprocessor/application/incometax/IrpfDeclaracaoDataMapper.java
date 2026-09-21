@@ -13,6 +13,7 @@ import br.com.verticelabs.pdfprocessor.domain.service.IncomeTaxDeclarationServic
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -122,7 +123,7 @@ public class IrpfDeclaracaoDataMapper {
                 .contribuicaoPatronalPrevidenciaSocial(info.getContribuicaoPrevEmpregadorDomestico())
                 .rendimentosTributaveisTotal(info.getRendimentosTributaveis())
                 .deducoesTotal(info.getDeducoes())
-                .baseCalculoImposto(info.getBaseCalculoImposto())
+                .baseCalculoImposto(resolverBaseCalculo(info))
                 .impostoDevido(info.getImpostoDevido())
                 .deducaoIncentivo(info.getDeducaoIncentivo())
                 .impostoDevidoI(info.getImpostoDevidoI())
@@ -167,15 +168,88 @@ public class IrpfDeclaracaoDataMapper {
     }
 
     /**
-     * Resolve a dedução de dependentes: total da página 1 (iText) tem prioridade;
-     * fallback para a linha "Dependentes" do RESUMO (Gemini/iText).
-     * No fluxo Gemini escaneado, {@code totalDeducaoDependentes} é sempre null.
+     * Base de cálculo do imposto no modelo Completo: rendimentos − total de deduções.
+     * No Simplificado: rendimentos − desconto simplificado.
+     * Não usa o valor solto extraído do RESUMO (layout de duas colunas pega o total de rendimentos
+     * ou omite dependentes).
+     */
+    static BigDecimal resolverBaseCalculo(IncomeTaxInfo info) {
+        if (info == null) {
+            return null;
+        }
+        BigDecimal rendimentos = info.getRendimentosTributaveis();
+        if (rendimentos == null) {
+            return info.getBaseCalculoImposto();
+        }
+        if ("SIMPLIFICADO".equalsIgnoreCase(info.getTipoTributacao())
+                && info.getDescontoSimplificado() != null) {
+            return baseCalculoRendimentosMenosDeducoes(rendimentos, info.getDescontoSimplificado());
+        }
+        BigDecimal total = totalDeducoesParaBase(info);
+        if (total != null && total.compareTo(BigDecimal.ZERO) >= 0
+                && total.compareTo(rendimentos) < 0) {
+            return baseCalculoRendimentosMenosDeducoes(rendimentos, total);
+        }
+        return info.getBaseCalculoImposto();
+    }
+
+    /**
+     * Soma as linhas de dedução que a planilha espelha, usando o total de dependentes da página 1
+     * quando o RESUMO veio zerado. Se o TOTAL extraído for maior (linha que o regex perdeu), usa o TOTAL.
+     */
+    static BigDecimal totalDeducoesParaBase(IncomeTaxInfo info) {
+        BigDecimal somaLinhas = nvl(info.getDeducoesContribPrevOficial())
+                .add(nvl(info.getDeducoesContribPrevRRA()))
+                .add(nvl(info.getDeducoesContribPrevCompl()))
+                .add(nvl(resolverDeducaoDependentes(info)))
+                .add(nvl(info.getDeducoesInstrucao()))
+                .add(nvl(info.getDeducoesMedicas()))
+                .add(nvl(info.getDeducoesPensaoJudicial()))
+                .add(nvl(info.getDeducoesPensaoEscritura()))
+                .add(nvl(info.getDeducoesPensaoRRA()))
+                .add(nvl(info.getDeducoesLivroCaixa()));
+        BigDecimal extraido = info.getDeducoes();
+        if (extraido != null
+                && extraido.compareTo(somaLinhas) > 0
+                && info.getRendimentosTributaveis() != null
+                && extraido.compareTo(info.getRendimentosTributaveis()) < 0) {
+            return extraido;
+        }
+        return somaLinhas;
+    }
+
+    public static BigDecimal baseCalculoRendimentosMenosDeducoes(
+            BigDecimal rendimentos, BigDecimal totalDeducoes) {
+        if (rendimentos == null) {
+            return null;
+        }
+        BigDecimal total = nvl(totalDeducoes);
+        return rendimentos.subtract(total).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private static BigDecimal nvl(BigDecimal value) {
+        return value != null ? value : BigDecimal.ZERO;
+    }
+
+    /**
+     * Resolve a dedução de dependentes: total da página 1 (iText/Gemini) tem prioridade;
+     * fallback para a linha "Dependentes" do RESUMO. Zero não prevalece sobre valor positivo.
      */
     static BigDecimal resolverDeducaoDependentes(IncomeTaxInfo info) {
         if (info == null) {
             return null;
         }
+        if (isPositive(info.getTotalDeducaoDependentes())) {
+            return info.getTotalDeducaoDependentes();
+        }
+        if (isPositive(info.getDeducoesDependentes())) {
+            return info.getDeducoesDependentes();
+        }
         return firstNonNull(info.getTotalDeducaoDependentes(), info.getDeducoesDependentes());
+    }
+
+    private static boolean isPositive(BigDecimal value) {
+        return value != null && value.compareTo(BigDecimal.ZERO) > 0;
     }
 
     private static BigDecimal firstNonNull(BigDecimal a, BigDecimal b) {

@@ -46,8 +46,9 @@ public class ExcelIrpfSimulacaoMapper {
                 .previdenciaOficial(IrpfPrevidenciaOficialResolver.resolver(data))
                 .qtdDependentes(qtdDependentes)
                 .qtdAlimentandos(qtdAlimentandos)
-                // Sem nvl: null permite ao motor calcular qtd × valorDependente
-                .deducaoDependentesDeclarada(data.getDeducaoDependentes())
+                // Zero/null: motor calcula qtd × valorDependente (Ilka 2017 RESUMO capturava 0,00)
+                .deducaoDependentesDeclarada(
+                        isPositive(data.getDeducaoDependentes()) ? data.getDeducaoDependentes() : null)
                 .impostoDevidoRRA(nvl(data.getImpostoSobreRRA()))
                 .impostoRetidoFonteTitular(nvl(data.getImpostoRetidoFonteTitular()))
                 .impostoRetidoFonteDependentes(nvl(data.getImpostoRetidoDependentes()))
@@ -117,15 +118,28 @@ public class ExcelIrpfSimulacaoMapper {
     private void aplicarDoacoes(IrpfDeclaracaoData data, SimuladorIrpfRequest.SimuladorIrpfRequestBuilder builder) {
         DoacoesBrutasDTO doacoes = pagamentosAggregator.aggregateDoacoes(data.getDoacoesEfetuadas());
         boolean temDoacoesGranulares = data.getDoacoesEfetuadas() != null && !data.getDoacoesEfetuadas().isEmpty();
+        BigDecimal incentivoGranular = temDoacoesGranulares
+                ? nvl(doacoes.getDeducaoIncentivoBruta())
+                : BigDecimal.ZERO;
 
-        if (temDoacoesGranulares) {
+        if (incentivoGranular.compareTo(BigDecimal.ZERO) > 0) {
             builder
-                    .deducaoIncentivo(nvl(doacoes.getDeducaoIncentivoBruta()))
+                    .deducaoIncentivo(incentivoGranular)
                     .dedPronon(nvl(doacoes.getDedPrononBruta()))
                     .dedPronas(nvl(doacoes.getDedPronasBruta()));
         } else {
+            // Cód. 99 (e similares) não é incentivo; não zerar ECA/Idoso do RESUMO (Ilka 2017).
             builder.deducaoIncentivo(nvl(data.getDeducaoIncentivo()));
+            if (temDoacoesGranulares) {
+                builder
+                        .dedPronon(nvl(doacoes.getDedPrononBruta()))
+                        .dedPronas(nvl(doacoes.getDedPronasBruta()));
+            }
         }
+    }
+
+    private boolean isPositive(BigDecimal v) {
+        return v != null && v.compareTo(BigDecimal.ZERO) > 0;
     }
 
     private Integer parseAno(String anoCalendario) {

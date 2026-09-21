@@ -90,8 +90,8 @@ public class ExcelIrpfDeducoesResumoHelper {
         }
         BigDecimal prevComplEfetiva = motorService.calcularPgblEfetivo(prevComplBruta, rendimentos);
 
-        BigDecimal dependentes = resolverDependentes(request, data);
-        BigDecimal instrucao = resolverInstrucao(request, data);
+        BigDecimal dependentes = resolverDependentes(request, data, params);
+        BigDecimal instrucao = resolverInstrucao(request, data, params);
         BigDecimal medicas = valorOuFallback(request.getDespesasMedicas(), data.getDespesasMedicas());
         BigDecimal pensaoJudicial = resolverPensaoJudicial(request, data);
         BigDecimal pensaoEscritura = nvl(data.getPensaoAlimenticiaEscrituraPublica());
@@ -124,19 +124,42 @@ public class ExcelIrpfDeducoesResumoHelper {
                 .build();
     }
 
-    private BigDecimal resolverDependentes(SimuladorIrpfRequest request, IrpfDeclaracaoData data) {
+    private BigDecimal resolverDependentes(
+            SimuladorIrpfRequest request, IrpfDeclaracaoData data, IrParametrosAnuais params) {
         if (request.getDeducaoDependentesDeclarada() != null
                 && request.getDeducaoDependentesDeclarada().compareTo(BigDecimal.ZERO) > 0) {
             return request.getDeducaoDependentesDeclarada();
         }
-        return nvl(data.getDeducaoDependentes());
+        if (nvl(data.getDeducaoDependentes()).compareTo(BigDecimal.ZERO) > 0) {
+            return data.getDeducaoDependentes();
+        }
+        if (nvl(data.getTotalDeducaoDependentes()).compareTo(BigDecimal.ZERO) > 0) {
+            return data.getTotalDeducaoDependentes();
+        }
+        int qtd = request.getQtdDependentes() != null ? request.getQtdDependentes() : 0;
+        if (qtd > 0 && params != null && params.getDeducaoDependente() != null) {
+            return params.getDeducaoDependente().multiply(BigDecimal.valueOf(qtd)).setScale(2, RM);
+        }
+        return BigDecimal.ZERO;
     }
 
-    private BigDecimal resolverInstrucao(SimuladorIrpfRequest request, IrpfDeclaracaoData data) {
+    private BigDecimal resolverInstrucao(
+            SimuladorIrpfRequest request, IrpfDeclaracaoData data, IrParametrosAnuais params) {
+        BigDecimal granular = somarInstrucaoRequest(request);
+        if (granular.compareTo(BigDecimal.ZERO) > 0 && params != null) {
+            return motorService.calcularEducacaoEfetiva(request, nvl(params.getLimiteInstrucao()));
+        }
         if (request.getDespesasInstrucaoDeclarada() != null
                 && request.getDespesasInstrucaoDeclarada().compareTo(BigDecimal.ZERO) > 0) {
             return request.getDespesasInstrucaoDeclarada();
         }
+        if (granular.compareTo(BigDecimal.ZERO) > 0) {
+            return granular;
+        }
+        return nvl(data.getDespesasInstrucao());
+    }
+
+    private BigDecimal somarInstrucaoRequest(SimuladorIrpfRequest request) {
         BigDecimal total = nvl(request.getDespesasInstrucaoTitular());
         if (request.getDespesasInstrucaoDependentes() != null) {
             for (BigDecimal v : request.getDespesasInstrucaoDependentes()) {
@@ -148,10 +171,7 @@ public class ExcelIrpfDeducoesResumoHelper {
                 total = total.add(nvl(v));
             }
         }
-        if (total.compareTo(BigDecimal.ZERO) > 0) {
-            return total;
-        }
-        return nvl(data.getDespesasInstrucao());
+        return total;
     }
 
     private BigDecimal resolverPensaoJudicial(SimuladorIrpfRequest request, IrpfDeclaracaoData data) {
