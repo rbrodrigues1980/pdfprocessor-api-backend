@@ -121,20 +121,21 @@ public class ExcelIrpfSimulacaoMapper {
         BigDecimal incentivoGranular = temDoacoesGranulares
                 ? nvl(doacoes.getDeducaoIncentivoBruta())
                 : BigDecimal.ZERO;
-
-        if (incentivoGranular.compareTo(BigDecimal.ZERO) > 0) {
+        BigDecimal incentivoResumo = nvl(data.getDeducaoIncentivo());
+        // RESUMO igual a Imposto devido I / total não é incentivo (layout embaralhado).
+        if (incentivoResumo.compareTo(BigDecimal.ZERO) > 0
+                && (incentivoResumo.compareTo(nvl(data.getImpostoDevidoI())) == 0
+                        || incentivoResumo.compareTo(nvl(data.getTotalImpostoDevido())) == 0)) {
+            incentivoResumo = BigDecimal.ZERO;
+        }
+        // Individuais (ECA 40 + Idoso 43) conferidos com o RESUMO: o maior prevalece
+        // quando a extração granular perdeu uma seção (Helena 2023: 271,74 vs 543,48).
+        // Cód. 99 não entra no granular — RESUMO ECA/Idoso permanece (Ilka 2017).
+        builder.deducaoIncentivo(incentivoGranular.max(incentivoResumo));
+        if (temDoacoesGranulares) {
             builder
-                    .deducaoIncentivo(incentivoGranular)
                     .dedPronon(nvl(doacoes.getDedPrononBruta()))
                     .dedPronas(nvl(doacoes.getDedPronasBruta()));
-        } else {
-            // Cód. 99 (e similares) não é incentivo; não zerar ECA/Idoso do RESUMO (Ilka 2017).
-            builder.deducaoIncentivo(nvl(data.getDeducaoIncentivo()));
-            if (temDoacoesGranulares) {
-                builder
-                        .dedPronon(nvl(doacoes.getDedPrononBruta()))
-                        .dedPronas(nvl(doacoes.getDedPronasBruta()));
-            }
         }
     }
 

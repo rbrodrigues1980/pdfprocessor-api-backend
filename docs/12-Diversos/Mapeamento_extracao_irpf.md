@@ -143,11 +143,11 @@ Fonte primária: lista granular. Fallback: totais do RESUMO quando `pagamentosEf
 | Layout multilinha (campo por linha) | ✅ | |
 | Layout inline SERPRO (ex.: `41 NOME … CNPJ 1.000,00 0,00`) | ✅ | |
 
-> **Distinção importante:** esta seção é distinta de **DOAÇÕES DIRETAMENTE NA DECLARAÇÃO - ECA** (§12). Quando a contribuinte faz doação ECA pelo fluxo direto na declaração, a seção DOAÇÕES EFETUADAS costuma vir *Sem Informações* — a doação é extraída da seção ECA direta e mapeada como cód. **40** em `doacoesEfetuadas[]`.
+> **Distinção importante:** esta seção é distinta de **DOAÇÕES DIRETAMENTE NA DECLARAÇÃO - ECA / PESSOA IDOSA** (§12). Quando a contribuinte faz doação pelo fluxo direto na declaração, a seção DOAÇÕES EFETUADAS costuma vir *Sem Informações* — as doações são extraídas das seções ECA (cód. **40**) e Pessoa Idosa (cód. **43**).
 
 > Em declaração **Simplificado**, o RESUMO costuma trazer `deducaoIncentivo = 0`. A simulação Completa usa a lista `doacoesEfetuadas` (cód. 40–43) como fonte primária — por isso a extração inline é necessária.
 
-Fonte primária do motor: lista granular. Fallback: `deducaoIncentivo` do RESUMO (reconciliado pela soma das doações cód. 40–43 quando o RESUMO falhar).
+Fonte primária do motor: lista granular. Conferência com o RESUMO: a simulação usa `max(soma 40–43, deducaoIncentivo do RESUMO)` para não perder Idoso/ECA quando uma seção ficou em outra página.
 
 ---
 
@@ -178,11 +178,12 @@ Fonte primária do motor: lista granular. Fallback: `deducaoIncentivo` do RESUMO
 | Espólio (Sem Informações) | ❌ não extraído |
 | Doações a Partidos Políticos (Sem Informações) | ✅ valor salvo via `doacoesPartidosPoliticos` no RESUMO |
 | **Doações Diretamente na Declaração — ECA** | ✅ `doacoesEfetuadas[]` cód. **40** (TIPO DE FUNDO / FUNDO / CNPJ / VALOR) |
-| Doações Diretamente na Declaração — ECA (Sem Informações) | ✅ lista vazia |
+| **Doações Diretamente na Declaração — Pessoa Idosa** | ✅ `doacoesEfetuadas[]` cód. **43** (mesmo layout; não cortar em “Página N de M”) |
+| Doações Diretamente na Declaração — ECA / Idoso (Sem Informações) | ✅ lista vazia |
 | Layout inline (ex.: `DF - BRASILIA 15.558.339/0001-85 1.198,00Municipal`) | ✅ |
 | Layout vertical (campo por linha) | ✅ fallback posicional |
 
-> Em declaração **Completo** com deduções legais, o valor aparece no RESUMO como **Dedução de incentivo**. Quando o layout do RESUMO está embaralhado (ex.: Eliana AC 2016), a extração da seção ECA alimenta `doacoesEfetuadas` e reconcilia `deducaoIncentivo`. Regressão: `Eliana2016DoacaoEcaTest`.
+> Em declaração **Completo** com deduções legais, o valor aparece no RESUMO como **Dedução de incentivo**. Conferir as doações individuais (ECA 40 + Idoso 43) e cruzar com o RESUMO: a simulação usa `max(soma granular, RESUMO)` para não subestimar quando uma seção fica em outra página. Ex.: Helena AC 2023 → ECA 271,74 + Idoso 271,74 = RESUMO 543,48. Regressões: `Eliana2016DoacaoEcaTest`, `Helena2023DoacaoEcaIdosoTest`.
 
 ---
 
@@ -343,6 +344,7 @@ Fonte primária do motor: lista granular. Fallback: `deducaoIncentivo` do RESUMO
 | **Parcelamento** | Valor da quota, nº de quotas, vencimento |
 | **Informações bancárias** | Banco, agência, conta |
 | **Doações ECA** | ✅ seção **DOAÇÕES DIRETAMENTE NA DECLARAÇÃO - ECA** → `doacoesEfetuadas[]` cód. 40 |
+| **Doações Pessoa Idosa** | ✅ seção **DOAÇÕES DIRETAMENTE NA DECLARAÇÃO - PESSOA IDOSA** → `doacoesEfetuadas[]` cód. 43 |
 | **Recibo de entrega** | Número do recibo |
 | **Deduções (sub-linhas)** | Contrib. prev. acumulados, pensão alimentícia acumulados |
 | **Agrupamento de pagamentos** | Titular vs. dependente dentro da seção PAGAMENTOS EFETUADOS |
