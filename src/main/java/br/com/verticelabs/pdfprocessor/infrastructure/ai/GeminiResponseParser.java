@@ -1,6 +1,7 @@
 package br.com.verticelabs.pdfprocessor.infrastructure.ai;
 
 import br.com.verticelabs.pdfprocessor.domain.model.PayrollEntry;
+import br.com.verticelabs.pdfprocessor.infrastructure.pdf.PdfLineParser;
 import br.com.verticelabs.pdfprocessor.domain.service.IncomeTaxDeclarationService.IncomeTaxInfo;
 import br.com.verticelabs.pdfprocessor.domain.service.IncomeTaxDeclarationService.IncomeTaxInfo.DependenteInfo;
 import br.com.verticelabs.pdfprocessor.domain.service.IncomeTaxDeclarationService.IncomeTaxInfo.DoacaoEfetuada;
@@ -264,8 +265,9 @@ public class GeminiResponseParser {
                 return null;
             }
 
-            // Limpar código (remover espaços)
-            codigo = codigo.replaceAll("\\s+", "");
+            // Limpar código (remover espaços). Demonstrativo FUNCEF imprime 6 dígitos
+            // (436204) — a rubrica cadastrada são os 4 primeiros (4362).
+            codigo = PdfLineParser.normalizeFuncefDemonstrativoCodigo(codigo.replaceAll("\\s+", ""));
 
             String descricao = getTextOrNull(rubricaNode, "descricao");
             BigDecimal provento = getDecimalOrNull(rubricaNode, "provento");

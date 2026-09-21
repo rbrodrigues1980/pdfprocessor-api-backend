@@ -96,7 +96,7 @@ public class IrSimuladorMotorService {
      * Limite de educação individual por CPF (titular, cada dependente, cada alimentando).
      * Não compartilha saldo entre pessoas.
      */
-    BigDecimal calcularEducacaoEfetiva(SimuladorIrpfRequest request, BigDecimal limiteEducacao) {
+    public BigDecimal calcularEducacaoEfetiva(SimuladorIrpfRequest request, BigDecimal limiteEducacao) {
         int dependentes = request.getQtdDependentes() != null ? request.getQtdDependentes() : 0;
         int alimentandos = request.getQtdAlimentandos() != null ? request.getQtdAlimentandos() : 0;
 

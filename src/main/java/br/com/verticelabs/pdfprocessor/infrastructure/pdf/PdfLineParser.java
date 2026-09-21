@@ -154,19 +154,23 @@ public class PdfLineParser {
      * Código tem 6 dígitos mas somente os 4 primeiros identificam a rubrica.
      *
      * Grupos:
-     *   1 = Mês Ref (MM/YYYY) — vira a referência da entry
-     *   2 = Código completo (6 dígitos) — usar apenas substring(0,4)
-     *   3 = Descrição
-     *   4 = Valor
+     *   1 = Mês (1-13)
+     *   2 = Ano (YYYY)
+     *   3 = Código completo (6 dígitos) — usar apenas substring(0,4)
+     *   4 = Descrição
+     *   5 = Valor
+     *
+     * OCR: "05/2016", "052016" (barra sumiu) e "1312016" ("/" lido como "1").
+     * Prazo no rodapé às vezes vem como letra "o" em vez de "0".
      */
     private static final Pattern FUNCEF_DEMONSTRATIVO_PATTERN = Pattern.compile(
-            "^(\\d{1,2}/\\d{4})" +           // Grupo 1: Mês Ref (MM/YYYY ou M/YYYY)
+            "^(\\d{1,2})(?:[/\\\\.1])?(\\d{4})" + // Grupos 1-2: Mês Ref (OCR: 05/2016, 052016, 1312016)
             "\\s+(?:\\d{2}/\\d{2}/\\d{4}\\s+)?" + // Data Início (opcional, DD/MM/YYYY)
-            "(\\d{6})" +                       // Grupo 2: Código 6 dígitos
-            "\\s+(.+?)" +                      // Grupo 3: Descrição (non-greedy)
-            "\\s+(\\d{1,3}(?:\\.\\d{3})*,\\d{2})" + // Grupo 4: Valor
+            "(\\d{6})" +                       // Grupo 3: Código 6 dígitos
+            "\\s+(.+?)" +                      // Grupo 4: Descrição (non-greedy)
+            "\\s+(\\d{1,3}(?:\\.\\d{3})*,\\d{2})" + // Grupo 5: Valor
             "\\s+\\d{1,3}(?:\\.\\d{3})*,\\d{2}" +   // Resíduo (ignorado)
-            "\\s+\\d+\\s*$",                   // Prazo (ignorado)
+            "\\s+[0-9oO]+\\s*$",               // Prazo (OCR: 0 ou o)
             Pattern.MULTILINE);
 
     /**
@@ -188,15 +192,16 @@ public class PdfLineParser {
      *   1 = Descrição
      *   2 = Valor
      *   3 = Código completo (6 dígitos) — usar apenas substring(0,4)
-     *   4 = Mês Ref (MM/YYYY)
+     *   4 = Mês
+     *   5 = Ano
      */
     private static final Pattern FUNCEF_DEMONSTRATIVO_PATTERN_GLUED = Pattern.compile(
             "^(.+?)" +                              // Grupo 1: Descrição (non-greedy)
             "\\s+(\\d{1,3}(?:\\.\\d{3})*,\\d{2})" + // Grupo 2: Valor (ancorado pela vírgula)
             "(\\d{6})" +                            // Grupo 3: Código 6 dígitos (colado ao valor)
-            "(\\d{1,2}/\\d{4})" +                   // Grupo 4: Competência MM/YYYY (colada ao código)
+            "(\\d{1,2})(?:[/\\\\.1])?(\\d{4})" +    // Grupos 4-5: Competência (OCR: 12/2016, 1212016)
             "\\s+\\d{1,3}(?:\\.\\d{3})*,\\d{2}" +   // Resíduo (ignorado)
-            "\\s+\\d+\\s*$",                        // Prazo (ignorado)
+            "\\s+[0-9oO]+\\s*$",                    // Prazo (OCR: 0 ou o)
             Pattern.MULTILINE);
 
     /**
@@ -522,8 +527,8 @@ public class PdfLineParser {
                         }
                     } else if (documentType == DocumentType.FUNCEF_DEMONSTRATIVO) {
                         // Dois layouts possíveis:
-                        //  - PADRÃO: mesRef(1), codigo6(2), descricao(3), valor(4)
-                        //  - GLUED:  descricao(1), valor(2), codigo6(3), mesRef(4)
+                        //  - PADRÃO: mes(1), ano(2), codigo6(3), descricao(4), valor(5)
+                        //  - GLUED:  descricao(1), valor(2), codigo6(3), mes(4), ano(5)
                         //    (colunas reordenadas e coladas em alguns PDFs)
                         // Apenas os 4 primeiros dígitos do código identificam a rubrica
                         String codigo6;
@@ -532,14 +537,14 @@ public class PdfLineParser {
                             descricaoRaw = lineMatcher.group(1);
                             valorStr = lineMatcher.group(2);
                             codigo6 = lineMatcher.group(3);
-                            referencia = lineMatcher.group(4); // MM/YYYY — normalizado depois em createEntry
+                            referencia = composeMesRef(lineMatcher.group(4), lineMatcher.group(5));
                         } else {
-                            referencia = lineMatcher.group(1); // MM/YYYY — normalizado depois em createEntry
-                            codigo6 = lineMatcher.group(2);
-                            descricaoRaw = lineMatcher.group(3);
-                            valorStr = lineMatcher.group(4);
+                            referencia = composeMesRef(lineMatcher.group(1), lineMatcher.group(2));
+                            codigo6 = lineMatcher.group(3);
+                            descricaoRaw = lineMatcher.group(4);
+                            valorStr = lineMatcher.group(5);
                         }
-                        codigo = codigo6.length() >= 4 ? codigo6.substring(0, 4) : codigo6;
+                        codigo = normalizeFuncefDemonstrativoCodigo(codigo6);
                         descricao = normalizer.normalizeDescription(descricaoRaw);
 
                         log.info("  └─ ✅ RUBRICA FUNCEF_DEMONSTRATIVO EXTRAÍDA:");
@@ -619,8 +624,18 @@ public class PdfLineParser {
      * A referência já vem na linha no formato YYYY/MM.
      */
     public List<ParsedLine> parseLinesFuncef(String pageText, String referenciaFromHeader) {
-        // Usa o mesmo método parseLines que já tem o padrão correto
-        return parseLines(pageText, DocumentType.FUNCEF);
+        List<ParsedLine> classic = parseLines(pageText, DocumentType.FUNCEF);
+        if (!classic.isEmpty()) {
+            return classic;
+        }
+        // PDFs de demonstrativo (código 6 dígitos) às vezes caem como FUNCEF clássico
+        // por OCR ("PAGAMENTC"). Tenta o layout de 6 dígitos antes de desistir.
+        List<ParsedLine> demonstrativo = parseLines(pageText, DocumentType.FUNCEF_DEMONSTRATIVO);
+        if (!demonstrativo.isEmpty()) {
+            log.info("Parser Funcef clássico vazio — usando layout FUNCEF_DEMONSTRATIVO ({} linhas)",
+                    demonstrativo.size());
+        }
+        return demonstrativo;
     }
 
     /**
@@ -684,5 +699,25 @@ public class PdfLineParser {
             return null;
         }
         return codigo.replaceAll("\\s+", "").trim();
+    }
+
+    /**
+     * No demonstrativo FUNCEF o código impresso tem 6 dígitos; a rubrica cadastrada
+     * são os 4 primeiros (436204 → 4362, 445904 → 4459).
+     */
+    public static String normalizeFuncefDemonstrativoCodigo(String codigo) {
+        if (codigo == null) {
+            return null;
+        }
+        String digits = codigo.replaceAll("\\s+", "").trim();
+        if (digits.matches("\\d{6}")) {
+            return digits.substring(0, 4);
+        }
+        return digits;
+    }
+
+    static String composeMesRef(String mes, String ano) {
+        int month = Integer.parseInt(mes);
+        return String.format("%02d/%s", month, ano);
     }
 }

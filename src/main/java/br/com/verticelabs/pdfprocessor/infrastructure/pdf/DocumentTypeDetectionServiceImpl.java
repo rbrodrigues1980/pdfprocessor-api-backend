@@ -65,13 +65,13 @@ public class DocumentTypeDetectionServiceImpl implements DocumentTypeDetectionSe
         // ===== PADRÕES FUNCEF DEMONSTRATIVO (novo layout) =====
         // "DEMONSTRATIVO DE PAGAMENTO" + logo FUNCEF + "PATROCINADORA" ou "MÊS PAGTO"
         // Colunas: Mês Ref. | Código (6 dígitos) | Descrição | Valor | Resíduo | Prazo
-        boolean hasFuncefDemonstrativoTitle = upperText.contains("DEMONSTRATIVO DE PAGAMENTO");
+        // OCR de PDFs antigos costuma ler PAGAMENTC / MÉS PAGTO em vez de PAGAMENTO / MÊS PAGTO.
+        boolean hasFuncefDemonstrativoTitle = upperText.contains("DEMONSTRATIVO DE PAGAMENT");
         boolean hasFuncefDemonstrativoLogo  = upperText.contains("FUNCEF") &&
                 (upperText.contains("FUNDACAO DOS ECONOMIARIOS FEDERAIS") ||
                  upperText.contains("FUNDAÇÃO DOS ECONOMIÁRIOS FEDERAIS"));
         boolean hasFuncefDemonstrativoFields = upperText.contains("PATROCINADORA") ||
-                upperText.contains("MÊS PAGTO") ||
-                upperText.contains("MES PAGTO");
+                upperText.contains("PAGTO");
         // Distingue do CAIXA: não tem "CAIXA ECONÔMICA FEDERAL"
         boolean notCaixaEconomica = !upperText.contains("CAIXA ECONÔMICA FEDERAL") &&
                                     !upperText.contains("CAIXA ECONOMICA FEDERAL");
@@ -105,7 +105,8 @@ public class DocumentTypeDetectionServiceImpl implements DocumentTypeDetectionSe
         boolean hasFuncefBeneficio = upperText.contains("Nº BENEFÍCIO INSS") ||
                                      upperText.contains("Nº BENEFICIO INSS") ||
                                      upperText.contains("N° BENEFÍCIO INSS") ||
-                                     upperText.contains("N° BENEFICIO INSS");
+                                     upperText.contains("N° BENEFICIO INSS") ||
+                                     upperText.contains("BENEF. INSS");
         
         // 5. Campo "Tipo Benefício" / "Tipo de Benefício"
         boolean hasFuncefTipoBeneficio = upperText.contains("TIPO BENEFÍCIO") ||

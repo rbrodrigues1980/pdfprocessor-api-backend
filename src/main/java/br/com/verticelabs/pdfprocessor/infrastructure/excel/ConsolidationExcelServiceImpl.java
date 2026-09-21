@@ -2,6 +2,7 @@ package br.com.verticelabs.pdfprocessor.infrastructure.excel;
 
 import br.com.verticelabs.pdfprocessor.application.excel.ExcelExportService;
 import br.com.verticelabs.pdfprocessor.application.incometax.IrpfPrevidenciaOficialResolver;
+import br.com.verticelabs.pdfprocessor.application.incometax.IrpfDeclaracaoDataMapper;
 import br.com.verticelabs.pdfprocessor.application.tributacao.IrCalculoProgressivoService;
 import br.com.verticelabs.pdfprocessor.application.tributacao.IrDoacoesDeducaoCalculator;
 import br.com.verticelabs.pdfprocessor.application.tributacao.IrSimuladorMotorService;
@@ -1255,7 +1256,8 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
                 nvl(data.getRendimentosTributaveisTotal()), totalStyle, totalLabelStyle);
 
         row = addSimDetalhe(sheet, row, "Desconto Simplificado", data.getDescontoSimplificado(), subLabelStyle, valueStyle);
-        row = addSimDetalhe(sheet, row, "Base de cálculo do Imposto", data.getBaseCalculoImposto(), subLabelStyle, valueStyle);
+        row = addSimDetalhe(sheet, row, "Base de cálculo do Imposto",
+                baseCalculoEspelho(data), subLabelStyle, valueStyle);
         row = addSimDetalhe(sheet, row, "Imposto devido", data.getImpostoDevido(), subLabelStyle, valueStyle);
         row = addSimDetalhe(sheet, row, "Imposto devido RRA", data.getImpostoSobreRRA(), subLabelStyle, valueStyle);
         row = addSimAliquotaDeclaracaoRow(sheet, row, "Aliquota efetiva (%)", data.getAliquotaEfetiva(),
@@ -1313,7 +1315,8 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
 
         sheet.createRow(row++);
         row = addSimTituloBloco(sheet, row, "IMPOSTO DEVIDO", sectionHeaderStyle);
-        row = addSimDetalhe(sheet, row, "Base de cálculo do Imposto", data.getBaseCalculoImposto(), subLabelStyle, valueStyle);
+        row = addSimDetalhe(sheet, row, "Base de cálculo do Imposto",
+                baseCalculoEspelho(data), subLabelStyle, valueStyle);
         row = addSimDetalhe(sheet, row, "Imposto devido", data.getImpostoDevido(), subLabelStyle, valueStyle);
         row = addSimDetalhe(sheet, row, "Dedução de incentivo", data.getDeducaoIncentivo(), subLabelStyle, valueStyle);
         row = addSimDetalhe(sheet, row, "Imposto devido I", data.getImpostoDevidoI(), subLabelStyle, valueStyle);
@@ -1394,10 +1397,21 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
 
         sheet.createRow(row++);
         row = addSimTituloBloco(sheet, row, "IMPOSTO DEVIDO", sectionHeaderStyle);
-        row = addSimDetalhe(sheet, row, "Base de cálculo do imposto", modelo.getBaseCalculo(), subLabelStyle, valueStyle);
-        row = addSimDetalhe(sheet, row, "Imposto devido", modelo.getImpostoDevidoFinal(), subLabelStyle, valueStyle);
+        BigDecimal baseSim = IrpfDeclaracaoDataMapper.baseCalculoRendimentosMenosDeducoes(
+                data.getRendimentosTributaveisTotal(), deducoes.getTotalDeducoes());
+        BigDecimal impostoSim = modelo.getImpostoDevidoFinal();
+        if (baseSim != null && (modelo.getBaseCalculo() == null
+                || modelo.getBaseCalculo().compareTo(baseSim) != 0)) {
+            BigDecimal recalculado = calcularImpostoComTabelaBanco(
+                    baseSim, ano, tabelasTributacao, parametrosTributacao);
+            if (recalculado.compareTo(BigDecimal.ZERO) > 0) {
+                impostoSim = recalculado;
+            }
+        }
+        row = addSimDetalhe(sheet, row, "Base de cálculo do imposto", baseSim, subLabelStyle, valueStyle);
+        row = addSimDetalhe(sheet, row, "Imposto devido", impostoSim, subLabelStyle, valueStyle);
         row = addSimDetalhe(sheet, row, "Dedução de incentivo", modelo.getDeducoesEspeciais(), subLabelStyle, valueStyle);
-        row = addSimDetalhe(sheet, row, "Imposto devido I", modelo.getImpostoDevidoFinal(), subLabelStyle, valueStyle);
+        row = addSimDetalhe(sheet, row, "Imposto devido I", impostoSim, subLabelStyle, valueStyle);
 
         if (nvl(modelo.getCreditoInssDomestico()).compareTo(BigDecimal.ZERO) > 0) {
             row = addSimDetalhe(sheet, row, "Contribuição Prev. Empregador Doméstico",
@@ -1410,11 +1424,11 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
                 subLabelStyle, valueStyle);
 
         BigDecimal impostoProgressivoTotal = modelo.getImpostoDevidoII() != null
+                && modelo.getBaseCalculo() != null && baseSim != null
+                && modelo.getBaseCalculo().compareTo(baseSim) == 0
                 ? modelo.getImpostoDevidoII()
-                : modelo.getImpostoDevidoFinal();
-        BigDecimal totalDevido = modelo.getResumo() != null && modelo.getResumo().getTotalImpostoDevido() != null
-                ? modelo.getResumo().getTotalImpostoDevido()
-                : nvl(impostoProgressivoTotal).add(nvl(data.getImpostoSobreRRA()));
+                : impostoSim;
+        BigDecimal totalDevido = nvl(impostoProgressivoTotal).add(nvl(data.getImpostoSobreRRA()));
         row = addSimDestaqueRow(sheet, row, "Total do imposto devido", totalDevido, totalStyle, totalLabelStyle);
 
         sheet.createRow(row++);
@@ -2172,7 +2186,7 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
 
         int anoCalendarioInt = parseAnoCalendario(ano);
         BigDecimal despesasMedicasExib = valorOuFallback(request.getDespesasMedicas(), data.getDespesasMedicas());
-        BigDecimal despesasInstrucaoExib = despesasInstrucaoParaExibicao(request, data);
+        BigDecimal despesasInstrucaoExib = despesasInstrucaoParaExibicao(request, data, paramsAno);
         BigDecimal pensaoJudicialExib = valorOuFallback(request.getPensaoAlimenticia(), data.getPensaoAlimenticiaJudicial());
         BigDecimal pensaoEscrituraExib = nvl(data.getPensaoAlimenticiaEscrituraPublica());
         BigDecimal prevComplExib = usarPrevidenciaPlanilha
@@ -2641,7 +2655,8 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
             CellStyle totalStyle, CellStyle totalLabelStyle, CellStyle aliquotaStyle) {
 
         row = addSimSectionHeader(sheet, row, "8", "IMPOSTO DEVIDO — CONFORME DECLARAÇÃO ENTREGUE", labelStyle);
-        row = addSimDetalhe(sheet, row, "Base de cálculo do imposto", data.getBaseCalculoImposto(), subLabelStyle, valueStyle);
+        row = addSimDetalhe(sheet, row, "Base de cálculo do imposto",
+                baseCalculoEspelho(data), subLabelStyle, valueStyle);
         row = addSimDetalhe(sheet, row, "Imposto devido", data.getImpostoDevido(), subLabelStyle, valueStyle);
         row = addSimDetalhe(sheet, row, "Dedução de incentivo", data.getDeducaoIncentivo(), subLabelStyle, valueStyle);
         row = addSimDetalhe(sheet, row, "Imposto devido I", data.getImpostoDevidoI(), subLabelStyle, valueStyle);
@@ -2892,6 +2907,24 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
         return v != null ? v : BigDecimal.ZERO;
     }
 
+    /**
+     * Base do espelho: rendimentos − total de deduções (ou desconto simplificado).
+     * Não usa o valor extraído isolado do RESUMO, que em layout de duas colunas
+     * costuma vir com o total de rendimentos ou sem dependentes.
+     */
+    private BigDecimal baseCalculoEspelho(IrpfDeclaracaoData data) {
+        if (data == null) {
+            return BigDecimal.ZERO;
+        }
+        if ("SIMPLIFICADO".equalsIgnoreCase(data.getTipoTributacao())) {
+            return IrpfDeclaracaoDataMapper.baseCalculoRendimentosMenosDeducoes(
+                    data.getRendimentosTributaveisTotal(), data.getDescontoSimplificado());
+        }
+        ExcelIrpfDeducoesResumoDTO deducoes = deducoesResumoHelper.montarConformeDeclaracao(data);
+        return IrpfDeclaracaoDataMapper.baseCalculoRendimentosMenosDeducoes(
+                data.getRendimentosTributaveisTotal(), deducoes.getTotalDeducoes());
+    }
+
     private int parseAnoCalendario(String ano) {
         if (ano == null || ano.isBlank()) {
             return 0;
@@ -2911,8 +2944,12 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
         return nvl(fallback);
     }
 
-    private BigDecimal despesasInstrucaoParaExibicao(SimuladorIrpfRequest request, IrpfDeclaracaoData data) {
+    private BigDecimal despesasInstrucaoParaExibicao(
+            SimuladorIrpfRequest request, IrpfDeclaracaoData data, IrParametrosAnuais params) {
         BigDecimal granular = somarInstrucaoRequest(request);
+        if (granular.compareTo(BigDecimal.ZERO) > 0 && params != null) {
+            return simuladorMotorService.calcularEducacaoEfetiva(request, nvl(params.getLimiteInstrucao()));
+        }
         if (granular.compareTo(BigDecimal.ZERO) > 0) {
             return granular;
         }

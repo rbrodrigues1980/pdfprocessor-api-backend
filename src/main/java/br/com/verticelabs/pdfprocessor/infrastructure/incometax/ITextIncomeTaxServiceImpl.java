@@ -78,6 +78,10 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
             "(?i)imposto\\s+devido\\s+I(?![I\\w])[ \\t]*([\\d]{1,3}(?:[.]\\d{3})*,\\d{2})",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
+    private static final Pattern IMPOSTO_DEVIDO_I_NEXT_LINE_PATTERN = Pattern.compile(
+            "(?i)imposto\\s+devido\\s+I(?![I\\w])\\s*[\\r\\n]+\\s*([\\d]{1,3}(?:[.]\\d{3})*,\\d{2})",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+
     private static final Pattern CONTRIBUICAO_PREV_EMPREGADOR_DOMESTICO_PATTERN = Pattern.compile(
             "(?i)contribui[çc][ãa]o\\s+prev[\\s\\S]*?empregador\\s+dom[eé]stico[\\s\\S]*?([\\d]{1,3}(?:[.]\\d{3})*,\\d{2})",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
@@ -161,8 +165,10 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
                     + "(?!\\s+p[úu]blica\\s*\\([^)]*at[ée]\\s+o\\s+limite)[\\s\\S]*?([\\d]{1,3}(?:[.]\\d{3})*,\\d{2})",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
+    // Evita "pelos/dos/com dependentes" em rendimentos e imposto pago; pega a linha DEDUÇÕES.
     private static final Pattern DEDUCOES_DEPENDENTES_PATTERN = Pattern.compile(
-            "(?i)dependentes[\\s\\S]*?([\\d]{1,3}(?:[.]\\d{3})*,\\d{2})",
+            "(?i)(?<!pelos\\s)(?<!pelo\\s)(?<!dos\\s)(?<!do\\s)(?<!com\\s)\\bdependentes\\b"
+                    + "(?!\\s+(?:pelo|pelos|do|dos|com)\\b)[\\s\\S]*?([\\d]{1,3}(?:[.]\\d{3})*,\\d{2})",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
     private static final Pattern DEDUCOES_INSTRUCAO_PATTERN = Pattern.compile(
@@ -419,6 +425,14 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
             "([A-Za-zÀ-ú\\-]+)?\\s*$",
             Pattern.UNICODE_CASE | Pattern.MULTILINE);
 
+    /** Fallback sem âncora de linha (iText pode concatenar "546,94Municipal"). */
+    private static final Pattern ECA_DIRETA_LOOSE_PATTERN = Pattern.compile(
+            "([A-Z]{2}\\s*-\\s*[^\\d\\n]{3,40}?)\\s+" +
+            "([\\d]{2,3}\\.[\\d]{3}\\.[\\d]{3}/[\\d]{4}-[\\d]{2})\\s+" +
+            "([\\d]{1,3}(?:[.]\\d{3})*,\\d{2})\\s*" +
+            "(Municipal|Estadual|Federal|Distrital)?",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+
     private static final String CODIGO_DOACAO_ECA = "40";
 
     // Linha inline (SERPRO): "50 NOME CPF/CNPJ [NIT] VALOR [PARC]"
@@ -440,31 +454,22 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
             return pdfBytes;
         })
                 .subscribeOn(Schedulers.boundedElastic())
-                .flatMap(pdfBytes -> {
-                    return findResumoPage(new ByteArrayInputStream(pdfBytes))
-                            .flatMap(resumoPage -> {
-                                log.info("📄 Página RESUMO encontrada: {}", resumoPage);
+                .flatMap(pdfBytes -> Mono.zip(
+                        findLastPageContaining(new ByteArrayInputStream(pdfBytes), "RESUMO"),
+                        findLastPaginaIdentificacaoContribuinte(new ByteArrayInputStream(pdfBytes))
+                                .onErrorReturn(1),
+                        extractAllPagesText(new ByteArrayInputStream(pdfBytes)))
+                        .flatMap(tuple -> {
+                            int resumoPage = tuple.getT1();
+                            int identPage = tuple.getT2() != null && tuple.getT2() > 0 ? tuple.getT2() : 1;
+                            String allPagesText = recortarUltimaDeclaracao(tuple.getT3());
+                            log.info("📄 Página RESUMO vigente: {}, identificação: {}", resumoPage, identPage);
 
-                                return Mono.zip(
-                                        extractRawTextFromPage(new ByteArrayInputStream(pdfBytes), 1),
-                                        extractRawTextFromPage(new ByteArrayInputStream(pdfBytes), resumoPage),
-                                        extractAllPagesText(new ByteArrayInputStream(pdfBytes)))
-                                        .map(tuple -> {
-                                            String primeiraPageText = tuple.getT1();
-                                            String resumoPageText = tuple.getT2();
-                                            String allPagesText = tuple.getT3();
-
-                                            log.debug("📝 Texto primeira página (primeiros 500 chars): {}",
-                                                    primeiraPageText.substring(0,
-                                                            Math.min(500, primeiraPageText.length())));
-                                            log.debug("📝 Texto página RESUMO (primeiros 500 chars): {}",
-                                                    resumoPageText.substring(0,
-                                                            Math.min(500, resumoPageText.length())));
-
-                                            return parseIncomeTaxInfo(primeiraPageText, resumoPageText, allPagesText);
-                                        });
-                            });
-                })
+                            return Mono.zip(
+                                    extractRawTextFromPage(new ByteArrayInputStream(pdfBytes), identPage),
+                                    extractRawTextFromPage(new ByteArrayInputStream(pdfBytes), resumoPage))
+                                    .map(pages -> parseIncomeTaxInfo(pages.getT1(), pages.getT2(), allPagesText));
+                        }))
                 .doOnSuccess(info -> log.info("✅ Extração concluída com sucesso"))
                 .doOnError(e -> log.error("❌ Erro na extração: {}", e.getMessage(), e));
     }
@@ -531,25 +536,93 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
 
     @Override
     public Mono<Integer> findResumoPage(InputStream inputStream) {
+        return findLastPageContaining(inputStream, "RESUMO");
+    }
+
+    /**
+     * Última página que contém o marcador (PDF com original + retificadora concatenados).
+     */
+    private Mono<Integer> findLastPageContaining(InputStream inputStream, String marker) {
         return Mono.fromCallable(() -> {
             try (PdfReader reader = new PdfReader(inputStream);
                     PdfDocument pdfDoc = new PdfDocument(reader)) {
 
                 int totalPages = pdfDoc.getNumberOfPages();
+                int last = -1;
+                String needle = marker.toUpperCase();
 
                 for (int i = 1; i <= totalPages; i++) {
                     LocationTextExtractionStrategy strategy = new LocationTextExtractionStrategy();
                     String pageText = PdfTextExtractor.getTextFromPage(pdfDoc.getPage(i), strategy);
 
-                    if (pageText != null && pageText.toUpperCase().contains("RESUMO")) {
-                        log.debug("🔍 'RESUMO' encontrado na página {}", i);
-                        return i;
+                    if (pageText != null && pageText.toUpperCase().contains(needle)) {
+                        last = i;
                     }
                 }
 
-                throw new IllegalArgumentException("Página RESUMO não encontrada no PDF");
+                if (last < 1) {
+                    throw new IllegalArgumentException("Página com '" + marker + "' não encontrada no PDF");
+                }
+                log.debug("🔍 '{}' vigente na página {}", marker, last);
+                return last;
             }
         }).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    private Mono<Integer> findLastPaginaIdentificacaoContribuinte(InputStream inputStream) {
+        return Mono.fromCallable(() -> {
+            try (PdfReader reader = new PdfReader(inputStream);
+                    PdfDocument pdfDoc = new PdfDocument(reader)) {
+
+                int totalPages = pdfDoc.getNumberOfPages();
+                int last = -1;
+
+                for (int i = 1; i <= totalPages; i++) {
+                    LocationTextExtractionStrategy strategy = new LocationTextExtractionStrategy();
+                    String pageText = PdfTextExtractor.getTextFromPage(pdfDoc.getPage(i), strategy);
+                    if (contemIdentificacaoContribuinte(pageText)) {
+                        last = i;
+                    }
+                }
+
+                if (last < 1) {
+                    throw new IllegalArgumentException("Página de identificação do contribuinte não encontrada no PDF");
+                }
+                return last;
+            }
+        }).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    private static boolean contemIdentificacaoContribuinte(String text) {
+        if (text == null) {
+            return false;
+        }
+        String upper = text.toUpperCase();
+        return upper.contains("IDENTIFICAÇÃO DO CONTRIBUINTE")
+                || upper.contains("IDENTIFICACAO DO CONTRIBUINTE");
+    }
+
+    /**
+     * PDFs da e-CAC às vezes concatenam a entrega original e a retificadora.
+     * Mantém só o texto a partir da última identificação do contribuinte.
+     */
+    static String recortarUltimaDeclaracao(String allPagesText) {
+        if (allPagesText == null || allPagesText.isBlank()) {
+            return allPagesText;
+        }
+        String upper = allPagesText.toUpperCase();
+        int identA = upper.lastIndexOf("IDENTIFICAÇÃO DO CONTRIBUINTE");
+        int identB = upper.lastIndexOf("IDENTIFICACAO DO CONTRIBUINTE");
+        int ident = Math.max(identA, identB);
+        if (ident <= 0) {
+            return allPagesText;
+        }
+        int marker = allPagesText.lastIndexOf("=== PAGINA", ident);
+        int start = marker >= 0 ? marker : ident;
+        if (start <= 0) {
+            return allPagesText;
+        }
+        return allPagesText.substring(start);
     }
 
     /**
@@ -628,6 +701,16 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
                     DEDUCOES_CONTRIB_PREV_COMPL_PATTERN);
         }
         BigDecimal deducoesDependentes = extractValorMonetario(resumoPageText, DEDUCOES_DEPENDENTES_PATTERN);
+        BigDecimal totalDeducaoDependentes = extractTotalDeducaoDependentes(primeiraPageText);
+        if (nvlBigDecimal(totalDeducaoDependentes).compareTo(BigDecimal.ZERO) == 0) {
+            totalDeducaoDependentes = extractTotalDeducaoDependentes(allPagesText);
+        }
+        if (nvlBigDecimal(deducoesDependentes).compareTo(BigDecimal.ZERO) == 0
+                && nvlBigDecimal(totalDeducaoDependentes).compareTo(BigDecimal.ZERO) > 0) {
+            log.info("✅ Dedução de dependentes do RESUMO substituída pelo total da página 1: {}",
+                    totalDeducaoDependentes);
+            deducoesDependentes = totalDeducaoDependentes;
+        }
         BigDecimal deducoesInstrucao = extractValorMonetario(resumoPageText, DEDUCOES_INSTRUCAO_PATTERN);
         BigDecimal deducoesMedicas = extractValorMonetario(resumoPageText, DEDUCOES_MEDICAS_PATTERN);
         BigDecimal deducoesPensaoJudicial = extractValorMonetario(resumoPageText, DEDUCOES_PENSAO_JUDICIAL_PATTERN);
@@ -828,7 +911,6 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
 
         // Dependentes
         List<DependenteInfo> dependentes = extractDependentes(primeiraPageText);
-        BigDecimal totalDeducaoDependentes = extractTotalDeducaoDependentes(primeiraPageText);
         log.info("👨‍👩‍👧 Dependentes: {} encontrados, total dedução: {}", dependentes.size(), totalDeducaoDependentes);
 
         // Alimentandos
@@ -1202,6 +1284,22 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
         }
 
         if (doacoes.isEmpty()) {
+            Matcher loose = ECA_DIRETA_LOOSE_PATTERN.matcher(section);
+            while (loose.find()) {
+                String fundo = loose.group(1).trim();
+                String cnpj = loose.group(2).trim();
+                BigDecimal valor = parseMonetaryString(loose.group(3));
+                String tipo = loose.group(4) != null ? loose.group(4).trim() : "";
+                if (valor == null || fundo.isBlank()) {
+                    continue;
+                }
+                String nome = tipo.isEmpty() ? fundo : tipo + " - " + fundo;
+                doacoes.add(new DoacaoEfetuada(CODIGO_DOACAO_ECA, nome, cnpj, valor));
+                log.info("🎁 Doação ECA direta (solta): nome={}, cnpj={}, valor={}", nome, cnpj, valor);
+            }
+        }
+
+        if (doacoes.isEmpty()) {
             String[] lines = section.split("\\r?\\n");
             Pattern cnpjLine = Pattern.compile(
                     "^\\s*([\\d]{2,3}\\.[\\d]{3}\\.[\\d]{3}/[\\d]{4}-[\\d]{2})\\s*$");
@@ -1460,7 +1558,7 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
      */
     private BigDecimal extractTotalDeducaoDependentes(String pageText) {
         Pattern p = Pattern.compile(
-                "TOTAL\\s+DE\\s+DEDU[ÇC][ÃA]O\\s+COM\\s+DEPENDENTES[\\s\\r\\n]*([\\d]{1,3}(?:[.]\\d{3})*,\\d{2})",
+                "TOTAL\\s+DE\\s+DEDU[ÇC][ÃA]O\\s+COM\\s+DEPENDENTES[\\s\\S]{0,200}?([\\d]{1,3}(?:[.]\\d{3})*,\\d{2})",
                 Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
         return extractValorMonetario(pageText, p);
     }
@@ -1924,12 +2022,13 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
 
         BigDecimal deducaoAntesRotulo = extractValorMonetarioAntesRotulo(
                 resumoPageText, "dedução de incentivo");
-        if (deducaoAntesRotulo != null) {
-            if (impostoDevido != null && deducaoAntesRotulo.compareTo(impostoDevido) == 0) {
-                deducaoIncentivo = BigDecimal.ZERO;
-            } else {
-                deducaoIncentivo = deducaoAntesRotulo;
-            }
+        // Não sobrescrever valor positivo do regex com 0,00 residual da coluna anterior
+        // (layout 2017: "Imposto devido / 0,00 / Imposto devido I / Dedução de incentivo").
+        if (nvlBigDecimal(deducaoIncentivo).compareTo(BigDecimal.ZERO) == 0
+                && deducaoAntesRotulo != null
+                && deducaoAntesRotulo.compareTo(BigDecimal.ZERO) > 0
+                && (impostoDevido == null || deducaoAntesRotulo.compareTo(impostoDevido) != 0)) {
+            deducaoIncentivo = deducaoAntesRotulo;
         } else if (deducaoIncentivo != null
                 && impostoDevido != null
                 && deducaoIncentivo.compareTo(impostoDevido) == 0) {
@@ -1959,8 +2058,11 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
             // de incentivo não foi capturada (0) mas o imposto devido bruto supera o total,
             // deriva deducaoIncentivo = impostoDevido − (total − RRA) e impostoDevidoI = total − RRA.
             // Ex.: doações ECA/Idoso que abatem o "Total do imposto devido".
-            if (impostoDevido != null && totalImpostoDevido != null
-                    && (impostoDevidoII == null || impostoDevidoII.compareTo(BigDecimal.ZERO) == 0)) {
+            // II igual ao total (cópia de I sem INSS doméstico) não bloqueia a derivação — Ilka 2017.
+            boolean iiNaoBloqueia = impostoDevidoII == null
+                    || impostoDevidoII.compareTo(BigDecimal.ZERO) == 0
+                    || (totalImpostoDevido != null && withinOneCent(impostoDevidoII, totalImpostoDevido));
+            if (impostoDevido != null && totalImpostoDevido != null && iiNaoBloqueia) {
                 BigDecimal rra = nvlBigDecimal(impostoDevidoRRA);
                 BigDecimal impostoIDerivado = totalImpostoDevido.subtract(rra);
                 BigDecimal incentivoDerivado = impostoDevido.subtract(impostoIDerivado);
@@ -2035,14 +2137,20 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
      */
     private BigDecimal extractImpostoDevidoI(String resumoPageText) {
         BigDecimal sameLine = extractValorMonetario(resumoPageText, IMPOSTO_DEVIDO_I_PATTERN);
-        if (sameLine != null) {
+        if (nvlBigDecimal(sameLine).compareTo(BigDecimal.ZERO) > 0) {
             return sameLine;
         }
-        BigDecimal beforeLabel = extractValorMonetarioAntesRotulo(resumoPageText, "Imposto devido I");
-        if (beforeLabel != null) {
-            log.info("✅ Imposto devido I extraído antes do rótulo: {}", beforeLabel);
+        BigDecimal nextLine = extractValorMonetario(resumoPageText, IMPOSTO_DEVIDO_I_NEXT_LINE_PATTERN);
+        if (nvlBigDecimal(nextLine).compareTo(BigDecimal.ZERO) > 0) {
+            log.info("✅ Imposto devido I extraído na linha seguinte: {}", nextLine);
+            return nextLine;
         }
-        return beforeLabel;
+        BigDecimal beforeLabel = extractValorMonetarioAntesRotulo(resumoPageText, "Imposto devido I");
+        if (nvlBigDecimal(beforeLabel).compareTo(BigDecimal.ZERO) > 0) {
+            log.info("✅ Imposto devido I extraído antes do rótulo: {}", beforeLabel);
+            return beforeLabel;
+        }
+        return sameLine != null ? sameLine : nextLine;
     }
 
     private static boolean withinOneCent(BigDecimal a, BigDecimal b) {

@@ -124,9 +124,9 @@ public class IncomeTaxDeclarationServiceImpl implements IncomeTaxDeclarationServ
                         "(?i)contribui..o\\s+.\\s+previd.ncia\\s+complementar.*?privada.*?Fapi\\s*([\\d]{1,3}(?:[.]?[\\d]{3})*[,][\\d]{2})",
                         Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
 
-        // Dependentes
+        // Dependentes — não capturar "pelos/dos dependentes" da seção de rendimentos
         private static final Pattern DEDUCOES_DEPENDENTES_PATTERN = Pattern.compile(
-                        "(?i)Dependentes\\s+([\\d]{1,3}(?:[.]?[\\d]{3})*[,][\\d]{2})",
+                        "(?i)(?<!pelos\\s)(?<!pelo\\s)(?<!dos\\s)(?<!do\\s)(?<!com\\s)Dependentes\\s+([\\d]{1,3}(?:[.]?[\\d]{3})*[,][\\d]{2})",
                         Pattern.CASE_INSENSITIVE);
 
         // Despesas com instrução
@@ -699,7 +699,7 @@ public class IncomeTaxDeclarationServiceImpl implements IncomeTaxDeclarationServ
                                                                 return Mono.empty();
                                                         });
                                 })
-                                .next()
+                                .reduce((primeira, seguinte) -> seguinte)
                                 .switchIfEmpty(Mono.error(
                                                 new IllegalArgumentException("Página RESUMO não encontrada no PDF")));
         }

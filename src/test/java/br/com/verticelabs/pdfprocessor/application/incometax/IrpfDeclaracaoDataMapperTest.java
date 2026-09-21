@@ -42,6 +42,18 @@ class IrpfDeclaracaoDataMapperTest {
     }
 
     @Test
+    @DisplayName("total da página 1 prevalece sobre RESUMO zerado (Gemini)")
+    void totalPagina1PrevaleceSobreResumoZerado() {
+        IncomeTaxInfo info = minimalInfo(
+                new BigDecimal("4550.16"),
+                BigDecimal.ZERO);
+
+        IrpfDeclaracaoData data = mapper.fromIncomeTaxInfo(info);
+
+        assertEquals(0, new BigDecimal("4550.16").compareTo(data.getDeducaoDependentes()));
+    }
+
+    @Test
     @DisplayName("sem nenhum valor → null")
     void semValorFicaNull() {
         IncomeTaxInfo info = minimalInfo(null, null);

@@ -104,8 +104,18 @@ public final class IncomeTaxGeminiHelper {
         BigDecimal totalImpostoDevido = source.getTotalImpostoDevido();
         BigDecimal contribuicaoPrevEmpregadorDomestico = source.getContribuicaoPrevEmpregadorDomestico();
 
-        if (impostoDevidoI == null && isPositive(impostoDevido) && deducaoIncentivo != null) {
-            impostoDevidoI = impostoDevido.subtract(deducaoIncentivo);
+        if (!isPositive(deducaoIncentivo)
+                && isPositive(impostoDevido)
+                && isPositive(totalImpostoDevido)
+                && impostoDevido.compareTo(totalImpostoDevido) > 0) {
+            BigDecimal derivado = impostoDevido.subtract(totalImpostoDevido)
+                    .setScale(2, RoundingMode.HALF_UP);
+            if (derivado.compareTo(TOLERANCE) > 0 && derivado.compareTo(impostoDevido) < 0) {
+                deducaoIncentivo = derivado;
+            }
+        }
+        if (!isPositive(impostoDevidoI) && isPositive(impostoDevido) && deducaoIncentivo != null) {
+            impostoDevidoI = impostoDevido.subtract(nvl(deducaoIncentivo));
         }
         // Derivar RRA omitido pelo Gemini: Total = (II se houver, senão I) + RRA
         if (!isPositive(impostoDevidoRRA)
@@ -122,7 +132,7 @@ public final class IncomeTaxGeminiHelper {
                 impostoDevidoRRA = rraDerivado;
             }
         }
-        if (impostoDevidoI == null && isPositive(totalImpostoDevido) && !isPositive(impostoDevidoRRA)) {
+        if (!isPositive(impostoDevidoI) && isPositive(totalImpostoDevido) && !isPositive(impostoDevidoRRA)) {
             impostoDevidoI = totalImpostoDevido;
         }
         if (impostoDevido == null && isPositive(impostoDevidoI) && deducaoIncentivo != null) {
@@ -233,14 +243,58 @@ public final class IncomeTaxGeminiHelper {
         List<IncomeTaxInfo.DependenteInfo> mergedList = hasList
                 ? current
                 : (dependentes != null ? dependentes : List.of());
-        BigDecimal mergedTotal = source.getTotalDeducaoDependentes() != null
+        BigDecimal mergedTotal = isPositive(source.getTotalDeducaoDependentes())
                 ? source.getTotalDeducaoDependentes()
                 : totalDeducao;
-        // Também preenche deducoesDependentes do RESUMO se ainda null e temos total
-        BigDecimal deducoesDependentes = source.getDeducoesDependentes() != null
-                ? source.getDeducoesDependentes()
-                : mergedTotal;
-        return copyWith(source, source.getPagamentosEfetuados(), mergedList, mergedTotal, deducoesDependentes);
+        // 0.00 do Gemini no RESUMO não conta — a página 1 tem o total real (ex.: Eurípedes 4.550,16)
+        boolean resumoDependentesMissing = !isPositive(source.getDeducoesDependentes());
+        BigDecimal deducoesDependentes = resumoDependentesMissing && isPositive(mergedTotal)
+                ? mergedTotal
+                : source.getDeducoesDependentes();
+
+        BigDecimal prevCompl = source.getDeducoesContribPrevCompl();
+        if (resumoDependentesMissing && isPositive(deducoesDependentes) && isPositive(prevCompl)) {
+            prevCompl = ajustarPrevComplAposPreencherDependentes(source, prevCompl, deducoesDependentes);
+        }
+
+        return copyWith(source, source.getPagamentosEfetuados(), mergedList, mergedTotal,
+                prevCompl, deducoesDependentes);
+    }
+
+    /**
+     * Quando o RESUMO omitiu Dependentes, o residual costuma ter sido jogado em Fapi
+     * ({@code 4.550,16 + 897,00 = 5.450,16}). Devolve o valor à linha correta.
+     */
+    private static BigDecimal ajustarPrevComplAposPreencherDependentes(
+            IncomeTaxInfo source, BigDecimal prevCompl, BigDecimal dependentes) {
+        if (prevCompl.compareTo(dependentes) == 0) {
+            BigDecimal implied = impliedPrevCompl(source, dependentes);
+            return implied != null ? implied : BigDecimal.ZERO;
+        }
+        if (prevCompl.compareTo(dependentes) > 0) {
+            return prevCompl.subtract(dependentes).setScale(2, RoundingMode.HALF_UP);
+        }
+        return prevCompl;
+    }
+
+    private static BigDecimal impliedPrevCompl(IncomeTaxInfo source, BigDecimal dependentes) {
+        if (source.getDeducoes() == null) {
+            return null;
+        }
+        BigDecimal others = sumNonNull(
+                source.getDeducoesContribPrevOficial(),
+                source.getDeducoesContribPrevRRA(),
+                dependentes,
+                source.getDeducoesInstrucao(),
+                source.getDeducoesMedicas(),
+                source.getDeducoesPensaoJudicial(),
+                source.getDeducoesPensaoEscritura(),
+                source.getDeducoesPensaoRRA(),
+                source.getDeducoesLivroCaixa(),
+                source.getDescontoSimplificado());
+        BigDecimal implied = source.getDeducoes().subtract(others != null ? others : BigDecimal.ZERO)
+                .setScale(2, RoundingMode.HALF_UP);
+        return implied.compareTo(BigDecimal.ZERO) >= 0 ? implied : null;
     }
 
     private static IncomeTaxInfo copyWith(
@@ -248,7 +302,8 @@ public final class IncomeTaxGeminiHelper {
             List<IncomeTaxInfo.PagamentoEfetuado> pagamentos,
             List<IncomeTaxInfo.DependenteInfo> dependentes,
             BigDecimal totalDeducaoDependentes) {
-        return copyWith(source, pagamentos, dependentes, totalDeducaoDependentes, source.getDeducoesDependentes());
+        return copyWith(source, pagamentos, dependentes, totalDeducaoDependentes,
+                source.getDeducoesContribPrevCompl(), source.getDeducoesDependentes());
     }
 
     private static IncomeTaxInfo copyWith(
@@ -256,6 +311,7 @@ public final class IncomeTaxGeminiHelper {
             List<IncomeTaxInfo.PagamentoEfetuado> pagamentos,
             List<IncomeTaxInfo.DependenteInfo> dependentes,
             BigDecimal totalDeducaoDependentes,
+            BigDecimal prevCompl,
             BigDecimal deducoesDependentes) {
         return new IncomeTaxInfo(
                 source.getNome(), source.getCpf(), source.getAnoCalendario(), source.getExercicio(),
@@ -267,7 +323,7 @@ public final class IncomeTaxGeminiHelper {
                 source.getRendimentosTributaveis(), source.getDeducoes(),
                 source.getImpostoRetidoFonteTitular(), source.getImpostoPagoTotal(), source.getImpostoRestituir(),
                 source.getDeducoesContribPrevOficial(), source.getDeducoesContribPrevRRA(),
-                source.getDeducoesContribPrevCompl(), deducoesDependentes,
+                prevCompl, deducoesDependentes,
                 source.getDeducoesInstrucao(), source.getDeducoesMedicas(),
                 source.getDeducoesPensaoJudicial(), source.getDeducoesPensaoEscritura(),
                 source.getDeducoesPensaoRRA(), source.getDeducoesLivroCaixa(),
@@ -303,6 +359,27 @@ public final class IncomeTaxGeminiHelper {
         return value != null && value.compareTo(BigDecimal.ZERO) > 0;
     }
 
+    private static BigDecimal nvl(BigDecimal value) {
+        return value != null ? value : BigDecimal.ZERO;
+    }
+
+    /**
+     * Residual que coincide com 1–6 × limite anual de dependente (2.275,08).
+     * Indica linha "Dependentes" omitida no RESUMO, não Fapi faltando.
+     */
+    static boolean pareceDeducaoDependentes(BigDecimal valor) {
+        if (!isPositive(valor)) {
+            return false;
+        }
+        for (int n = 1; n <= 6; n++) {
+            BigDecimal esperado = LIMITE_DEPENDENTE_ANUAL.multiply(BigDecimal.valueOf(n));
+            if (valor.subtract(esperado).abs().compareTo(DEPENDENTES_MATCH_DELTA) <= 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static boolean allNullOrZero(BigDecimal... values) {
         for (BigDecimal value : values) {
             if (isPositive(value)) {
@@ -330,6 +407,9 @@ public final class IncomeTaxGeminiHelper {
     }
 
     private static final BigDecimal TOLERANCE = new BigDecimal("0.02");
+    /** Limite anual por dependente vigente por vários anos-calendário (inclui 2019). */
+    private static final BigDecimal LIMITE_DEPENDENTE_ANUAL = new BigDecimal("2275.08");
+    private static final BigDecimal DEPENDENTES_MATCH_DELTA = new BigDecimal("10.00");
 
     /**
      * Corrige inconsistências comuns na extração Gemini de deduções:
@@ -362,22 +442,39 @@ public final class IncomeTaxGeminiHelper {
 
         boolean reconciledFromTotal = false;
 
-        // Total de deduções legível mas soma das linhas diverge → ajusta prev. complementar
+        // Total de deduções legível mas soma das linhas diverge → ajusta prev. complementar.
+        // Não absorver residual que parece dedução de dependentes omitida (Eurípedes 2019:
+        // Fapi 897,00 + Dependentes 4.550,16 virava 5.450,16 em Fapi).
         if (total != null && sumLines != null && total.subtract(sumLines).abs().compareTo(TOLERANCE) > 0
                 && isPositive(prevCompl)) {
-            prevCompl = prevCompl.add(total.subtract(sumLines));
-            sumLines = sumNonNull(sumOthers, prevCompl);
-            reconciledFromTotal = true;
+            BigDecimal residual = total.subtract(sumLines);
+            if (isPositive(dependentes) || !pareceDeducaoDependentes(residual)) {
+                prevCompl = prevCompl.add(residual);
+                sumLines = sumNonNull(sumOthers, prevCompl);
+                reconciledFromTotal = true;
+            }
         }
 
-        // Rendimentos e base de cálculo legíveis mas total diverge — só se ainda não reconciliou pelo total
+        // Rendimentos e base de cálculo legíveis mas total diverge — só se ainda não
+        // reconciliou pelo total. Se o TOTAL fecha com as linhas e a diferença para a
+        // base extraída é exatamente a dedução de dependentes, a base é que está errada
+        // (Miguel 2016) — não reescreve o total.
         if (!reconciledFromTotal && isPositive(rendimentosTributaveis) && base != null
                 && base.compareTo(rendimentosTributaveis) < 0) {
             BigDecimal impliedTotal = rendimentosTributaveis.subtract(base);
-            if (total == null || impliedTotal.subtract(total).abs().compareTo(TOLERANCE) > 0) {
+            boolean baseOmitiuDependentes = total != null
+                    && ((isPositive(dependentes)
+                    && total.subtract(impliedTotal).subtract(dependentes).abs().compareTo(TOLERANCE) <= 0)
+                    || (!isPositive(dependentes) && pareceDeducaoDependentes(total.subtract(impliedTotal))));
+            if (!baseOmitiuDependentes
+                    && (total == null || impliedTotal.subtract(total).abs().compareTo(TOLERANCE) > 0)) {
                 if (sumOthers != null) {
                     BigDecimal impliedPrev = impliedTotal.subtract(sumOthers);
-                    if (impliedPrev.compareTo(BigDecimal.ZERO) > 0
+                    BigDecimal deltaPrev = impliedPrev.subtract(nvl(prevCompl));
+                    boolean residualPareceDependentes = !isPositive(dependentes)
+                            && (pareceDeducaoDependentes(impliedPrev) || pareceDeducaoDependentes(deltaPrev));
+                    if (!residualPareceDependentes
+                            && impliedPrev.compareTo(BigDecimal.ZERO) > 0
                             && (prevCompl == null || impliedPrev.subtract(prevCompl).abs().compareTo(TOLERANCE) > 0)) {
                         prevCompl = impliedPrev;
                         total = impliedTotal;
@@ -388,10 +485,16 @@ public final class IncomeTaxGeminiHelper {
             }
         }
 
-        // Base ausente ou inconsistente após reconciliação pelo total de deduções
+        // Base ausente ou inconsistente com rendimentos − total de deduções:
+        // a planilha e o RESUMO exigem Base = TOTAL RENDIMENTOS − TOTAL DEDUÇÕES.
         if (isPositive(rendimentosTributaveis) && total != null
-                && (base == null || (reconciledFromTotal && rendimentosTributaveis.subtract(total).subtract(base).abs().compareTo(TOLERANCE) > 0))) {
-            base = rendimentosTributaveis.subtract(total);
+                && total.compareTo(rendimentosTributaveis) < 0) {
+            BigDecimal derived = rendimentosTributaveis.subtract(total)
+                    .setScale(2, RoundingMode.HALF_UP);
+            if (derived.compareTo(BigDecimal.ZERO) >= 0
+                    && (base == null || derived.subtract(base).abs().compareTo(TOLERANCE) > 0)) {
+                base = derived;
+            }
         }
 
         return new DeducoesReconciled(total, prevCompl, base);

@@ -77,7 +77,11 @@ public final class GeminiPrompts {
             3. Referência pode ser horas, dias, percentual ou null
             4. Extraia TODAS as rubricas visíveis, incluindo as com valor zero
             5. O código da rubrica é o número que aparece antes da descrição (ex: 001, 101, 4482)
-            6. Se o documento for da CAIXA ECONÔMICA FEDERAL ou FUNCEF, atente para os layouts específicos
+            6. Se o documento for da CAIXA ECONÔMICA FEDERAL ou FUNCEF, atente para os layouts específicos.
+               FUNCEF "DEMONSTRATIVO DE PAGAMENTO": o código impresso tem 6 dígitos (ex: 436204, 443004, 445904).
+               Use SOMENTE os 4 primeiros dígitos no campo "codigo" (4362, 4430, 4459).
+               A competência da linha é a coluna "Mês Ref." (MM/YYYY; 13/YYYY = abono anual).
+               Não extraia linhas informativas com código alfabético (RBASE, MGCONS, BDEFICIT).
             7. IMPORTANTE: Cada rubrica pode ter sua PRÓPRIA competência (coluna "Competência" ou "Prazo" na tabela).
                Se a competência da rubrica for DIFERENTE da competência do cabeçalho, inclua no campo "competencia" da rubrica.
                Isso acontece quando uma página tem rubricas de MESES DIFERENTES.
@@ -102,6 +106,7 @@ public final class GeminiPrompts {
             - Valores monetários com PONTO como decimal (ex: 1234.56)
             - Se algo não estiver legível, use null
             - Retorne APENAS JSON válido, sem texto extra
+            - FUNCEF demonstrativo: código de 6 dígitos → use só os 4 primeiros (436204 → 4362)
 
             JSON:
             {
@@ -156,8 +161,11 @@ public final class GeminiPrompts {
             ATENÇÃO — DUAS LINHAS DISTINTAS DE PREVIDÊNCIA (declaração COMPLETA / DEDUÇÕES LEGAIS):
             - "previdenciaOficial" = linha com "ATÉ o limite do patrocinador" (prev. oficial + compl. pública até o limite)
             - "previdenciaComplementar" = linha com "ACIMA do limite do patrocinador" ou "privada, e Fapi"
-              (PGBL/prev. privada dedutível — costuma ser o MAIOR valor entre as duas linhas de previdência)
+              (PGBL/prev. privada dedutível — NÃO é necessariamente o maior valor da seção)
             NÃO confundir essas linhas. Leia o valor à DIREITA de cada rótulo na seção DEDUÇÕES itemizada.
+            A linha "Dependentes" vem IMEDIATAMENTE ABAIXO da linha Fapi — são valores DIFERENTES.
+            NÃO copie o valor de Dependentes (ex.: 4.550,16 = 2 × 2.275,08) para previdenciaComplementar.
+            previdenciaComplementar pode ser um valor menor (ex.: 897,00). Dependentes vai em "dependentes".
             Em PDFs digitalizados, confira cada dígito (confusões comuns: 3/8, 4/1, 9/5, 6/7).
 
             IDENTIFICAÇÃO DO TIPO DE TRIBUTAÇÃO — leia o título da seção RESUMO:
@@ -270,8 +278,10 @@ public final class GeminiPrompts {
 
             ATENÇÃO — PREVIDÊNCIA COMPLEMENTAR (deduções legais):
             Existem DUAS linhas de previdência na seção DEDUÇÕES — NÃO confundir:
-            - previdenciaOficial = "ATÉ o limite do patrocinador" (valor menor, ex: 7.707,96)
-            - previdenciaComplementar = "ACIMA do limite do patrocinador" ou "privada, e Fapi" (valor maior, ex: 34.964,17)
+            - previdenciaOficial = "ATÉ o limite do patrocinador" (ex: 7.707,96 ou 0,00)
+            - previdenciaComplementar = "ACIMA do limite do patrocinador" ou "privada, e Fapi"
+              (NÃO é necessariamente o maior valor; pode ser 897,00)
+            A linha seguinte é "Dependentes" — valor próprio (ex.: 4.550,16). NÃO copie Dependentes para Fapi.
             Use os valores da lista itemizada em DEDUÇÕES (não de resumos condensados em outra parte).
             Leia cada dígito com cuidado em PDFs digitalizados. Confira: soma das linhas ≈ total deduções;
             rendimentos − total deduções ≈ base de cálculo.
@@ -503,6 +513,8 @@ public final class GeminiPrompts {
             4. Extraia TODAS as rubricas visíveis, incluindo as com valor zero.
             5. O código da rubrica é o número que aparece antes da descrição.
             6. Se o documento for da CAIXA ECONÔMICA FEDERAL ou FUNCEF, atente para os layouts específicos.
+               FUNCEF "DEMONSTRATIVO DE PAGAMENTO": código de 6 dígitos → use só os 4 primeiros (436204 → 4362).
+               Não extraia RBASE/MGCONS/BDEFICIT.
             7. Cada rubrica pode ter uma competência própria (campo "Competência" ou "Prazo"). Se presente, inclua no campo "competencia" da rubrica.
             """;
 
@@ -556,6 +568,7 @@ public final class GeminiPrompts {
             3. Se os totais (salário bruto, descontos, líquido) estiverem visíveis, extraia-os.
             4. Cada rubrica pode ter competência própria — se presente, inclua.
             5. O código da rubrica é o número antes da descrição (ex: 4346, 4412).
+               Se o código tiver 6 dígitos (demonstrativo FUNCEF, ex: 436204), use só os 4 primeiros (4362).
             """;
 
     // ==========================================
