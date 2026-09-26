@@ -80,6 +80,35 @@ class Ilka2017DependentesInstrucaoIncentivoTest {
     }
 
     @Test
+    void regexDependentesNaoPegaRendaVariavelNemTotalDeRendimentos() throws Exception {
+        Pattern pattern = pattern("DEDUCOES_DEPENDENTES_PATTERN");
+        String resumo = """
+                RENDA VARIÁVEL - OPERAÇÕES COMUNS/DAYTRADE - DEPENDENTES
+                Sem Informações
+                RESUMO
+                RENDIMENTOS TRIBUTÁVEIS E DESCONTO SIMPLIFICADO
+                Recebidos de Pessoa Jurídica pelo Titular 170.498,81
+                Recebidos de Pessoa Jurídica pelos Dependentes 0,00
+                TOTAL DE RENDIMENTOS TRIBUTÁVEIS 170.498,81
+                Desconto Simplificado 16.754,34
+                """;
+        assertNull(extract(resumo, pattern),
+                "Simplificado sem linha DEDUÇÕES Dependentes não pode herdar 170.498,81");
+    }
+
+    @Test
+    void regexDependentesAceitaValorNaLinhaSeguinte() throws Exception {
+        Pattern pattern = pattern("DEDUCOES_DEPENDENTES_PATTERN");
+        String resumo = """
+                DEDUÇÕES
+                Dependentes
+                2.275,08
+                Despesas com instrução 3.561,50
+                """;
+        assertEquals(new BigDecimal("2275.08"), extract(resumo, pattern));
+    }
+
+    @Test
     void simulacaoAplicaTetoInstrucaoEMantemIncentivoComDoacao99() {
         IrpfDeclaracaoData data = IrpfDeclaracaoData.builder()
                 .anoCalendario("2017")

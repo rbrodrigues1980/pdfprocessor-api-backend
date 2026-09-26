@@ -46,6 +46,8 @@
 | CPF | `dependentes[].cpf` | ✅ |
 | Total de Dedução com Dependentes | `totalDeducaoDependentes` | ✅ |
 
+> **Sem Informações:** lista vazia e dedução 0. Não capturar o título `RENDA VARIÁVEL … DEPENDENTES` do RESUMO Simplificado — o próximo valor monetário é o total de rendimentos do titular (Edirce AC 2019: 170.498,81). Regressão: `Edirce2019DependentesSemInformacoesTest`.
+
 ---
 
 ## 3. Alimentandos (Página 1)
