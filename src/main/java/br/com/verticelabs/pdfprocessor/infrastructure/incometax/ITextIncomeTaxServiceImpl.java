@@ -166,10 +166,13 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
                     + "(?!\\s+p[úu]blica\\s*\\([^)]*at[ée]\\s+o\\s+limite)[\\s\\S]*?([\\d]{1,3}(?:[.]\\d{3})*,\\d{2})",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
-    // Evita "pelos/dos/com dependentes" em rendimentos e imposto pago; pega a linha DEDUÇÕES.
+    // Linha DEDUÇÕES "Dependentes 2.275,08" (ou valor na linha seguinte).
+    // Não usa [\\s\\S]*?: em Simplificado o RESUMO vem depois de "RENDA VARIÁVEL - DEPENDENTES"
+    // e o próximo número é o total de rendimentos (Edirce 2019: 170.498,81).
     private static final Pattern DEDUCOES_DEPENDENTES_PATTERN = Pattern.compile(
-            "(?i)(?<!pelos\\s)(?<!pelo\\s)(?<!dos\\s)(?<!do\\s)(?<!com\\s)\\bdependentes\\b"
-                    + "(?!\\s+(?:pelo|pelos|do|dos|com)\\b)[\\s\\S]*?([\\d]{1,3}(?:[.]\\d{3})*,\\d{2})",
+            "(?i)(?<!pelos\\s)(?<!pelo\\s)(?<!dos\\s)(?<!do\\s)(?<!com\\s)(?<!-\\s)\\bdependentes\\b"
+                    + "(?!\\s+(?:pelo|pelos|do|dos|com)\\b)[ \\t]*+(?:\\r?\\n[ \\t]*)?"
+                    + "([\\d]{1,3}(?:[.]\\d{3})*,\\d{2})",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
     private static final Pattern DEDUCOES_INSTRUCAO_PATTERN = Pattern.compile(
@@ -709,15 +712,36 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
                     DEDUCOES_CONTRIB_PREV_COMPL_PATTERN);
         }
         BigDecimal deducoesDependentes = extractValorMonetario(resumoPageText, DEDUCOES_DEPENDENTES_PATTERN);
-        BigDecimal totalDeducaoDependentes = extractTotalDeducaoDependentes(primeiraPageText);
-        if (nvlBigDecimal(totalDeducaoDependentes).compareTo(BigDecimal.ZERO) == 0) {
+        boolean dependentesSemInformacoes = secaoSemInformacoes(primeiraPageText, "DEPENDENTES")
+                || secaoSemInformacoes(allPagesText, "DEPENDENTES");
+        BigDecimal totalDeducaoDependentes = dependentesSemInformacoes
+                ? BigDecimal.ZERO
+                : extractTotalDeducaoDependentes(primeiraPageText);
+        if (!dependentesSemInformacoes
+                && nvlBigDecimal(totalDeducaoDependentes).compareTo(BigDecimal.ZERO) == 0) {
             totalDeducaoDependentes = extractTotalDeducaoDependentes(allPagesText);
         }
-        if (nvlBigDecimal(deducoesDependentes).compareTo(BigDecimal.ZERO) == 0
+        if (dependentesSemInformacoes) {
+            if (nvlBigDecimal(deducoesDependentes).compareTo(BigDecimal.ZERO) > 0) {
+                log.warn("⚠️ Dedução de dependentes descartada (seção Sem Informações): era {}",
+                        deducoesDependentes);
+            }
+            deducoesDependentes = BigDecimal.ZERO;
+            totalDeducaoDependentes = BigDecimal.ZERO;
+        } else if (nvlBigDecimal(deducoesDependentes).compareTo(BigDecimal.ZERO) == 0
                 && nvlBigDecimal(totalDeducaoDependentes).compareTo(BigDecimal.ZERO) > 0) {
             log.info("✅ Dedução de dependentes do RESUMO substituída pelo total da página 1: {}",
                     totalDeducaoDependentes);
             deducoesDependentes = totalDeducaoDependentes;
+        }
+        if (nvlBigDecimal(deducoesDependentes).compareTo(BigDecimal.ZERO) > 0
+                && rendimentosTributaveis != null
+                && deducoesDependentes.compareTo(rendimentosTributaveis) == 0) {
+            log.warn("⚠️ Dedução de dependentes descartada (igual aos rendimentos): {}", deducoesDependentes);
+            deducoesDependentes = BigDecimal.ZERO;
+            if (nvlBigDecimal(totalDeducaoDependentes).compareTo(rendimentosTributaveis) == 0) {
+                totalDeducaoDependentes = BigDecimal.ZERO;
+            }
         }
         BigDecimal deducoesInstrucao = extractValorMonetario(resumoPageText, DEDUCOES_INSTRUCAO_PATTERN);
         BigDecimal deducoesMedicas = extractValorMonetario(resumoPageText, DEDUCOES_MEDICAS_PATTERN);
@@ -1596,8 +1620,23 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
     }
 
     /**
-     * Extrai total de dedução com dependentes.
+     * True quando a seção (ex. DEPENDENTES) está "Sem Informações" logo após o título.
      */
+    private boolean secaoSemInformacoes(String pageText, String sectionMarker) {
+        if (pageText == null || sectionMarker == null || sectionMarker.isBlank()) {
+            return false;
+        }
+        String upper = pageText.toUpperCase();
+        String marker = sectionMarker.toUpperCase();
+        int startIdx = upper.indexOf(marker);
+        if (startIdx < 0) {
+            return false;
+        }
+        int from = startIdx + marker.length();
+        String snippet = upper.substring(from, Math.min(from + 400, upper.length()));
+        String head = snippet.length() > 120 ? snippet.substring(0, 120) : snippet;
+        return head.contains("SEM INFORMA");
+    }
     private BigDecimal extractTotalDeducaoDependentes(String pageText) {
         Pattern p = Pattern.compile(
                 "TOTAL\\s+DE\\s+DEDU[ÇC][ÃA]O\\s+COM\\s+DEPENDENTES[\\s\\S]{0,200}?([\\d]{1,3}(?:[.]\\d{3})*,\\d{2})",
@@ -1626,8 +1665,7 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
 
         String section = pageText.substring(startIdx, endIdx);
 
-        // Verificar "Sem Informações"
-        if (section.toUpperCase().contains("SEM INFORMA")) {
+        if (secaoSemInformacoes(pageText, sectionMarker)) {
             log.debug("📋 Seção '{}' com Sem Informações", sectionMarker);
             return result;
         }
