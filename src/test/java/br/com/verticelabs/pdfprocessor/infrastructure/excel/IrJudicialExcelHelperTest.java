@@ -106,7 +106,33 @@ class IrJudicialExcelHelperTest {
     }
 
     @Test
-    void descricaoPadraoQuandoLinhaNaoVeioNaConsolidacao() {
+    void naoGeraAbaNemSomaQuandoCodigoIgualMasDescricaoDiverge() {
+        List<ConsolidationRow> homonima = List.of(
+                row("4326", "IMPOSTO DE RENDA RETIDO NA FONTE", map("2018-03", "999.00")),
+                row("4426", "IR SOBRE ABONO ANUAL", map("2018-11", "888.00")));
+        assertFalse(IrJudicialExcelHelper.deveGerarAba(homonima));
+        assertNull(IrJudicialExcelHelper.totalAno(homonima, "4326", "2018"));
+        assertNull(IrJudicialExcelHelper.totalAno(homonima, "4426", "2018"));
+    }
+
+    @Test
+    void somaSoALinhaComDescricaoDoContrachequeEIgnoraHomonima() {
+        List<ConsolidationRow> rubricas = List.of(
+                row("4326", "IMPOSTO DE RENDA RETIDO NA FONTE", map("2018-03", "999.00")),
+                row("4326", "  imposto renda acao judicial  ", map("2018-03", "150.10")),
+                row("4426", "IR SOBRE ABONO ANUAL", map("2018-11", "888.00")));
+        assertTrue(IrJudicialExcelHelper.deveGerarAba(rubricas));
+        assertEquals(new BigDecimal("150.10"),
+                IrJudicialExcelHelper.totalAno(rubricas, "4326", "2018"));
+        assertNull(IrJudicialExcelHelper.totalAno(rubricas, "4426", "2018"));
+    }
+
+    @Test
+    void descricaoNaAbaESempreADoContracheque() {
+        List<ConsolidationRow> rubricas = List.of(
+                row("4326", "imposto renda acao judicial", map("2018-01", "10.00")));
+        assertEquals("IMPOSTO RENDA ACAO JUDICIAL",
+                IrJudicialExcelHelper.descricao(rubricas, IrJudicialExcelHelper.LINHAS.get(0)));
         assertEquals("IR AB. AN. FUNCEF AC. JUDIC",
                 IrJudicialExcelHelper.descricao(List.of(), IrJudicialExcelHelper.LINHAS.get(1)));
     }
