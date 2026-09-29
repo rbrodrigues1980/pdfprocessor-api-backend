@@ -424,7 +424,7 @@ Regressão: `ExcelResumoGeralHelperDepositoJudicialTest`.
 
 # 16. Aba "IR Judicial"
 
-Gerada **depois da aba Consolidação**, somente se a consolidação tiver valor diferente de zero em **4326** (`IMPOSTO RENDA ACAO JUDICIAL`) e/ou **4426** (`IR AB. AN. FUNCEF AC. JUDIC`).
+Gerada **depois da aba Consolidação**, somente se a consolidação tiver valor diferente de zero em **4326** com a descrição **`IMPOSTO RENDA ACAO JUDICIAL`** e/ou **4426** com **`IR AB. AN. FUNCEF AC. JUDIC`**. Código e descrição precisam bater juntos (como no contracheque). Homônimas com o mesmo número e outra descrição **não entram** nesta aba nem na extração (`RubricaValidator`).
 
 Nos demonstrativos FUNCEF/CAIXA o código vem com 6 dígitos (`432604`, `442604`) e é normalizado para 4. As rubricas precisam estar **cadastradas e ativas**; senão o parser descarta a linha e a aba não aparece.
 
@@ -433,7 +433,7 @@ Nos demonstrativos FUNCEF/CAIXA o código vem com 6 dígitos (`432604`, `442604`
 | Coluna | Conteúdo |
 |--------|----------|
 | A — CÓDIGO | `4326` / `4426` (sempre as duas linhas, nessa ordem) |
-| B — DESCRIÇÃO | Descrição da consolidação ou o rótulo padrão acima |
+| B — DESCRIÇÃO | Sempre `IMPOSTO RENDA ACAO JUDICIAL` e `IR AB. AN. FUNCEF AC. JUDIC` |
 | C… — anos | Um ano por coluna, na mesma ordem das abas anuais (`anosOrdenados`) |
 
 Cada célula de ano é a **soma simples** de `YYYY-01` … `YYYY-12`. Não aplica a regra Funcef de 13º/FEV+NOV. Ano sem movimento fica **em branco** (não `0,00`).

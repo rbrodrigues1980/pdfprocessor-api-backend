@@ -147,4 +147,66 @@ class RubricaValidatorTest {
                 .expectNext(rubrica)
                 .verifyComplete();
     }
+
+    @Test
+    @DisplayName("4326: aceita IMPOSTO RENDA ACAO JUDICIAL")
+    void aceita4326ComDescricaoDoContracheque() {
+        Rubrica rubrica = Rubrica.builder()
+                .codigo("4326")
+                .descricao("IMPOSTO RENDA ACAO JUDICIAL")
+                .ativo(true)
+                .build();
+        when(rubricaRepository.findByCodigo("4326")).thenReturn(Mono.just(rubrica));
+
+        StepVerifier.create(rubricaValidator.validateRubrica(
+                        "4326", "IMPOSTO RENDA ACAO JUDICIAL"))
+                .expectNext(rubrica)
+                .verifyComplete();
+    }
+
+    @Test
+    @DisplayName("4326: rejeita homônima com o mesmo código")
+    void rejeita4326ComDescricaoDivergente() {
+        Rubrica rubrica = Rubrica.builder()
+                .codigo("4326")
+                .descricao("IMPOSTO RENDA ACAO JUDICIAL")
+                .ativo(true)
+                .build();
+        when(rubricaRepository.findByCodigo("4326")).thenReturn(Mono.just(rubrica));
+
+        StepVerifier.create(rubricaValidator.validateRubrica(
+                        "4326", "IMPOSTO DE RENDA RETIDO NA FONTE"))
+                .verifyComplete();
+    }
+
+    @Test
+    @DisplayName("4426: aceita IR AB. AN. FUNCEF AC. JUDIC")
+    void aceita4426ComDescricaoDoContracheque() {
+        Rubrica rubrica = Rubrica.builder()
+                .codigo("4426")
+                .descricao("IR AB. AN. FUNCEF AC. JUDIC")
+                .ativo(true)
+                .build();
+        when(rubricaRepository.findByCodigo("4426")).thenReturn(Mono.just(rubrica));
+
+        StepVerifier.create(rubricaValidator.validateRubrica(
+                        "4426", "ir ab. an. funcef ac. judic"))
+                .expectNext(rubrica)
+                .verifyComplete();
+    }
+
+    @Test
+    @DisplayName("4426: rejeita homônima com o mesmo código")
+    void rejeita4426ComDescricaoDivergente() {
+        Rubrica rubrica = Rubrica.builder()
+                .codigo("4426")
+                .descricao("IR AB. AN. FUNCEF AC. JUDIC")
+                .ativo(true)
+                .build();
+        when(rubricaRepository.findByCodigo("4426")).thenReturn(Mono.just(rubrica));
+
+        StepVerifier.create(rubricaValidator.validateRubrica(
+                        "4426", "IR SOBRE ABONO ANUAL"))
+                .verifyComplete();
+    }
 }

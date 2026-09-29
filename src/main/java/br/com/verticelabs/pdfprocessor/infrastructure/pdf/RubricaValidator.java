@@ -22,14 +22,16 @@ public class RubricaValidator {
     private static final Map<String, String> RUBRICAS_CODIGO_E_DESCRICAO = Map.of(
             "3396", "REP TAXA ADMINISTRATIVA BUA NOVO PLANO",
             "4432", "FUNCEF CONTR. EQUACIONAMENTO2 SALDADO",
-            "4436", "FUNCEF CONTRIB EQU SALDADO 02 GRT NATAL"
+            "4436", "FUNCEF CONTRIB EQU SALDADO 02 GRT NATAL",
+            "4326", "IMPOSTO RENDA ACAO JUDICIAL",
+            "4426", "IR AB. AN. FUNCEF AC. JUDIC"
     );
 
     private final RubricaRepository rubricaRepository;
 
     /**
      * Valida se uma rubrica existe e está ativa no banco de dados.
-     * Para 3396, 4432 e 4436, exige também que a descrição extraída bata com a esperada.
+     * Para 3396, 4432, 4436, 4326 e 4426, exige também que a descrição extraída bata com a esperada.
      * Retorna a rubrica se válida, ou Mono.empty() caso contrário.
      */
     public Mono<Rubrica> validateRubrica(String codigo, String descricaoExtraida) {
@@ -76,7 +78,7 @@ public class RubricaValidator {
         return normalizeForMatch(esperada).equals(normalizeForMatch(descricaoExtraida));
     }
 
-    static String normalizeForMatch(String descricao) {
+    public static String normalizeForMatch(String descricao) {
         if (descricao == null) {
             return "";
         }

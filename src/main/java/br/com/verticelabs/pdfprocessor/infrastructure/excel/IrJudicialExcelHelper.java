@@ -1,6 +1,7 @@
 package br.com.verticelabs.pdfprocessor.infrastructure.excel;
 
 import br.com.verticelabs.pdfprocessor.interfaces.consolidation.dto.ConsolidationRow;
+import br.com.verticelabs.pdfprocessor.infrastructure.pdf.RubricaValidator;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.Row;
@@ -14,7 +15,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Aba Excel "IR Judicial": rubricas 4326 e 4426 somadas por ano-calendário.
+ * Aba Excel "IR Judicial": só 4326/4426 com a descrição do contracheque
+ * (IMPOSTO RENDA ACAO JUDICIAL / IR AB. AN. FUNCEF AC. JUDIC).
  * Soma simples dos 12 meses — sem regra Funcef de 13º/FEV+NOV.
  */
 public final class IrJudicialExcelHelper {
@@ -42,7 +44,7 @@ public final class IrJudicialExcelHelper {
             return false;
         }
         for (Linha linha : LINHAS) {
-            ConsolidationRow row = encontrar(rubricas, linha.codigo());
+            ConsolidationRow row = encontrar(rubricas, linha);
             if (row != null && temQualquerValor(row)) {
                 return true;
             }
@@ -51,10 +53,19 @@ public final class IrJudicialExcelHelper {
     }
 
     /**
-     * Soma Jan–Dez do ano. {@code null} quando não há movimento (célula vazia no Excel).
+     * Soma Jan–Dez do ano, só se código e descrição baterem com a linha judicial.
+     * {@code null} quando não há movimento (célula vazia no Excel).
      */
     public static BigDecimal totalAno(List<ConsolidationRow> rubricas, String codigo, String ano) {
-        ConsolidationRow row = encontrar(rubricas, codigo);
+        Linha linha = linhaPorCodigo(codigo);
+        if (linha == null) {
+            return null;
+        }
+        return totalAno(rubricas, linha, ano);
+    }
+
+    public static BigDecimal totalAno(List<ConsolidationRow> rubricas, Linha linha, String ano) {
+        ConsolidationRow row = encontrar(rubricas, linha);
         if (row == null || ano == null || ano.isBlank()) {
             return null;
         }
@@ -76,10 +87,6 @@ public final class IrJudicialExcelHelper {
     }
 
     public static String descricao(List<ConsolidationRow> rubricas, Linha linha) {
-        ConsolidationRow row = encontrar(rubricas, linha.codigo());
-        if (row != null && row.getDescricao() != null && !row.getDescricao().isBlank()) {
-            return row.getDescricao().trim();
-        }
         return linha.descricaoPadrao();
     }
 
@@ -115,13 +122,13 @@ public final class IrJudicialExcelHelper {
             codigoC.setCellValue(linha.codigo());
             codigoC.setCellStyle(defaultStyle);
             Cell descC = data.createCell(1);
-            descC.setCellValue(descricao(rubricas, linha));
+            descC.setCellValue(linha.descricaoPadrao());
             descC.setCellStyle(defaultStyle);
             int anoCol = 2;
             if (anos != null) {
                 for (String ano : anos) {
                     Cell valorC = data.createCell(anoCol++);
-                    BigDecimal total = totalAno(rubricas, linha.codigo(), ano);
+                    BigDecimal total = totalAno(rubricas, linha, ano);
                     if (total != null) {
                         valorC.setCellValue(total.doubleValue());
                         valorC.setCellStyle(numberStyle);
@@ -140,16 +147,35 @@ public final class IrJudicialExcelHelper {
         sheet.createFreezePane(2, 1);
     }
 
-    static ConsolidationRow encontrar(List<ConsolidationRow> rubricas, String codigo) {
-        if (rubricas == null || codigo == null) {
+    static ConsolidationRow encontrar(List<ConsolidationRow> rubricas, Linha linha) {
+        if (rubricas == null || linha == null) {
             return null;
         }
         for (ConsolidationRow row : rubricas) {
-            if (row != null && row.getCodigo() != null && codigo.equals(row.getCodigo().trim())) {
+            if (row != null && row.getCodigo() != null
+                    && linha.codigo().equals(row.getCodigo().trim())
+                    && descricaoBate(row.getDescricao(), linha.descricaoPadrao())) {
                 return row;
             }
         }
         return null;
+    }
+
+    static Linha linhaPorCodigo(String codigo) {
+        if (codigo == null) {
+            return null;
+        }
+        for (Linha linha : LINHAS) {
+            if (linha.codigo().equals(codigo.trim())) {
+                return linha;
+            }
+        }
+        return null;
+    }
+
+    static boolean descricaoBate(String extraida, String esperada) {
+        return RubricaValidator.normalizeForMatch(esperada)
+                .equals(RubricaValidator.normalizeForMatch(extraida));
     }
 
     private static boolean temQualquerValor(ConsolidationRow row) {
