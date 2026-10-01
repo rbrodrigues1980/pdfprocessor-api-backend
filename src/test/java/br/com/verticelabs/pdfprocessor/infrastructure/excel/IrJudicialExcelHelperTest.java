@@ -137,6 +137,32 @@ class IrJudicialExcelHelperTest {
                 IrJudicialExcelHelper.descricao(List.of(), IrJudicialExcelHelper.LINHAS.get(1)));
     }
 
+    @Test
+    void linhaJudicialNaoIncluiHomonimaComMesmoCodigo() {
+        assertTrue(IrJudicialExcelHelper.ehLinhaJudicial(
+                row("4326", "IMPOSTO RENDA ACAO JUDICIAL", map("2020-01", "196.00"))));
+        assertTrue(IrJudicialExcelHelper.ehLinhaJudicial(
+                row("4426", "IR AB. AN. FUNCEF AC. JUDIC", map("2020-01", "194.90"))));
+        assertFalse(IrJudicialExcelHelper.ehLinhaJudicial(
+                row("4326", "IMPOSTO DE RENDA RETIDO NA FONTE", map("2020-01", "196.00"))));
+        assertFalse(IrJudicialExcelHelper.ehLinhaJudicial(
+                row("4362", "TAXA ADMINISTRATIVA - SALDADO", map("2020-01", "31.04"))));
+        assertFalse(IrJudicialExcelHelper.ehLinhaJudicial(null));
+    }
+
+    @Test
+    void valorMesLinhasJudiciaisIgnoraHomonimaEOutrasRubricas() {
+        List<ConsolidationRow> rubricas = List.of(
+                row("4326", "IMPOSTO RENDA ACAO JUDICIAL", map("2020-01", "196.00")),
+                row("4326", "IMPOSTO DE RENDA RETIDO NA FONTE", map("2020-01", "999.00")),
+                row("4426", "IR AB. AN. FUNCEF AC. JUDIC", map("2020-01", "194.90")),
+                row("4362", "TAXA ADMINISTRATIVA - SALDADO", map("2020-01", "31.04")));
+        assertEquals(new BigDecimal("390.90"),
+                IrJudicialExcelHelper.valorMesLinhasJudiciais(rubricas, "2020-01"));
+        assertEquals(BigDecimal.ZERO,
+                IrJudicialExcelHelper.valorMesLinhasJudiciais(rubricas, "2020-02"));
+    }
+
     private static ConsolidationRow row(String codigo, String descricao, Map<String, BigDecimal> valores) {
         return ConsolidationRow.builder()
                 .codigo(codigo)
