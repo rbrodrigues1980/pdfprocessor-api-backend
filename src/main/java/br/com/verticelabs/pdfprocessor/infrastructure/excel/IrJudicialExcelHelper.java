@@ -15,21 +15,25 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Aba Excel "IR Judicial": só 4326/4426 com a descrição do contracheque
- * (IMPOSTO RENDA ACAO JUDICIAL / IR AB. AN. FUNCEF AC. JUDIC).
- * Essas linhas não entram nas abas de ano nem na Consolidação.
+ * Aba Excel "IR Judicial": 4326/4327/4426 com a descrição do contracheque.
+ * 4327 só entra com {@code IMPOSTO DE RENDA - DEP JUDICIAL} (contracheque Caixa);
+ * a 4327 da FUNCEF ({@code IMPOSTO RENDA FONTE}) permanece nas abas de ano.
+ * Essas linhas judiciais não entram nas abas de ano nem na Consolidação.
  * Soma simples dos 12 meses — sem regra Funcef de 13º/FEV+NOV.
  */
 public final class IrJudicialExcelHelper {
 
     public static final String NOME_ABA = "IR Judicial";
     public static final String CODIGO_4326 = "4326";
+    public static final String CODIGO_4327 = "4327";
     public static final String CODIGO_4426 = "4426";
     public static final String DESCRICAO_4326 = "IMPOSTO RENDA ACAO JUDICIAL";
+    public static final String DESCRICAO_4327 = "IMPOSTO DE RENDA - DEP JUDICIAL";
     public static final String DESCRICAO_4426 = "IR AB. AN. FUNCEF AC. JUDIC";
 
     public static final List<Linha> LINHAS = List.of(
             new Linha(CODIGO_4326, DESCRICAO_4326),
+            new Linha(CODIGO_4327, DESCRICAO_4327),
             new Linha(CODIGO_4426, DESCRICAO_4426));
 
     private static final RoundingMode RM = RoundingMode.HALF_UP;
@@ -172,7 +176,7 @@ public final class IrJudicialExcelHelper {
         }
 
         sheet.setColumnWidth(0, 4000);
-        sheet.setColumnWidth(1, 14000);
+        sheet.setColumnWidth(1, 16000);
         for (int i = 2; i < colCount; i++) {
             sheet.setColumnWidth(i, 3500);
         }
