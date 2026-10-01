@@ -46,6 +46,13 @@ class IrJudicialExcelHelperTest {
     }
 
     @Test
+    void geraAbaSeSo4327TiverValor() {
+        List<ConsolidationRow> rubricas = List.of(
+                row("4327", "IMPOSTO DE RENDA - DEP JUDICIAL", map("2022-01", "677.83")));
+        assertTrue(IrJudicialExcelHelper.deveGerarAba(rubricas));
+    }
+
+    @Test
     void somaSimplesDoAnoIgnoraZerosETotaisPorAnoFuncef() {
         Map<String, BigDecimal> valores = map(
                 "2018-01", "10.00",
@@ -68,13 +75,14 @@ class IrJudicialExcelHelperTest {
     }
 
     @Test
-    void layoutExcelDuasLinhasFixasAnosNaOrdemECelulaVazia() throws IOException {
+    void layoutExcelTresLinhasFixasAnosNaOrdemECelulaVazia() throws IOException {
         List<ConsolidationRow> rubricas = List.of(
                 row("4326", "IMPOSTO RENDA ACAO JUDICIAL", map(
                         "2018-01", "100.00",
                         "2018-06", "50.74")),
+                row("4327", "IMPOSTO DE RENDA - DEP JUDICIAL", map("2022-01", "677.83")),
                 row("1090", "OUTRA", map("2017-01", "1.00")));
-        TreeSet<String> anos = new TreeSet<>(List.of("2017", "2018"));
+        TreeSet<String> anos = new TreeSet<>(List.of("2017", "2018", "2022"));
 
         try (XSSFWorkbook wb = new XSSFWorkbook()) {
             Sheet sheet = wb.createSheet(IrJudicialExcelHelper.NOME_ABA);
@@ -88,6 +96,7 @@ class IrJudicialExcelHelperTest {
             assertEquals("DESCRIÇÃO", header.getCell(1).getStringCellValue());
             assertEquals("2017", header.getCell(2).getStringCellValue());
             assertEquals("2018", header.getCell(3).getStringCellValue());
+            assertEquals("2022", header.getCell(4).getStringCellValue());
 
             Row r4326 = sheet.getRow(1);
             assertEquals("4326", r4326.getCell(0).getStringCellValue());
@@ -95,13 +104,23 @@ class IrJudicialExcelHelperTest {
             assertEquals(CellType.BLANK, r4326.getCell(2).getCellType());
             assertEquals(CellType.NUMERIC, r4326.getCell(3).getCellType());
             assertEquals(150.74, r4326.getCell(3).getNumericCellValue(), 0.001);
+            assertEquals(CellType.BLANK, r4326.getCell(4).getCellType());
 
-            Row r4426 = sheet.getRow(2);
+            Row r4327 = sheet.getRow(2);
+            assertEquals("4327", r4327.getCell(0).getStringCellValue());
+            assertEquals("IMPOSTO DE RENDA - DEP JUDICIAL", r4327.getCell(1).getStringCellValue());
+            assertEquals(CellType.BLANK, r4327.getCell(2).getCellType());
+            assertEquals(CellType.BLANK, r4327.getCell(3).getCellType());
+            assertEquals(CellType.NUMERIC, r4327.getCell(4).getCellType());
+            assertEquals(677.83, r4327.getCell(4).getNumericCellValue(), 0.001);
+
+            Row r4426 = sheet.getRow(3);
             assertEquals("4426", r4426.getCell(0).getStringCellValue());
             assertEquals("IR AB. AN. FUNCEF AC. JUDIC", r4426.getCell(1).getStringCellValue());
             assertEquals(CellType.BLANK, r4426.getCell(2).getCellType());
             assertEquals(CellType.BLANK, r4426.getCell(3).getCellType());
-            assertEquals(2, sheet.getLastRowNum());
+            assertEquals(CellType.BLANK, r4426.getCell(4).getCellType());
+            assertEquals(3, sheet.getLastRowNum());
         }
     }
 
@@ -113,6 +132,9 @@ class IrJudicialExcelHelperTest {
         assertFalse(IrJudicialExcelHelper.deveGerarAba(homonima));
         assertNull(IrJudicialExcelHelper.totalAno(homonima, "4326", "2018"));
         assertNull(IrJudicialExcelHelper.totalAno(homonima, "4426", "2018"));
+        assertNull(IrJudicialExcelHelper.totalAno(
+                List.of(row("4327", "IMPOSTO RENDA FONTE (FUNCEF)", map("2022-01", "2298.96"))),
+                "4327", "2022"));
     }
 
     @Test
@@ -133,8 +155,10 @@ class IrJudicialExcelHelperTest {
                 row("4326", "imposto renda acao judicial", map("2018-01", "10.00")));
         assertEquals("IMPOSTO RENDA ACAO JUDICIAL",
                 IrJudicialExcelHelper.descricao(rubricas, IrJudicialExcelHelper.LINHAS.get(0)));
-        assertEquals("IR AB. AN. FUNCEF AC. JUDIC",
+        assertEquals("IMPOSTO DE RENDA - DEP JUDICIAL",
                 IrJudicialExcelHelper.descricao(List.of(), IrJudicialExcelHelper.LINHAS.get(1)));
+        assertEquals("IR AB. AN. FUNCEF AC. JUDIC",
+                IrJudicialExcelHelper.descricao(List.of(), IrJudicialExcelHelper.LINHAS.get(2)));
     }
 
     @Test
@@ -143,6 +167,10 @@ class IrJudicialExcelHelperTest {
                 row("4326", "IMPOSTO RENDA ACAO JUDICIAL", map("2020-01", "196.00"))));
         assertTrue(IrJudicialExcelHelper.ehLinhaJudicial(
                 row("4426", "IR AB. AN. FUNCEF AC. JUDIC", map("2020-01", "194.90"))));
+        assertTrue(IrJudicialExcelHelper.ehLinhaJudicial(
+                row("4327", "IMPOSTO DE RENDA - DEP JUDICIAL", map("2022-01", "677.83"))));
+        assertFalse(IrJudicialExcelHelper.ehLinhaJudicial(
+                row("4327", "IMPOSTO RENDA FONTE (FUNCEF)", map("2022-01", "2298.96"))));
         assertFalse(IrJudicialExcelHelper.ehLinhaJudicial(
                 row("4326", "IMPOSTO DE RENDA RETIDO NA FONTE", map("2020-01", "196.00"))));
         assertFalse(IrJudicialExcelHelper.ehLinhaJudicial(
@@ -156,8 +184,10 @@ class IrJudicialExcelHelperTest {
                 row("4326", "IMPOSTO RENDA ACAO JUDICIAL", map("2020-01", "196.00")),
                 row("4326", "IMPOSTO DE RENDA RETIDO NA FONTE", map("2020-01", "999.00")),
                 row("4426", "IR AB. AN. FUNCEF AC. JUDIC", map("2020-01", "194.90")),
+                row("4327", "IMPOSTO DE RENDA - DEP JUDICIAL", map("2020-01", "677.83")),
+                row("4327", "IMPOSTO RENDA FONTE (FUNCEF)", map("2020-01", "2298.96")),
                 row("4362", "TAXA ADMINISTRATIVA - SALDADO", map("2020-01", "31.04")));
-        assertEquals(new BigDecimal("390.90"),
+        assertEquals(new BigDecimal("1068.73"),
                 IrJudicialExcelHelper.valorMesLinhasJudiciais(rubricas, "2020-01"));
         assertEquals(BigDecimal.ZERO,
                 IrJudicialExcelHelper.valorMesLinhasJudiciais(rubricas, "2020-02"));

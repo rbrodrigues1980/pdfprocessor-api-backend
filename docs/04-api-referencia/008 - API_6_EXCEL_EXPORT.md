@@ -10,7 +10,7 @@ O Excel contém:
 - Formatação idêntica ao modelo fornecido
 - Separação por rubricas válidas
 - Conversão automática para valores numéricos
-- Aba **IR Judicial** (4326 / 4426 somados por ano), quando houver valor — essas duas linhas **não** entram nas abas de ano nem na Consolidação
+- Aba **IR Judicial** (4326 / 4327 / 4426 somados por ano), quando houver valor — essas linhas **não** entram nas abas de ano nem na Consolidação
 
 ---
 
@@ -424,18 +424,24 @@ Regressão: `ExcelResumoGeralHelperDepositoJudicialTest`.
 
 # 16. Aba "IR Judicial"
 
-Gerada **depois da aba Consolidação**, somente se a consolidação tiver valor diferente de zero em **4326** com a descrição **`IMPOSTO RENDA ACAO JUDICIAL`** e/ou **4426** com **`IR AB. AN. FUNCEF AC. JUDIC`**. Código e descrição precisam bater juntos (como no contracheque). Homônimas com o mesmo número e outra descrição **não entram** nesta aba nem na extração (`RubricaValidator`).
+Gerada **depois da aba Consolidação**, somente se a consolidação tiver valor diferente de zero em alguma destas linhas (código **e** descrição do contracheque):
 
-Essas duas linhas **não aparecem** nas abas de ano nem na aba Consolidação; os totais mensais dessas abas também não as incluem. O destino único no Excel é esta aba.
+- **4326** — `IMPOSTO RENDA ACAO JUDICIAL`
+- **4327** — `IMPOSTO DE RENDA - DEP JUDICIAL` (contracheque **Caixa**; a 4327 da FUNCEF `IMPOSTO RENDA FONTE` **não** entra nesta aba)
+- **4426** — `IR AB. AN. FUNCEF AC. JUDIC`
 
-Nos demonstrativos FUNCEF/CAIXA o código vem com 6 dígitos (`432604`, `442604`) e é normalizado para 4. As rubricas precisam estar **cadastradas e ativas**; senão o parser descarta a linha e a aba não aparece.
+Homônimas com o mesmo número e outra descrição **não entram** nesta aba. 4326 e 4426 também são filtradas na extração (`RubricaValidator`). 4327 judicial **não** entra nesse filtro de descrição obrigatória, para não descartar a 4327 da FUNCEF nas abas de ano.
+
+Essas linhas judiciais **não aparecem** nas abas de ano nem na aba Consolidação; os totais mensais dessas abas também não as incluem. O destino único no Excel é esta aba.
+
+Nos demonstrativos FUNCEF o código vem com 6 dígitos (`432604`, `442604`) e é normalizado para 4. As rubricas precisam estar **cadastradas e ativas**; senão o parser descarta a linha e a aba não aparece.
 
 ### Layout
 
 | Coluna | Conteúdo |
 |--------|----------|
-| A — CÓDIGO | `4326` / `4426` (sempre as duas linhas, nessa ordem) |
-| B — DESCRIÇÃO | Sempre `IMPOSTO RENDA ACAO JUDICIAL` e `IR AB. AN. FUNCEF AC. JUDIC` |
+| A — CÓDIGO | `4326` / `4327` / `4426` (sempre as três linhas, nessa ordem) |
+| B — DESCRIÇÃO | Sempre `IMPOSTO RENDA ACAO JUDICIAL`, `IMPOSTO DE RENDA - DEP JUDICIAL` e `IR AB. AN. FUNCEF AC. JUDIC` |
 | C… — anos | Um ano por coluna, na mesma ordem das abas anuais (`anosOrdenados`) |
 
 Cada célula de ano é a **soma simples** de `YYYY-01` … `YYYY-12`. Não aplica a regra Funcef de 13º/FEV+NOV. Ano sem movimento fica **em branco** (não `0,00`).
