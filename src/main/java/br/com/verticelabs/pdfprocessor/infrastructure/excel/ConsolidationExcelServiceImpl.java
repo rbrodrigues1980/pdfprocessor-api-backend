@@ -657,6 +657,9 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
 
         // Filtrar valores apenas do ano atual
         for (ConsolidationRow rubrica : consolidatedResponse.getRubricas()) {
+            if (IrJudicialExcelHelper.ehLinhaJudicial(rubrica)) {
+                continue;
+            }
 
             // Verificar se a rubrica tem valores neste ano
             boolean temValorNoAno = false;
@@ -808,7 +811,9 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
         for (int mes = 1; mes <= 12; mes++) {
             String mesStr = String.format("%02d", mes);
             String referencia = ano + "-" + mesStr;
-            BigDecimal totalMes = consolidatedResponse.getTotaisMensais().getOrDefault(referencia, BigDecimal.ZERO);
+            BigDecimal totalMes = consolidatedResponse.getTotaisMensais().getOrDefault(referencia, BigDecimal.ZERO)
+                    .subtract(IrJudicialExcelHelper.valorMesLinhasJudiciais(
+                            consolidatedResponse.getRubricas(), referencia));
 
             Cell totalMesCell = totalRow.createCell(colNum++);
             totalMesCell.setCellValue(totalMes.doubleValue());
@@ -819,6 +824,9 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
         // aplicada)
         BigDecimal totalGeralAno = BigDecimal.ZERO;
         for (ConsolidationRow rubrica : consolidatedResponse.getRubricas()) {
+            if (IrJudicialExcelHelper.ehLinhaJudicial(rubrica)) {
+                continue;
+            }
             // Calcular a soma simples para este ano
             BigDecimal somaAno = BigDecimal.ZERO;
             for (int mes = 1; mes <= 12; mes++) {
@@ -893,6 +901,9 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
         int rowNum = startRow;
 
         for (ConsolidationRow rubrica : consolidatedResponse.getRubricas()) {
+            if (IrJudicialExcelHelper.ehLinhaJudicial(rubrica)) {
+                continue;
+            }
 
             // Verificar se a rubrica tem valores em algum dos anos
             boolean temValorGeral = false;
@@ -986,7 +997,9 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
             for (int mes = 1; mes <= 12; mes++) {
                 String mesStr = String.format("%02d", mes);
                 String referencia = ano + "-" + mesStr;
-                BigDecimal totalMes = consolidatedResponse.getTotaisMensais().getOrDefault(referencia, BigDecimal.ZERO);
+                BigDecimal totalMes = consolidatedResponse.getTotaisMensais().getOrDefault(referencia, BigDecimal.ZERO)
+                        .subtract(IrJudicialExcelHelper.valorMesLinhasJudiciais(
+                                consolidatedResponse.getRubricas(), referencia));
 
                 Cell totalMesCell = totalRow.createCell(colNum++);
                 totalMesCell.setCellValue(totalMes.doubleValue());
@@ -998,6 +1011,9 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
         // aplicada)
         BigDecimal totalGeralConsolidado = BigDecimal.ZERO;
         for (ConsolidationRow rubrica : consolidatedResponse.getRubricas()) {
+            if (IrJudicialExcelHelper.ehLinhaJudicial(rubrica)) {
+                continue;
+            }
             BigDecimal totalRubrica = BigDecimal.ZERO;
             for (String ano : anos) {
                 // Calcular a soma simples para este ano

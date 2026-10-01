@@ -17,6 +17,7 @@ import java.util.Map;
 /**
  * Aba Excel "IR Judicial": só 4326/4426 com a descrição do contracheque
  * (IMPOSTO RENDA ACAO JUDICIAL / IR AB. AN. FUNCEF AC. JUDIC).
+ * Essas linhas não entram nas abas de ano nem na Consolidação.
  * Soma simples dos 12 meses — sem regra Funcef de 13º/FEV+NOV.
  */
 public final class IrJudicialExcelHelper {
@@ -37,6 +38,37 @@ public final class IrJudicialExcelHelper {
     }
 
     public record Linha(String codigo, String descricaoPadrao) {
+    }
+
+    /** Código + descrição do contracheque: só estas linhas vão para a aba IR Judicial. */
+    public static boolean ehLinhaJudicial(ConsolidationRow row) {
+        if (row == null || row.getCodigo() == null) {
+            return false;
+        }
+        String codigo = row.getCodigo().trim();
+        for (Linha linha : LINHAS) {
+            if (linha.codigo().equals(codigo) && descricaoBate(row.getDescricao(), linha.descricaoPadrao())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static BigDecimal valorMesLinhasJudiciais(List<ConsolidationRow> rubricas, String referencia) {
+        if (rubricas == null || referencia == null) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal soma = BigDecimal.ZERO;
+        for (ConsolidationRow row : rubricas) {
+            if (!ehLinhaJudicial(row) || row.getValores() == null) {
+                continue;
+            }
+            BigDecimal v = row.getValores().get(referencia);
+            if (v != null) {
+                soma = soma.add(v);
+            }
+        }
+        return soma;
     }
 
     public static boolean deveGerarAba(List<ConsolidationRow> rubricas) {

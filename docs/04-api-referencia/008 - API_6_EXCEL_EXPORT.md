@@ -10,7 +10,7 @@ O Excel contém:
 - Formatação idêntica ao modelo fornecido
 - Separação por rubricas válidas
 - Conversão automática para valores numéricos
-- Aba **IR Judicial** (4326 / 4426 somados por ano), quando houver valor
+- Aba **IR Judicial** (4326 / 4426 somados por ano), quando houver valor — essas duas linhas **não** entram nas abas de ano nem na Consolidação
 
 ---
 
@@ -425,6 +425,8 @@ Regressão: `ExcelResumoGeralHelperDepositoJudicialTest`.
 # 16. Aba "IR Judicial"
 
 Gerada **depois da aba Consolidação**, somente se a consolidação tiver valor diferente de zero em **4326** com a descrição **`IMPOSTO RENDA ACAO JUDICIAL`** e/ou **4426** com **`IR AB. AN. FUNCEF AC. JUDIC`**. Código e descrição precisam bater juntos (como no contracheque). Homônimas com o mesmo número e outra descrição **não entram** nesta aba nem na extração (`RubricaValidator`).
+
+Essas duas linhas **não aparecem** nas abas de ano nem na aba Consolidação; os totais mensais dessas abas também não as incluem. O destino único no Excel é esta aba.
 
 Nos demonstrativos FUNCEF/CAIXA o código vem com 6 dígitos (`432604`, `442604`) e é normalizado para 4. As rubricas precisam estar **cadastradas e ativas**; senão o parser descarta a linha e a aba não aparece.
 
