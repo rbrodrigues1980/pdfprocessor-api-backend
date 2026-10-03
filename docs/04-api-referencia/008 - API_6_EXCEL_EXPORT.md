@@ -427,12 +427,10 @@ Regressão: `ExcelResumoGeralHelperDepositoJudicialTest`.
 Gerada **depois da aba Consolidação**, somente se a consolidação tiver valor diferente de zero em alguma destas linhas (código **e** descrição do contracheque):
 
 - **4326** — `IMPOSTO RENDA ACAO JUDICIAL`
-- **4327** — `IMPOSTO DE RENDA - DEP JUDICIAL` (contracheque **Caixa**; a 4327 da FUNCEF `IMPOSTO RENDA FONTE` **não** entra nesta aba)
+- **4327** — `IMPOSTO DE RENDA - DEP JUDICIAL`
 - **4426** — `IR AB. AN. FUNCEF AC. JUDIC`
 
-Homônimas com o mesmo número e outra descrição **não entram** nesta aba. 4326 e 4426 também são filtradas na extração (`RubricaValidator`). 4327 judicial **não** entra nesse filtro de descrição obrigatória, para não descartar a 4327 da FUNCEF nas abas de ano.
-
-Essas linhas judiciais **não aparecem** nas abas de ano nem na aba Consolidação; os totais mensais dessas abas também não as incluem. O destino único no Excel é esta aba.
+Homônimas com o mesmo número e outra descrição **não entram** nesta aba nem na extração (`RubricaValidator`). Essas três linhas **não aparecem** nas abas de ano nem na aba Consolidação; os totais mensais dessas abas também não as incluem. O destino único no Excel é esta aba.
 
 Nos demonstrativos FUNCEF o código vem com 6 dígitos (`432604`, `442604`) e é normalizado para 4. As rubricas precisam estar **cadastradas e ativas**; senão o parser descarta a linha e a aba não aparece.
 

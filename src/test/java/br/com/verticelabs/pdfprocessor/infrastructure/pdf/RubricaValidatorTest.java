@@ -209,4 +209,35 @@ class RubricaValidatorTest {
                         "4426", "IR SOBRE ABONO ANUAL"))
                 .verifyComplete();
     }
+
+    @Test
+    @DisplayName("4327: aceita IMPOSTO DE RENDA - DEP JUDICIAL")
+    void aceita4327ComDescricaoDoContracheque() {
+        Rubrica rubrica = Rubrica.builder()
+                .codigo("4327")
+                .descricao("IMPOSTO DE RENDA - DEP JUDICIAL")
+                .ativo(true)
+                .build();
+        when(rubricaRepository.findByCodigo("4327")).thenReturn(Mono.just(rubrica));
+
+        StepVerifier.create(rubricaValidator.validateRubrica(
+                        "4327", "IMPOSTO DE RENDA - DEP JUDICIAL"))
+                .expectNext(rubrica)
+                .verifyComplete();
+    }
+
+    @Test
+    @DisplayName("4327: rejeita homônima com o mesmo código")
+    void rejeita4327ComDescricaoDivergente() {
+        Rubrica rubrica = Rubrica.builder()
+                .codigo("4327")
+                .descricao("IMPOSTO DE RENDA - DEP JUDICIAL")
+                .ativo(true)
+                .build();
+        when(rubricaRepository.findByCodigo("4327")).thenReturn(Mono.just(rubrica));
+
+        StepVerifier.create(rubricaValidator.validateRubrica(
+                        "4327", "IMPOSTO DE RENDA"))
+                .verifyComplete();
+    }
 }

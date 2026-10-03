@@ -19,19 +19,20 @@ public class RubricaValidator {
      * Rubricas em que código e descrição extraídos precisam bater juntos.
      * Se o código existir mas a descrição divergir, o valor não é considerado.
      */
-    private static final Map<String, String> RUBRICAS_CODIGO_E_DESCRICAO = Map.of(
-            "3396", "REP TAXA ADMINISTRATIVA BUA NOVO PLANO",
-            "4432", "FUNCEF CONTR. EQUACIONAMENTO2 SALDADO",
-            "4436", "FUNCEF CONTRIB EQU SALDADO 02 GRT NATAL",
-            "4326", "IMPOSTO RENDA ACAO JUDICIAL",
-            "4426", "IR AB. AN. FUNCEF AC. JUDIC"
+    private static final Map<String, String> RUBRICAS_CODIGO_E_DESCRICAO = Map.ofEntries(
+            Map.entry("3396", "REP TAXA ADMINISTRATIVA BUA NOVO PLANO"),
+            Map.entry("4432", "FUNCEF CONTR. EQUACIONAMENTO2 SALDADO"),
+            Map.entry("4436", "FUNCEF CONTRIB EQU SALDADO 02 GRT NATAL"),
+            Map.entry("4326", "IMPOSTO RENDA ACAO JUDICIAL"),
+            Map.entry("4327", "IMPOSTO DE RENDA - DEP JUDICIAL"),
+            Map.entry("4426", "IR AB. AN. FUNCEF AC. JUDIC")
     );
 
     private final RubricaRepository rubricaRepository;
 
     /**
      * Valida se uma rubrica existe e está ativa no banco de dados.
-     * Para 3396, 4432, 4436, 4326 e 4426, exige também que a descrição extraída bata com a esperada.
+     * Para 3396, 4432, 4436, 4326, 4327 e 4426, exige também que a descrição extraída bata com a esperada.
      * Retorna a rubrica se válida, ou Mono.empty() caso contrário.
      */
     public Mono<Rubrica> validateRubrica(String codigo, String descricaoExtraida) {
