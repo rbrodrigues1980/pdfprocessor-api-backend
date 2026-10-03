@@ -132,9 +132,6 @@ class IrJudicialExcelHelperTest {
         assertFalse(IrJudicialExcelHelper.deveGerarAba(homonima));
         assertNull(IrJudicialExcelHelper.totalAno(homonima, "4326", "2018"));
         assertNull(IrJudicialExcelHelper.totalAno(homonima, "4426", "2018"));
-        assertNull(IrJudicialExcelHelper.totalAno(
-                List.of(row("4327", "IMPOSTO RENDA FONTE (FUNCEF)", map("2022-01", "2298.96"))),
-                "4327", "2022"));
     }
 
     @Test
@@ -169,8 +166,10 @@ class IrJudicialExcelHelperTest {
                 row("4426", "IR AB. AN. FUNCEF AC. JUDIC", map("2020-01", "194.90"))));
         assertTrue(IrJudicialExcelHelper.ehLinhaJudicial(
                 row("4327", "IMPOSTO DE RENDA - DEP JUDICIAL", map("2022-01", "677.83"))));
-        assertFalse(IrJudicialExcelHelper.ehLinhaJudicial(
-                row("4327", "IMPOSTO RENDA FONTE (FUNCEF)", map("2022-01", "2298.96"))));
+        assertTrue(IrJudicialExcelHelper.ehLinhaJudicial(
+                row("4327", "IMPOSTO DE RENDA DEP JUDICIAL", map("2022-01", "677.83"))));
+        assertEquals("4327|IR_JUDICIAL",
+                IrJudicialExcelHelper.chaveConsolidacao("4327", "IMPOSTO DE RENDA - DEP JUDICIAL"));
         assertFalse(IrJudicialExcelHelper.ehLinhaJudicial(
                 row("4326", "IMPOSTO DE RENDA RETIDO NA FONTE", map("2020-01", "196.00"))));
         assertFalse(IrJudicialExcelHelper.ehLinhaJudicial(
@@ -185,7 +184,6 @@ class IrJudicialExcelHelperTest {
                 row("4326", "IMPOSTO DE RENDA RETIDO NA FONTE", map("2020-01", "999.00")),
                 row("4426", "IR AB. AN. FUNCEF AC. JUDIC", map("2020-01", "194.90")),
                 row("4327", "IMPOSTO DE RENDA - DEP JUDICIAL", map("2020-01", "677.83")),
-                row("4327", "IMPOSTO RENDA FONTE (FUNCEF)", map("2020-01", "2298.96")),
                 row("4362", "TAXA ADMINISTRATIVA - SALDADO", map("2020-01", "31.04")));
         assertEquals(new BigDecimal("1068.73"),
                 IrJudicialExcelHelper.valorMesLinhasJudiciais(rubricas, "2020-01"));

@@ -9,6 +9,7 @@ import org.apache.poi.ss.usermodel.Sheet;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.text.Normalizer;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -16,9 +17,7 @@ import java.util.Map;
 
 /**
  * Aba Excel "IR Judicial": 4326/4327/4426 com a descrição do contracheque.
- * 4327 só entra com {@code IMPOSTO DE RENDA - DEP JUDICIAL} (contracheque Caixa);
- * a 4327 da FUNCEF ({@code IMPOSTO RENDA FONTE}) permanece nas abas de ano.
- * Essas linhas judiciais não entram nas abas de ano nem na Consolidação.
+ * Essas linhas não entram nas abas de ano nem na Consolidação.
  * Soma simples dos 12 meses — sem regra Funcef de 13º/FEV+NOV.
  */
 public final class IrJudicialExcelHelper {
@@ -46,16 +45,34 @@ public final class IrJudicialExcelHelper {
 
     /** Código + descrição do contracheque: só estas linhas vão para a aba IR Judicial. */
     public static boolean ehLinhaJudicial(ConsolidationRow row) {
-        if (row == null || row.getCodigo() == null) {
+        if (row == null) {
             return false;
         }
-        String codigo = row.getCodigo().trim();
+        return ehLinhaJudicial(row.getCodigo(), row.getDescricao());
+    }
+
+    public static boolean ehLinhaJudicial(String codigo, String descricao) {
+        if (codigo == null) {
+            return false;
+        }
+        String codigoNormalizado = codigo.trim();
+        if (CODIGO_4327.equals(codigoNormalizado)) {
+            return true;
+        }
         for (Linha linha : LINHAS) {
-            if (linha.codigo().equals(codigo) && descricaoBate(row.getDescricao(), linha.descricaoPadrao())) {
+            if (linha.codigo().equals(codigoNormalizado) && descricaoBate(descricao, linha.descricaoPadrao())) {
                 return true;
             }
         }
         return false;
+    }
+
+    public static String chaveConsolidacao(String codigo, String descricao) {
+        String c = codigo == null ? "" : codigo.trim();
+        if (ehLinhaJudicial(c, descricao)) {
+            return c + "|IR_JUDICIAL";
+        }
+        return c;
     }
 
     public static BigDecimal valorMesLinhasJudiciais(List<ConsolidationRow> rubricas, String referencia) {
@@ -210,8 +227,14 @@ public final class IrJudicialExcelHelper {
     }
 
     static boolean descricaoBate(String extraida, String esperada) {
-        return RubricaValidator.normalizeForMatch(esperada)
-                .equals(RubricaValidator.normalizeForMatch(extraida));
+        return normalizeDescricao(esperada).equals(normalizeDescricao(extraida));
+    }
+
+    static String normalizeDescricao(String descricao) {
+        String n = RubricaValidator.normalizeForMatch(descricao);
+        n = Normalizer.normalize(n, Normalizer.Form.NFD).replaceAll("\\p{M}+", "");
+        n = n.replace('-', ' ').replace('\u2013', ' ').replace('\u2014', ' ').replace('.', ' ');
+        return n.replaceAll("\\s+", " ").trim();
     }
 
     private static boolean temQualquerValor(ConsolidationRow row) {

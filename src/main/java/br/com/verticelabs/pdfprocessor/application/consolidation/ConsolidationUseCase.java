@@ -9,6 +9,7 @@ import br.com.verticelabs.pdfprocessor.domain.model.Person;
 import br.com.verticelabs.pdfprocessor.domain.model.Rubrica;
 import br.com.verticelabs.pdfprocessor.domain.repository.PayrollDocumentRepository;
 import br.com.verticelabs.pdfprocessor.domain.repository.PersonRepository;
+import br.com.verticelabs.pdfprocessor.infrastructure.excel.IrJudicialExcelHelper;
 import br.com.verticelabs.pdfprocessor.infrastructure.security.ReactiveSecurityContextHelper;
 import br.com.verticelabs.pdfprocessor.interfaces.consolidation.dto.ConsolidatedResponse;
 import br.com.verticelabs.pdfprocessor.interfaces.consolidation.dto.ConsolidationRow;
@@ -432,7 +433,8 @@ public class ConsolidationUseCase {
         log.debug("Agrupando entries por rubrica");
         Map<String, List<PayrollEntry>> entriesByRubrica = entries.stream()
                 .filter(entryToAdjustedRef::containsKey)
-                .collect(Collectors.groupingBy(PayrollEntry::getRubricaCodigo));
+                .collect(Collectors.groupingBy(entry -> IrJudicialExcelHelper.chaveConsolidacao(
+                        entry.getRubricaCodigo(), entry.getRubricaDescricao())));
 
         log.info("Total de rubricas únicas para consolidar: {}", entriesByRubrica.size());
         log.debug("Códigos das rubricas: {}", entriesByRubrica.keySet());
@@ -442,8 +444,10 @@ public class ConsolidationUseCase {
         List<ConsolidationRow> rubricas = new ArrayList<>();
 
         for (Map.Entry<String, List<PayrollEntry>> rubricaEntry : entriesByRubrica.entrySet()) {
-            String codigo = rubricaEntry.getKey();
             List<PayrollEntry> rubricaEntries = rubricaEntry.getValue();
+            String codigo = rubricaEntries.isEmpty() || rubricaEntries.get(0).getRubricaCodigo() == null
+                    ? rubricaEntry.getKey()
+                    : rubricaEntries.get(0).getRubricaCodigo();
 
             log.debug("Processando rubrica {} - {} entries", codigo, rubricaEntries.size());
 

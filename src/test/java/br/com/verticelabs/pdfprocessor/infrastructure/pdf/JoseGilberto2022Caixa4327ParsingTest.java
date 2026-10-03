@@ -11,7 +11,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Contracheque Caixa APCEF BA 2022 (José Gilberto): 4327 IMPOSTO DE RENDA - DEP JUDICIAL.
- * Não confundir com a 4327 da FUNCEF (IMPOSTO RENDA FONTE).
  */
 @DisplayName("Caixa 4327 DEP JUDICIAL José Gilberto 2022")
 class JoseGilberto2022Caixa4327ParsingTest {
