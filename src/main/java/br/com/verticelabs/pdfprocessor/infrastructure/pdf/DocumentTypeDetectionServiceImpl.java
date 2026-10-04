@@ -41,8 +41,10 @@ public class DocumentTypeDetectionServiceImpl implements DocumentTypeDetectionSe
                                upperText.contains("CAIXA ECONOMICA FEDERAL");
         
         // 3. Campo "Mês/Ano de Pagamento" (específico da CAIXA)
-        boolean hasCaixaDateField = upperText.contains("MÊS/ANO DE PAGAMENTO") ||
-                                    upperText.contains("MES/ANO DE PAGAMENTO");
+        boolean hasCaixaDateField = CAIXA_MES_ANO_PAGAMENTO.matcher(upperText).find();
+
+        // 3b. Coluna "Discriminação da Rubrica" (Demonstrativo de Pagamento do ativo)
+        boolean hasCaixaColunaRubrica = CAIXA_COLUNA_RUBRICA.matcher(upperText).find();
         
         // 4. Campo "Agência" seguido de número (ex: "Agência 2789")
         boolean hasCaixaAgencia = (upperText.contains("AGÊNCIA") || upperText.contains("AGENCIA")) &&
@@ -58,6 +60,7 @@ public class DocumentTypeDetectionServiceImpl implements DocumentTypeDetectionSe
         boolean hasCaixa = (hasCaixaTitle ? 1 : 0) +
                           (hasCaixaLogo ? 1 : 0) +
                           (hasCaixaDateField ? 1 : 0) +
+                          (hasCaixaColunaRubrica ? 1 : 0) +
                           (hasCaixaAgencia ? 1 : 0) +
                           (hasCaixaSigla ? 1 : 0) +
                           (hasCaixaOperacao ? 1 : 0) >= 2;
@@ -246,7 +249,40 @@ public class DocumentTypeDetectionServiceImpl implements DocumentTypeDetectionSe
         return hasTitle && hasSabesp && (hasPeriodoMatric || upperText.contains("SABESPREV"));
     }
 
+    /**
+     * Página com marcadores de algum contracheque/demonstrativo suportado.
+     * Página legível sem rubricas e sem esses marcadores (ex.: conta de energia anexada ao PDF)
+     * não deve acionar Gemini.
+     */
+    public static boolean looksLikePayslipPage(String pageText) {
+        if (pageText == null || pageText.isBlank()) {
+            return false;
+        }
+        String upper = pageText.toUpperCase();
+        return upper.contains("DEMONSTRATIVO DE PAGAMENT")
+                || upper.contains("DEMONSTRATIVO DE PROVENTOS")
+                || upper.contains("TIPO / RUBRICA")
+                || CAIXA_COLUNA_RUBRICA.matcher(upper).find()
+                || CAIXA_MES_ANO_PAGAMENTO.matcher(upper).find()
+                || containsMesAnoReferencia(upper)
+                || upper.contains("ANO PAGAMENTO / M")
+                || upper.contains("CONTRACHEQUE")
+                || upper.contains("FUNCEF")
+                || upper.contains("ECONOMIARIOS FEDERAIS")
+                || upper.contains("ECONOMIÁRIOS FEDERAIS")
+                || upper.contains("SABESP")
+                || upper.contains("FICHA FINANCEIRA")
+                || upper.contains("COMPROVANTE DE RENDIMENTOS")
+                || FUNCEF_RUBRICA_LINE.matcher(pageText).find();
+    }
+
     private static final java.util.regex.Pattern FUNCEF_RUBRICA_LINE = java.util.regex.Pattern.compile(
             "(?m)^\\d\\s+\\d{3}\\s+\\d{4}/\\d{1,2}\\b");
+
+    private static final java.util.regex.Pattern CAIXA_MES_ANO_PAGAMENTO = java.util.regex.Pattern.compile(
+            "M[ÊE]S\\s*/\\s*ANO\\s+DE\\s+PAGAMENTO");
+
+    private static final java.util.regex.Pattern CAIXA_COLUNA_RUBRICA = java.util.regex.Pattern.compile(
+            "DISCRIMINA[ÇC][ÃA]O\\s+DA\\s+RUBRICA");
 }
 

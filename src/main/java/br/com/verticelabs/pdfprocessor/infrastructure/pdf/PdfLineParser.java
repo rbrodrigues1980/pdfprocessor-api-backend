@@ -68,7 +68,7 @@ public class PdfLineParser {
     // "4412 FUNCEF CONTR. EQUACIONAMENTO1 SALDADO 11/2016 001 115,37"
     // "2002 SALARIO PADRAO 5.825,00" (sem competência)
     private static final Pattern CAIXA_PATTERN_LINHA_UNICA = Pattern.compile(
-            "^([0-9]\\s*[0-9]\\s*[0-9]\\s*[0-9]?)\\s+" + // Grupo 1: Código (3-4 dígitos, pode ter espaços) -
+            "^([0-9]\\s*[0-9]\\s*[0-9]\\s*[0-9]?[0-9]?)\\s+" + // Grupo 1: Código (3-5 dígitos, pode ter espaços) -
                                                          // OBRIGATÓRIO
                     "(?:(.+?)\\s+(?=([0-9]{1,2}/[0-9]{4}|[A-Z]?[0-9]{1,3}(?:\\.[0-9]{3})*[,\\.][0-9]{2})))?" + // Grupo
                                                                                                                // 2:
@@ -92,7 +92,7 @@ public class PdfLineParser {
     // "4346 FUNCEF - NOVO PLANO - 01/2020 999 T48,62"
     // "4412 FUNCEF CONTR. EQUACIONAMENTO1 SALDADO 01/2020 001 102,61"
     private static final Pattern CAIXA_PATTERN_DATA_SEPARADA = Pattern.compile(
-            "^([0-9]\\s*[0-9]\\s*[0-9]\\s*[0-9]?)\\s+" + // Grupo 1: Código (3-4 dígitos) - OBRIGATÓRIO
+            "^([0-9]\\s*[0-9]\\s*[0-9]\\s*[0-9]?[0-9]?)\\s+" + // Grupo 1: Código (3-5 dígitos) - OBRIGATÓRIO
                     "(?:(.+?)\\s+(?=([0-9]{1,2}/[0-9]{4}|[A-Z]?[0-9]{1,3}(?:\\.[0-9]{3})*[,\\.][0-9]{2})))?" + // Grupo
                                                                                                                // 2:
                                                                                                                // Descrição
@@ -106,7 +106,7 @@ public class PdfLineParser {
     // e valor
     // PRIORIDADE: Código + Valor são obrigatórios
     private static final Pattern CAIXA_PATTERN_SIMPLES = Pattern.compile(
-            "^([0-9]{3,4})\\s+" + // Grupo 1: Código (3-4 dígitos, sem espaços) - OBRIGATÓRIO
+            "^([0-9]{3,5})\\s+" + // Grupo 1: Código (3-5 dígitos, sem espaços) - OBRIGATÓRIO
                     "(?:(.+?)\\s+(?=([0-9]{1,2}/[0-9]{4}|[A-Z]?[0-9]{1,3}(?:\\.[0-9]{3})*[,\\.][0-9]{2})))?" + // Grupo
                                                                                                                // 2:
                                                                                                                // Descrição
@@ -118,12 +118,19 @@ public class PdfLineParser {
 
     // Formato nativo com data colada: código descrição [prazo] valor+data
     private static final Pattern CAIXA_PATTERN_NATIVE = Pattern.compile(
-            "^([0-9]\\s*[0-9]\\s*[0-9]\\s*[0-9]?)\\s+" + // Grupo 1: Código
+            "^([0-9]\\s*[0-9]\\s*[0-9]\\s*[0-9]?[0-9]?)\\s+" + // Grupo 1: Código
                     "(?:(.+?)\\s+)?" + // Grupo 2: Descrição (opcional)
                     "(?:([0-9]{3})\\s+)?" + // Grupo 3: Prazo (opcional)
                     "([0-9]{1,3}(?:\\.[0-9]{3})*[,\\.][0-9]{2})([0-9]{2}/[0-9]{4})\\s*$", // Grupo 4: Valor, Grupo 5:
                                                                                           // Data colada
             Pattern.MULTILINE);
+
+    /**
+     * Demonstrativo de Pagamento CAIXA (ativo) traz {@code R$} antes do valor:
+     * {@code 1034 AC APIP/IP - CONVERSAO 01/2016 001 R$ 496,83}.
+     */
+    private static final Pattern CAIXA_RS_ANTES_VALOR = Pattern.compile(
+            "\\s+R\\$\\s*(?=[0-9]{1,3}(?:\\.[0-9]{3})*,[0-9]{2}\\s*$)");
 
     // Padrão ULTRA FLEXÍVEL: código + valor (obrigatórios), descrição e competência
     // opcionais
@@ -134,7 +141,7 @@ public class PdfLineParser {
     // "2002 SALARIO PADRAO 5.825,00" (sem competência)
     // "4412 115,37" (apenas código e valor)
     private static final Pattern CAIXA_PATTERN_FLEXIVEL = Pattern.compile(
-            "^([0-9]\\s*[0-9]\\s*[0-9]\\s*[0-9]?)\\s+" + // Grupo 1: Código (3-4 dígitos) - OBRIGATÓRIO
+            "^([0-9]\\s*[0-9]\\s*[0-9]\\s*[0-9]?[0-9]?)\\s+" + // Grupo 1: Código (3-5 dígitos) - OBRIGATÓRIO
                     "(?:(.+?)\\s+(?=([0-9]{1,2}/[0-9]{4}|[0-9]{3}\\s+[A-Z]?[0-9]{1,3}(?:\\.[0-9]{3})*[,\\.][0-9]{2}|[A-Z]?[0-9]{1,3}(?:\\.[0-9]{3})*[,\\.][0-9]{2})))?"
                     + // Grupo 2: Descrição (opcional)
                     "(?:([0-9]{1,2}/[0-9]{4})\\s+)?" + // Grupo 3: Competência (opcional: M/YYYY ou MM/YYYY)
@@ -233,6 +240,13 @@ public class PdfLineParser {
             "^(?i)(RENDA\\s+BASE|BRUTO|DESCONTOS|L[IÍ]QUIDO|MARGEM\\s+CONSIGN[AÁ]VEL|"
                     + "IR\\s+COMPENSADO|IR\\s+INFORMATIVO|EXCESSO\\s+DE\\s+D[EÉ]BITO|BASE\\s+DEFICIT|"
                     + "OBSERVA[CÇ][AÃ]O|DOCUMENTO\\s+EMITIDO|TIPO\\s*/\\s*RUBRICA).*");
+
+    /**
+     * Rodapé do portal colado ao último valor da página.
+     * Ex.: {@code 4 335 2025/11 CAIXA - CONSIGNACOES 111 R$ 500,00Documento emitido pelo portal...}
+     */
+    private static final Pattern FUNCEF_GLUED_FOOTER = Pattern.compile(
+            "(?i)(?<=\\d,\\d{2})\\s*(?=Documento\\s+emitido)");
 
     /**
      * SABESP — layout {@code CONTA DESCRIÇÃO … valor} (último valor monetário da linha).
@@ -384,6 +398,9 @@ public class PdfLineParser {
             if (documentType == DocumentType.FUNCEF && FUNCEF_TOTAL_LABEL.matcher(line).matches()) {
                 log.debug("Ignorando linha de total/rodapé Funcef: [{}]", line);
                 continue;
+            }
+            if (documentType == DocumentType.CAIXA || documentType == DocumentType.CAIXA_FUNCEF) {
+                line = CAIXA_RS_ANTES_VALOR.matcher(line).replaceFirst(" ");
             }
 
             // Tentar cada padrão até encontrar um match
@@ -646,7 +663,15 @@ public class PdfLineParser {
         List<String> joined = new ArrayList<>();
         StringBuilder pending = null;
 
+        List<String> splitLines = new ArrayList<>(rawLines.length);
         for (String raw : rawLines) {
+            if (raw == null) {
+                continue;
+            }
+            splitLines.addAll(List.of(FUNCEF_GLUED_FOOTER.split(raw)));
+        }
+
+        for (String raw : splitLines) {
             String line = raw == null ? "" : raw.trim();
             if (line.isEmpty()) {
                 continue;
