@@ -60,6 +60,14 @@ Detectar se contém *qualquer* dos termos:
 (?i)(contracheque|caixa econômica|mês de referência)
 ```
 
+Na implementação (`DocumentTypeDetectionServiceImpl`) a página é CAIXA com **2 ou mais** sinais: título `DEMONSTRATIVO DE PAGAMENTO`, `CAIXA ECONÔMICA FEDERAL`, `Mês/Ano de Pagamento` (regex `M[ÊE]S\s*/\s*ANO\s+DE\s+PAGAMENTO`, aceita `Mês / Ano`), coluna `Discriminação da Rubrica`, `Agência NNNN`, `Sigla GIREC`, `Operação`.
+
+O Demonstrativo de Pagamento do ativo (ex.: Mauro, APCEF BA) só tem título + `Mês / Ano de Pagamento` + `Discriminação da Rubrica`. Sem esses dois últimos sinais, páginas com a rubrica `4346 FUNCEF - NOVO PLANO` caíam na regra genérica e eram classificadas como FUNCEF (0 rubricas).
+
+### Páginas que não são contracheque
+
+`DocumentTypeDetectionServiceImpl.looksLikePayslipPage` verifica marcadores conhecidos (demonstrativos CAIXA/FUNCEF/SABESP, `Tipo / Rubrica`, `Mês/Ano Referência`, `FUNCEF`, `CONTRACHEQUE`...). Em `DocumentProcessUseCase`, página **legível** com 0 rubricas e sem esses marcadores (ex.: conta de energia anexada ao PDF) **não aciona o Gemini**. Página ilegível/escaneada continua indo para o Gemini.
+
 ---
 
 ## 3.2 Regras para Funcef
@@ -146,6 +154,15 @@ Detectar se contém:
 | 3 | 2017/08 | Referência |
 | 4 | 885,47 | Valor |
 
+### Variante Demonstrativo de Pagamento (ativo) com `R$`
+
+Linha: `1034 AC  APIP/IP - CONVERSAO 01/2016 001 R$ 496,83` (código, descrição, competência, prazo, `R$` valor).
+
+- Para CAIXA/CAIXA_FUNCEF, `PdfLineParser` remove o `R$` que precede o valor final (`CAIXA_RS_ANTES_VALOR`) antes dos padrões; assim a descrição não absorve competência/prazo e a competência por linha é capturada. O `mesPagamento` continua vindo do cabeçalho (`JANEIRO / 2016`).
+- Código de **3 a 5 dígitos** nos padrões CAIXA (`12004`, `21100`, `43345`, `43355`...). O código é mantido como está e só entra se estiver cadastrado (`RubricaValidator`).
+
+Regressão: `CaixaDemonstrativoMauroParsingTest` (fixtures) e `CaixaDemonstrativoMauroPdfValidationTest` (PDFs reais em `temp/`, skip se ausentes).
+
 ---
 
 # 5.2 Regex FUNCEF — COMPLETA
@@ -192,6 +209,20 @@ Layout do **portal de autoatendimento** Funcef (PDF digital agrupado, várias co
 
 Classes: `DocumentTypeDetectionServiceImpl`, `MonthYearDetectionServiceImpl`, `PdfLineParser`, `DocumentUploadUseCase` / `DocumentProcessUseCase`.  
 Regressão: `FuncefPortalAgrupadoParsingTest`.
+
+### Variante APCEF BA (Rita de Cassia, 2016–2025)
+
+Mesmo layout, sem novo tipo. Particularidades cobertas:
+
+| Caso | Exemplo | Tratamento |
+|------|---------|------------|
+| Prazo antes do `R$` | `4 335 2016/01 CAIXA - CONSIGNACOES 103 R$ 367,98` | Grupo opcional de prazo (1–3 dígitos) do `FUNCEF_PATTERN`; não entra na descrição |
+| Descrição em 3 linhas com prazo na última | `4 432 ... FIXO -` / `FGQC` / `57 R$ 2,03` | `joinBrokenFuncefLines` |
+| Linhas tipo `1` (acerto) e `3` (reposição) | `1 317 2025/13 AC. CONT...`, `3 130 2025/13 REP. ...` | Código vira `1317` / `3130`; referência da linha preservada (`2025/13`) |
+| Rodapé colado ao último valor | `... 111 R$ 500,00Documento emitido pelo portal...` | `FUNCEF_GLUED_FOOTER` quebra a linha antes de `Documento emitido` |
+
+Só entram rubricas cadastradas (`RubricaValidator`); homônimos como 4432/4436 de empréstimo seguem rejeitados pela descrição.  
+Regressão: `FuncefPortalRitaParsingTest` (fixtures) e `FuncefPortalRitaPdfValidationTest` (PDFs reais em `temp/`, skip se ausentes).
 
 Plano: **Funcef portal agrupado**. Catálogo: [008 - PLANOS_EXECUTADOS…](../10-planejamento/008%20-%20PLANOS_EXECUTADOS_PDFPROCESSOR.md).
 

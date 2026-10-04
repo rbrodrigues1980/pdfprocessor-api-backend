@@ -108,6 +108,26 @@ public class DocumentProcessUseCaseTest {
     }
 
     @Test
+    public void testSkipsGeminiWhenPageIsNotPayslip() {
+        String pageText = "DANFE - DOCUMENTO AUXILIAR DA NOTA FISCAL DE ENERGIA ELÉTRICA ELETRÔNICA\n"
+                + "COMPANHIA DE ELETRICIDADE DO ESTADO DA BAHIA\n"
+                + "Consumo-TUSD kWh 100,00 0,74841431 74,84\n"
+                + "NOME DO CLIENTE: MAURO ANTONIO COSTA DE MENDONCA";
+        when(pdfService.extractTextFromPage(any(InputStream.class), eq(1)))
+                .thenReturn(Mono.just(pageText));
+        when(monthYearDetectionService.detectMonthYear(anyString()))
+                .thenReturn(Mono.just(Optional.empty()));
+        when(lineParser.parseLinesFuncef(anyString(), any()))
+                .thenReturn(Collections.emptyList());
+
+        DocumentProcessUseCase.PageResult result = useCase.processPageWithMetadata(document, pdfBytes, 1, 1).block();
+
+        verify(aiPdfExtractionService, never()).extractPayrollData(any(byte[].class), anyInt());
+        Assertions.assertNotNull(result);
+        Assertions.assertTrue(result.getEntries().isEmpty());
+    }
+
+    @Test
     public void testFallbackWhenValidationFails() {
         // Arrange: mock PDF text has values but validation score will be < 0.85
         String pageText = "DEMONSTRATIVO DE PROVENTOS\nCPF: 123.456.789-01\nBruto: R$ 5.000,00\nDescontos: R$ 1.000,00\nLíquido: R$ 4.000,00";

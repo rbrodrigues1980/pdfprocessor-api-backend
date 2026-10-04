@@ -789,6 +789,13 @@ public class DocumentProcessUseCase {
                             .flatMap(parserResult -> {
                                 // Se o parser regex não encontrou nenhuma rubrica, acionar fallback
                                 if (parserResult.getEntries().isEmpty()) {
+                                    if (!DocumentTypeDetectionServiceImpl.looksLikePayslipPage(pageText)) {
+                                        log.info("Página {}: texto legível sem marcadores de contracheque — pulando Gemini", pageNumber);
+                                        addInfoEvent(document, pageNumber, ProcessingEventType.TEXT_EXTRACTED,
+                                                String.format("Página %d não parece contracheque (sem rubricas nem cabeçalho conhecido) — Gemini não necessário.", pageNumber),
+                                                Map.of("entriesCount", 0, "skippedGemini", true));
+                                        return Mono.just(parserResult);
+                                    }
                                     if (aiPdfExtractionService.isEnabled()) {
                                         log.warn("\u26A0\uFE0F Parser regex extraiu 0 rubricas na página {}. Acionando fallback para Gemini AI...", pageNumber);
                                         addWarnEvent(document, pageNumber, ProcessingEventType.TEXT_UNREADABLE,
