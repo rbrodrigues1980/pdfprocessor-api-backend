@@ -43,7 +43,7 @@ public class ExcelIrpfSimulacaoMapper {
                 .anoCalendario(anoCalendario)
                 .tipoIncidencia("ANUAL")
                 .rendimentosTributaveis(nvl(data.getRendimentosTributaveisTotal()))
-                .previdenciaOficial(IrpfPrevidenciaOficialResolver.resolver(data))
+                .previdenciaOficial(previdenciaOficialSimulacao(data))
                 .qtdDependentes(qtdDependentes)
                 .qtdAlimentandos(qtdAlimentandos)
                 // Zero/null: motor calcula qtd × valorDependente (Ilka 2017 RESUMO capturava 0,00)
@@ -74,6 +74,12 @@ public class ExcelIrpfSimulacaoMapper {
         List<IrpfDeclaracaoData.PagamentoEfetuadoIrpf> pagamentos = data.getPagamentosEfetuados();
         DeducoesPagamentosDTO agg = pagamentosAggregator.aggregate(pagamentos, data);
 
+        BigDecimal previdenciaPrivada = data.getAjusteSimulacaoPrevComplementar() != null
+                ? data.getAjusteSimulacaoPrevComplementar()
+                : null;
+        if (previdenciaPrivada != null) {
+            builder.previdenciaPrivadaSemTeto(true);
+        }
         if (agg.isFonteGranular()) {
             builder
                     .despesasMedicas(nvl(agg.getDespesasMedicas()))
@@ -82,8 +88,10 @@ public class ExcelIrpfSimulacaoMapper {
                     .despesasInstrucaoAlimentandos(agg.getDespesasInstrucaoAlimentandos())
                     .pensaoAlimenticia(nvl(agg.getPensaoAlimenticia()))
                     .previdenciaEmpregadoDomestico(nvl(agg.getPrevidenciaEmpregadoDomestico()))
-                    .previdenciaPrivada(resolverPrevidenciaPrivada(
-                            previdenciaPrivadaParam, agg.getPrevidenciaPrivada(), preferirPrevidenciaPlanilha));
+                    .previdenciaPrivada(previdenciaPrivada != null
+                            ? previdenciaPrivada
+                            : resolverPrevidenciaPrivada(
+                                    previdenciaPrivadaParam, agg.getPrevidenciaPrivada(), preferirPrevidenciaPlanilha));
         } else {
             builder
                     .despesasMedicas(nvl(data.getDespesasMedicas()))
@@ -91,9 +99,24 @@ public class ExcelIrpfSimulacaoMapper {
                     .pensaoAlimenticia(nvl(data.getPensaoAlimenticiaJudicial())
                             .add(nvl(data.getPensaoAlimenticiaEscrituraPublica())))
                     .previdenciaEmpregadoDomestico(nvl(data.getContribuicaoPatronalPrevidenciaSocial()))
-                    .previdenciaPrivada(resolverPrevidenciaPrivada(
-                            previdenciaPrivadaParam, data.getContribuicaoPrevidenciaPrivada(), preferirPrevidenciaPlanilha));
+                    .previdenciaPrivada(previdenciaPrivada != null
+                            ? previdenciaPrivada
+                            : resolverPrevidenciaPrivada(
+                                    previdenciaPrivadaParam,
+                                    data.getContribuicaoPrevidenciaPrivada(),
+                                    preferirPrevidenciaPlanilha));
         }
+    }
+
+    /** Ajuste manual substitui a prev. oficial; o RRA manual soma na base, em linha própria na planilha. */
+    private BigDecimal previdenciaOficialSimulacao(IrpfDeclaracaoData data) {
+        BigDecimal oficial = data.getAjusteSimulacaoPrevOficialPublica() != null
+                ? data.getAjusteSimulacaoPrevOficialPublica()
+                : IrpfPrevidenciaOficialResolver.resolver(data);
+        if (data.getAjusteSimulacaoPrevOficialRra() != null) {
+            oficial = oficial.add(data.getAjusteSimulacaoPrevOficialRra());
+        }
+        return oficial;
     }
 
     /**

@@ -134,8 +134,10 @@ public class IrSimuladorMotorService {
                 ? nvl(request.getDeducaoDependentesDeclarada())
                 : valorDependente.multiply(BigDecimal.valueOf(dependentes));
 
-        BigDecimal pgblEfetivo = nvl(request.getPrevidenciaPrivada())
-                .min(rendimentos.multiply(PGBL_LIMITE_PCT));
+        BigDecimal pgblInformada = nvl(request.getPrevidenciaPrivada());
+        BigDecimal pgblEfetivo = Boolean.TRUE.equals(request.getPrevidenciaPrivadaSemTeto())
+                ? pgblInformada
+                : pgblInformada.min(rendimentos.multiply(PGBL_LIMITE_PCT));
 
         BigDecimal inssDomesticoEfetivo = IrDoacoesDeducaoCalculator.calcularInssDomesticoEfetivo(
                 request.getPrevidenciaEmpregadoDomestico(),

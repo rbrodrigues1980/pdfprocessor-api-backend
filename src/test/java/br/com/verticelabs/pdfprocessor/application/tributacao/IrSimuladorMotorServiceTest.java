@@ -596,6 +596,24 @@ class IrSimuladorMotorServiceTest {
 
 
 
+    @Test
+    void previdenciaPrivadaSemTetoUsaOValorInformado() {
+        SimuladorIrpfRequest limitado = SimuladorIrpfRequest.builder()
+                .anoCalendario(2020)
+                .rendimentosTributaveis(new BigDecimal("1000.00"))
+                .previdenciaPrivada(new BigDecimal("500.00"))
+                .build();
+        SimuladorIrpfRequest informado = SimuladorIrpfRequest.builder()
+                .anoCalendario(2020)
+                .rendimentosTributaveis(new BigDecimal("1000.00"))
+                .previdenciaPrivada(new BigDecimal("500.00"))
+                .previdenciaPrivadaSemTeto(true)
+                .build();
+
+        assertEquals(new BigDecimal("880.00"), motor.simular(limitado, faixas2020, params2020).getModeloCompleto().getBaseCalculo());
+        assertEquals(new BigDecimal("500.00"), motor.simular(informado, faixas2020, params2020).getModeloCompleto().getBaseCalculo());
+    }
+
     private IrTabelaTributacao faixa(int ano, int n, String inf, String sup, String aliq, String ded, String desc) {
 
         return IrTabelaTributacao.builder()

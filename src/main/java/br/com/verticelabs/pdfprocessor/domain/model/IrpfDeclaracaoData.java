@@ -13,7 +13,7 @@ import java.util.List;
  * Embutido em {@link PayrollDocument} quando o tipo for {@code INCOME_TAX}.
  */
 @Data
-@Builder
+@Builder(toBuilder = true)
 @NoArgsConstructor
 @AllArgsConstructor
 public class IrpfDeclaracaoData {
@@ -150,6 +150,36 @@ public class IrpfDeclaracaoData {
     // ==========================================
 
     private BigDecimal rendimentosTributaveisTitularPJ;
+
+    /**
+     * Substitui {@link #rendimentosTributaveisTitularPJ} só na simulação com aproveitamento.
+     * {@code null} = usar o valor extraído da declaração.
+     */
+    private BigDecimal ajusteSimulacaoRendimentosPjTitular;
+
+    /**
+     * Soma no imposto pago só da simulação com aproveitamento.
+     * {@code null} = não somar.
+     */
+    private BigDecimal ajusteSimulacaoImpostoDepositoJudicialCivel;
+
+    /**
+     * Substitui a prev. oficial até o limite do patrocinador só na simulação.
+     * {@code null} = usar o valor extraído.
+     */
+    private BigDecimal ajusteSimulacaoPrevOficialPublica;
+
+    /**
+     * Substitui a prev. oficial de rendimentos acumulados só na simulação.
+     * {@code null} = a simulação mantém 0,00 nessa linha.
+     */
+    private BigDecimal ajusteSimulacaoPrevOficialRra;
+
+    /**
+     * Substitui a prev. complementar/Fapi só na simulação, no valor informado.
+     * {@code null} = usar a planilha de contracheques, limitada a 12%.
+     */
+    private BigDecimal ajusteSimulacaoPrevComplementar;
     private BigDecimal rendimentosTributaveisDependentesPJ;
     private BigDecimal rendimentosTributaveisTitularPF;
     private BigDecimal rendimentosTributaveisDependentesPF;

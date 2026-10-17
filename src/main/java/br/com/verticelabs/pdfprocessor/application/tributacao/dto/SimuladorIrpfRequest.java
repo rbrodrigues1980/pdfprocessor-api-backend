@@ -41,6 +41,11 @@ public class SimuladorIrpfRequest {
     private BigDecimal despesasInstrucaoDeclarada;
     private BigDecimal previdenciaOficial;
     private BigDecimal previdenciaPrivada;
+    /**
+     * Quando true, {@link #previdenciaPrivada} entra na base no valor informado,
+     * sem o teto de 12% dos rendimentos. Usado no ajuste manual da simulação.
+     */
+    private Boolean previdenciaPrivadaSemTeto;
     private BigDecimal pensaoAlimenticia;
     /** INSS patronal recolhido por empregador doméstico (dedução histórica AC ≤ 2018). */
     private BigDecimal previdenciaEmpregadoDomestico;

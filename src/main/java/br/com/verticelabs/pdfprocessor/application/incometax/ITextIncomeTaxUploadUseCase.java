@@ -237,6 +237,9 @@ public class ITextIncomeTaxUploadUseCase {
                 return iTextIncomeTaxService.extractIncomeTaxInfo(inputStream)
                                 .map(info -> {
                                         IrpfDeclaracaoData irpfData = irpfDeclaracaoDataMapper.fromIncomeTaxInfo(info);
+                                        // Upload novo não tem ajuste anterior. A cópia vale quando o
+                                        // processamento substitui um irpfData já gravado.
+                                        AjusteSimulacaoIrpf.preservar(null, irpfData);
                                         return new IncomeTaxMetadata(info.getAnoCalendario(), info.getCpf(), irpfData);
                                 })
                                 .doOnSuccess(metadata -> log.info(
