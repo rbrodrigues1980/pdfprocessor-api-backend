@@ -15,6 +15,8 @@ import br.com.verticelabs.pdfprocessor.interfaces.documents.dto.BulkUploadRespon
 import br.com.verticelabs.pdfprocessor.interfaces.entries.EntryMapper;
 import br.com.verticelabs.pdfprocessor.interfaces.entries.dto.PersonEntriesResponse;
 import br.com.verticelabs.pdfprocessor.domain.model.PersonStatus;
+import br.com.verticelabs.pdfprocessor.interfaces.persons.dto.AjusteSimulacaoIrpfRequest;
+import br.com.verticelabs.pdfprocessor.interfaces.persons.dto.AjusteSimulacaoIrpfResponse;
 import br.com.verticelabs.pdfprocessor.interfaces.persons.dto.CreatePersonRequest;
 import br.com.verticelabs.pdfprocessor.interfaces.persons.dto.PersonListResponse;
 import br.com.verticelabs.pdfprocessor.interfaces.persons.dto.PersonResponse;
@@ -65,6 +67,7 @@ public class PersonController {
         private final DeleteDocumentUseCase deleteDocumentUseCase;
         private final IncomeTaxUploadUseCase incomeTaxUploadUseCase;
         private final CpfValidationService cpfValidationService;
+        private final AjusteSimulacaoIrpfUseCase ajusteSimulacaoIrpfUseCase;
 
         /**
          * POST /api/v1/persons
@@ -78,6 +81,37 @@ public class PersonController {
                 return createPersonUseCase.execute(request)
                                 .flatMap(person -> personResponseEnricher.enrich(person)
                                                 .map(response -> ResponseEntity.status(HttpStatus.CREATED).body((Object) response)));
+        }
+
+        /**
+         * GET /api/v1/persons/{id}/ajustes-simulacao-irpf
+         * Lista declarações e lançamentos manuais da simulação com aproveitamento.
+         */
+        @GetMapping("/{id}/ajustes-simulacao-irpf")
+        public Mono<ResponseEntity<AjusteSimulacaoIrpfResponse>> listarAjustesSimulacao(@PathVariable String id) {
+                return ajusteSimulacaoIrpfUseCase.listar(id).map(ResponseEntity::ok);
+        }
+
+        /**
+         * PUT /api/v1/persons/{id}/ajustes-simulacao-irpf
+         * Inclui ou substitui o valor manual de um ano e tipo.
+         */
+        @PutMapping("/{id}/ajustes-simulacao-irpf")
+        public Mono<ResponseEntity<AjusteSimulacaoIrpfResponse>> salvarAjusteSimulacao(
+                        @PathVariable String id,
+                        @RequestBody AjusteSimulacaoIrpfRequest request) {
+                return ajusteSimulacaoIrpfUseCase.salvar(id, request).map(ResponseEntity::ok);
+        }
+
+        /**
+         * DELETE /api/v1/persons/{id}/ajustes-simulacao-irpf
+         * Remove o lançamento. A simulação volta a usar o valor da declaração.
+         */
+        @DeleteMapping("/{id}/ajustes-simulacao-irpf")
+        public Mono<ResponseEntity<AjusteSimulacaoIrpfResponse>> excluirAjusteSimulacao(
+                        @PathVariable String id,
+                        @RequestBody AjusteSimulacaoIrpfRequest request) {
+                return ajusteSimulacaoIrpfUseCase.excluir(id, request).map(ResponseEntity::ok);
         }
 
         /**

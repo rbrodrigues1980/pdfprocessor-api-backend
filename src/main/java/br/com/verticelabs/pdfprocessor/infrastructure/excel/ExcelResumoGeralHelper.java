@@ -1,5 +1,6 @@
 package br.com.verticelabs.pdfprocessor.infrastructure.excel;
 
+import br.com.verticelabs.pdfprocessor.application.incometax.AjusteSimulacaoIrpf;
 import br.com.verticelabs.pdfprocessor.application.tributacao.IrSimuladorMotorService;
 import br.com.verticelabs.pdfprocessor.application.tributacao.dto.ModeloTributacaoResultDTO;
 import br.com.verticelabs.pdfprocessor.application.tributacao.dto.SimuladorIrpfRequest;
@@ -315,8 +316,9 @@ public class ExcelResumoGeralHelper {
             IrParametrosAnuais paramsAno,
             InformeRendimentosData informeRendimentos) {
 
+        IrpfDeclaracaoData simulacao = AjusteSimulacaoIrpf.paraSimulacao(data);
         SimuladorIrpfRequest request = excelIrpfSimulacaoMapper.fromDeclaracao(
-                data, prevComplPlanilha, true);
+                simulacao, prevComplPlanilha, true);
         request.setInssDomesticoComoCreditoImposto(true);
 
         SimuladorIrpfResponse response = simuladorMotorService.simular(request, faixasTabela, paramsAno);
@@ -328,7 +330,8 @@ public class ExcelResumoGeralHelper {
         BigDecimal totalDevido = modelo.getResumo() != null && modelo.getResumo().getTotalImpostoDevido() != null
                 ? modelo.getResumo().getTotalImpostoDevido()
                 : nvl(impostoProgressivoTotal).add(nvl(data.getImpostoSobreRRA()));
-        BigDecimal totalPago = calcularTotalImpostoPagoDeclaracao(data)
+        BigDecimal totalPago = AjusteSimulacaoIrpf.somarImpostoDepositoJudicialCivel(
+                        calcularTotalImpostoPagoDeclaracao(data), data)
                 .add(somarIrrfDepositoJudicial(informeRendimentos));
 
         return calcularResultadoPositivoDeTotais(totalPago, totalDevido);

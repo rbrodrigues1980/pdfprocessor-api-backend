@@ -1,6 +1,7 @@
 package br.com.verticelabs.pdfprocessor.infrastructure.excel;
 
 import br.com.verticelabs.pdfprocessor.application.excel.ExcelExportService;
+import br.com.verticelabs.pdfprocessor.application.incometax.AjusteSimulacaoIrpf;
 import br.com.verticelabs.pdfprocessor.application.incometax.IrpfPrevidenciaOficialResolver;
 import br.com.verticelabs.pdfprocessor.application.incometax.IrpfDeclaracaoDataMapper;
 import br.com.verticelabs.pdfprocessor.application.tributacao.IrCalculoProgressivoService;
@@ -1390,14 +1391,15 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
                 tabelasTributacao.getOrDefault(ano, Collections.emptyList());
         IrParametrosAnuais paramsAno = parametrosTributacao != null ? parametrosTributacao.get(ano) : null;
 
+        IrpfDeclaracaoData simulacao = AjusteSimulacaoIrpf.paraSimulacao(data);
         SimuladorIrpfRequest request = excelIrpfSimulacaoMapper.fromDeclaracao(
-                data, prevComplPlanilha, true);
+                simulacao, prevComplPlanilha, true);
         request.setInssDomesticoComoCreditoImposto(true);
 
         SimuladorIrpfResponse response = simuladorMotorService.simular(request, faixasTabela, paramsAno);
         ModeloTributacaoResultDTO modelo = response.getModeloCompleto();
         ExcelIrpfDeducoesResumoDTO deducoes = deducoesResumoHelper.montar(
-                data, request, prevComplPlanilha, paramsAno);
+                simulacao, request, prevComplPlanilha, paramsAno);
 
         int row = startRow;
         sheet.createRow(row++);
@@ -1415,9 +1417,9 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
                 bannerSubtitleStyle);
 
         row = addSimTituloBloco(sheet, row, "RENDIMENTOS TRIBUTÁVEIS", sectionHeaderStyle);
-        row = addSimRendimentosTributaveisDetalhe(sheet, row, data, subLabelStyle, valueStyle);
+        row = addSimRendimentosTributaveisDetalhe(sheet, row, simulacao, subLabelStyle, valueStyle);
         row = addSimDestaqueRow(sheet, row, "TOTAL DE RENDIMENTOS TRIBUTÁVEIS",
-                nvl(data.getRendimentosTributaveisTotal()), totalStyle, totalLabelStyle);
+                nvl(simulacao.getRendimentosTributaveisTotal()), totalStyle, totalLabelStyle);
 
         sheet.createRow(row++);
         row = addSimSecaoDeducoesResumo(sheet, row, deducoes, sectionHeaderStyle, subLabelStyle,
@@ -1426,7 +1428,7 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
         sheet.createRow(row++);
         row = addSimTituloBloco(sheet, row, "IMPOSTO DEVIDO", sectionHeaderStyle);
         BigDecimal baseSim = IrpfDeclaracaoDataMapper.baseCalculoRendimentosMenosDeducoes(
-                data.getRendimentosTributaveisTotal(), deducoes.getTotalDeducoes());
+                simulacao.getRendimentosTributaveisTotal(), deducoes.getTotalDeducoes());
         BigDecimal impostoSim = modelo.getImpostoDevidoFinal();
         if (baseSim != null && (modelo.getBaseCalculo() == null
                 || modelo.getBaseCalculo().compareTo(baseSim) != 0)) {
@@ -1462,8 +1464,10 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
         sheet.createRow(row++);
         row = addSimTituloBloco(sheet, row,
                 "IMPOSTO PAGO — ESTUDO COM APROVEITAMENTO DAS CONTRIBUIÇÕES EXTRAS", sectionHeaderStyle);
-        row = addSimImpostoPagoLinhas(sheet, row, data, subLabelStyle, valueStyle);
-        BigDecimal totalPagoDirpf = calcularTotalImpostoPagoDeclaracao(data);
+        BigDecimal depositoJudicial = AjusteSimulacaoIrpf.impostoDepositoJudicialCivel(data);
+        row = addSimImpostoPagoLinhas(sheet, row, data, subLabelStyle, valueStyle, depositoJudicial);
+        BigDecimal totalPagoDirpf = AjusteSimulacaoIrpf.somarImpostoDepositoJudicialCivel(
+                calcularTotalImpostoPagoDeclaracao(data), data);
         row = addSimDestaqueRow(sheet, row, "Total do imposto pago", totalPagoDirpf, totalStyle, totalLabelStyle);
 
         BigDecimal totalPago = totalPagoDirpf;
@@ -2150,6 +2154,11 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
 
     private int addSimImpostoPagoLinhas(Sheet sheet, int row, IrpfDeclaracaoData data,
             CellStyle subLabelStyle, CellStyle valueStyle) {
+        return addSimImpostoPagoLinhas(sheet, row, data, subLabelStyle, valueStyle, null);
+    }
+
+    private int addSimImpostoPagoLinhas(Sheet sheet, int row, IrpfDeclaracaoData data,
+            CellStyle subLabelStyle, CellStyle valueStyle, BigDecimal depositoJudicialCivel) {
         row = addSimDetalhe(sheet, row, "Imposto retido na fonte do titular",
                 data.getImpostoRetidoFonteTitular(), subLabelStyle, valueStyle);
         row = addSimDetalhe(sheet, row, "Imp. retido na fonte dos dependentes",
@@ -2161,6 +2170,10 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
         row = addSimDetalhe(sheet, row, "Imposto retido na fonte (Lei nº 11.033/2004)",
                 data.getImpostoRetidoFonteLei11033(), subLabelStyle, valueStyle);
         row = addSimDetalhe(sheet, row, "Imposto retido RRA", data.getImpostoRetidoRRA(), subLabelStyle, valueStyle);
+        if (depositoJudicialCivel != null) {
+            row = addSimDetalhe(sheet, row, AjusteSimulacaoIrpf.ROTULO_IMPOSTO_DEPOSITO,
+                    depositoJudicialCivel, subLabelStyle, valueStyle);
+        }
         return row;
     }
 

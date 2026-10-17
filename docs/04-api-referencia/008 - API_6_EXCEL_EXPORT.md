@@ -228,8 +228,9 @@ Quando existe declaração IRPF importada para o ano-calendário da aba, `Consol
 
 ### Bloco 2 — Simulação Completa + planilha
 
-- Seção **RENDIMENTOS TRIBUTÁVEIS** (igual ao bloco 1)
-- Seção **DEDUÇÕES** com rótulos do RESUMO IRPF (prev. oficial, prev. compl. limitada a 12%, médicas, etc.)
+- Seção **RENDIMENTOS TRIBUTÁVEIS**. Sem ajuste manual, igual ao bloco 1. Com `ajusteSimulacaoRendimentosPjTitular`, a linha **Recebidos de Pessoa Jurídica pelo titular** usa o valor informado e o total de rendimentos tributáveis vira `total da declaração − PJ titular da declaração + valor manual`. Esse total alimenta o motor, a base e o limite de 12% da previdência complementar. O bloco 1 continua com o PDF.
+- **Imposto Recolhido Através de Depósito Judicial Processo Cível** (`ajusteSimulacaoImpostoDepositoJudicialCivel`), no mesmo estilo das demais linhas, entra só em **IMPOSTO PAGO — ESTUDO…** e soma no total pago (além dos depósitos do Informe, se houver). Ausente = não aparece. `0` é valor informado.
+- Seção **DEDUÇÕES** com rótulos do RESUMO IRPF (prev. oficial, prev. compl. limitada a 12%, médicas, etc.). Três linhas podem ser substituídas só neste bloco: prev. oficial até o limite do patrocinador (`ajusteSimulacaoPrevOficialPublica`), prev. oficial de rendimentos acumulados (`ajusteSimulacaoPrevOficialRra`, ausente continua 0,00) e prev. complementar/Fapi (`ajusteSimulacaoPrevComplementar`, no valor informado, sem o teto de 12%). Ausente na complementar continua a planilha, limitada a 12%. O total de deduções, a base e o imposto devido usam esses valores. O bloco 1 não muda.
 - **INSS doméstico** não entra nas deduções — aplica-se como **crédito** (Imposto devido II = Imposto devido I − INSS). Sem INSS doméstico, Imposto devido II exibe **0,00** no bloco 2 e é omitido no bloco 1; total devido = Imposto devido I + RRA.
 - Imposto devido, pago (valores da declaração) e resultado (saldo = total devido − total pago)
 - Prev. complementar da planilha destacada em verde
@@ -239,6 +240,8 @@ Quando existe declaração IRPF importada para o ano-calendário da aba, `Consol
 **Deduções:** `ExcelIrpfDeducoesResumoHelper` centraliza linhas do RESUMO; `ExcelIrpfSimulacaoMapper` com `preferirPrevidenciaPlanilha=true`; `IrpfPrevidenciaOficialResolver` soma prev. oficial das fontes pagadoras PJ.
 
 **Motor:** flag `inssDomesticoComoCreditoImposto` em `SimuladorIrpfRequest` para alinhar ao RESUMO da Receita.
+
+**Ajuste manual (admin):** `GET`/`PUT`/`DELETE /api/v1/persons/{id}/ajustes-simulacao-irpf`, papéis `TENANT_ADMIN` e `SUPER_ADMIN`. O lançamento é por ano-calendário e tipo, agrupado na área do quadro: rendimentos (`RENDIMENTOS_PJ_TITULAR`), deduções (`DEDUCAO_PREV_OFICIAL_PUBLICA`, `DEDUCAO_PREV_OFICIAL_RRA`, `DEDUCAO_PREV_COMPLEMENTAR`) e imposto pago (`IMPOSTO_DEPOSITO_JUDICIAL_CIVEL`). Excluir volta ao valor da declaração. Reprocessar o PDF preserva os campos (`AjusteSimulacaoIrpf.preservar`). A coluna C do Resumo Geral usa o mesmo cálculo; a coluna B não.
 
 **Layout (colunas B:F):** título B:F; rótulos B:E, valor F; totais com fundo amarelo.
 

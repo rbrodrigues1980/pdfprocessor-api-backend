@@ -83,12 +83,24 @@ public class ExcelIrpfDeducoesResumoHelper {
         BigDecimal rendimentos = nvl(data.getRendimentosTributaveisTotal());
         BigDecimal limite12 = rendimentos.multiply(PGBL_LIMITE_PCT).setScale(2, RM);
 
-        BigDecimal prevOficial = IrpfPrevidenciaOficialResolver.resolver(data);
-        BigDecimal prevComplBruta = nvl(request.getPrevidenciaPrivada());
-        if (prevComplBruta.compareTo(BigDecimal.ZERO) <= 0) {
-            prevComplBruta = nvl(prevComplementarPlanilha);
+        BigDecimal prevOficial = data.getAjusteSimulacaoPrevOficialPublica() != null
+                ? data.getAjusteSimulacaoPrevOficialPublica()
+                : IrpfPrevidenciaOficialResolver.resolver(data);
+        BigDecimal prevOficialRra = data.getAjusteSimulacaoPrevOficialRra() != null
+                ? data.getAjusteSimulacaoPrevOficialRra()
+                : BigDecimal.ZERO;
+        BigDecimal prevComplBruta;
+        BigDecimal prevComplEfetiva;
+        if (data.getAjusteSimulacaoPrevComplementar() != null) {
+            prevComplBruta = data.getAjusteSimulacaoPrevComplementar();
+            prevComplEfetiva = prevComplBruta.setScale(2, RM);
+        } else {
+            prevComplBruta = nvl(request.getPrevidenciaPrivada());
+            if (prevComplBruta.compareTo(BigDecimal.ZERO) <= 0) {
+                prevComplBruta = nvl(prevComplementarPlanilha);
+            }
+            prevComplEfetiva = motorService.calcularPgblEfetivo(prevComplBruta, rendimentos);
         }
-        BigDecimal prevComplEfetiva = motorService.calcularPgblEfetivo(prevComplBruta, rendimentos);
 
         BigDecimal dependentes = resolverDependentes(request, data, params);
         BigDecimal instrucao = resolverInstrucao(request, data, params);
@@ -98,6 +110,7 @@ public class ExcelIrpfDeducoesResumoHelper {
         BigDecimal inssCredito = motorService.calcularInssDomesticoCredito(request, params);
 
         BigDecimal total = prevOficial
+                .add(prevOficialRra)
                 .add(prevComplEfetiva)
                 .add(dependentes)
                 .add(instrucao)
@@ -108,7 +121,7 @@ public class ExcelIrpfDeducoesResumoHelper {
 
         return ExcelIrpfDeducoesResumoDTO.builder()
                 .prevOficialPublica(prevOficial)
-                .prevOficialRra(BigDecimal.ZERO)
+                .prevOficialRra(prevOficialRra)
                 .prevComplementarPrivadaEfetiva(prevComplEfetiva)
                 .prevComplementarPlanilhaBruta(prevComplBruta)
                 .dependentes(dependentes)

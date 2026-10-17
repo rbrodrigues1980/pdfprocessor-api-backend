@@ -2068,8 +2068,12 @@ public class DocumentProcessUseCase {
 
                     log.info("Criadas {} entries para declaração de IR", entries.size());
 
-                    // Atualizar irpfData com todos os campos extraídos (independente de entries)
-                    document.setIrpfData(irpfDeclaracaoDataMapper.fromIncomeTaxInfo(incomeTaxInfo));
+                    // Atualizar irpfData com todos os campos extraídos (independente de entries).
+                    // Reprocessar não apaga os ajustes manuais da simulação.
+                    IrpfDeclaracaoData irpfExtraido = irpfDeclaracaoDataMapper.fromIncomeTaxInfo(incomeTaxInfo);
+                    br.com.verticelabs.pdfprocessor.application.incometax.AjusteSimulacaoIrpf.preservar(
+                            document.getIrpfData(), irpfExtraido);
+                    document.setIrpfData(irpfExtraido);
                     log.info("✅ irpfData atualizado com dados extraídos (pagamentos={}, doações={})",
                             incomeTaxInfo.getPagamentosEfetuados() != null
                                     ? incomeTaxInfo.getPagamentosEfetuados().size() : 0,
