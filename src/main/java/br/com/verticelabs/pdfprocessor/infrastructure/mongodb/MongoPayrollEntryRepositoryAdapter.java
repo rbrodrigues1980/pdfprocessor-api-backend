@@ -75,7 +75,7 @@ public class MongoPayrollEntryRepositoryAdapter implements PayrollEntryRepositor
 
     @Override
     public Mono<Long> countAll() {
-        return repository.count();
+        return mongoTemplate.estimatedCount("payroll_entries");
     }
 
     @Override
