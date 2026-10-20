@@ -13,8 +13,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Service
@@ -22,11 +25,13 @@ import java.util.List;
 public class DashboardUseCase {
 
     private static final int TOP_RUBRICAS_LIMIT = 10;
+    private static final Duration CACHE_TTL = Duration.ofMinutes(10);
 
     private final PayrollDocumentRepository documentRepository;
     private final PayrollEntryRepository entryRepository;
     private final PersonRepository personRepository;
     private final RubricaRepository rubricaRepository;
+    private final ConcurrentHashMap<String, CachedDashboard> cache = new ConcurrentHashMap<>();
 
     public Mono<DashboardResponse> getDashboardMetrics() {
         log.info("=== DashboardUseCase.getDashboardMetrics() INICIADO ===");
@@ -35,24 +40,36 @@ public class DashboardUseCase {
                 .flatMap(isSuperAdmin -> {
                     if (Boolean.TRUE.equals(isSuperAdmin)) {
                         log.info("Usuário é SUPER_ADMIN - buscando métricas agregadas de todos os tenants");
-                        return getMetrics(null,
+                        return cached("ALL", () -> getMetrics(null,
                                 "Documentos processados (todos os tenants)",
                                 "Total de lançamentos (todos os tenants)",
                                 "Pessoas cadastradas (todos os tenants)",
-                                "Rubricas ativas (todos os tenants)");
+                                "Rubricas ativas (todos os tenants)"));
                     }
                     return ReactiveSecurityContextHelper.getTenantId()
                             .flatMap(tenantId -> {
                                 log.info("Buscando métricas para tenant: {}", tenantId);
-                                return getMetrics(tenantId,
+                                return cached(tenantId, () -> getMetrics(tenantId,
                                         "Documentos processados",
                                         "Total de lançamentos",
                                         "Pessoas cadastradas",
-                                        "Rubricas ativas");
+                                        "Rubricas ativas"));
                             });
                 })
                 .doOnSuccess(response -> log.info("✓ Dashboard metrics obtidas com sucesso"))
                 .doOnError(error -> log.error("Erro ao obter métricas do dashboard", error));
+    }
+
+    private Mono<DashboardResponse> cached(String key, java.util.function.Supplier<Mono<DashboardResponse>> loader) {
+        CachedDashboard hit = cache.get(key);
+        if (hit != null && hit.expiresAt().isAfter(Instant.now())) {
+            return Mono.just(hit.response());
+        }
+        return loader.get().doOnNext(response ->
+                cache.put(key, new CachedDashboard(response, Instant.now().plus(CACHE_TTL))));
+    }
+
+    private record CachedDashboard(DashboardResponse response, Instant expiresAt) {
     }
 
     private Mono<DashboardResponse> getMetrics(

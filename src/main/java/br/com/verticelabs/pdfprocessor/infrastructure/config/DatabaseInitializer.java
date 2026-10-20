@@ -29,6 +29,9 @@ public class DatabaseInitializer implements CommandLineRunner {
         
         // Inicializar collection payroll_documents com índices
         initializePayrollDocumentsCollection();
+
+        // payroll_entries não tinha índice: cada busca por documento varria a coleção inteira
+        initializePayrollEntriesCollection();
         
         // Inicializar collection persons com índice único
         initializePersonsCollection();
@@ -218,6 +221,29 @@ public class DatabaseInitializer implements CommandLineRunner {
                             .onErrorResume(error -> Mono.empty());
                         })
                 )
+                .subscribe();
+    }
+
+    private void initializePayrollEntriesCollection() {
+        String collectionName = "payroll_entries";
+        log.info("Criando índices para collection '{}'...", collectionName);
+
+        ReactiveIndexOperations indexOps = mongoTemplate.indexOps(collectionName);
+        Index documentoIdIndex = new Index().on("documentoId", org.springframework.data.domain.Sort.Direction.ASC);
+        Index tenantDocumentoIndex = new Index()
+                .on("tenantId", org.springframework.data.domain.Sort.Direction.ASC)
+                .on("documentoId", org.springframework.data.domain.Sort.Direction.ASC);
+        Index rubricaIndex = new Index().on("rubricaCodigo", org.springframework.data.domain.Sort.Direction.ASC);
+
+        Mono.when(
+                        indexOps.ensureIndex(documentoIdIndex),
+                        indexOps.ensureIndex(tenantDocumentoIndex),
+                        indexOps.ensureIndex(rubricaIndex))
+                .doOnSuccess(v -> log.info(
+                        "Collection '{}' inicializada. Índices: documentoId, (tenantId, documentoId), rubricaCodigo",
+                        collectionName))
+                .doOnError(error -> log.warn("Aviso ao criar índices na collection '{}': {}", collectionName, error.getMessage()))
+                .onErrorResume(error -> Mono.empty())
                 .subscribe();
     }
 
