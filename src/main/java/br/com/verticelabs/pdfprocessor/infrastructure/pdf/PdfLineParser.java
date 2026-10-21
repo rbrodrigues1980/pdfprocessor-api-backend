@@ -257,6 +257,14 @@ public class PdfLineParser {
             "^([0-9]{3,4})\\s+(.+)\\s+([0-9]{1,3}(?:\\.[0-9]{3})*,[0-9]{2})\\s*$");
 
     /**
+     * Benefício SABESPREV — {@code código descrição DD/MM/AAAA valor}.
+     * O sinal do contracheque é descartado: desconto entra positivo. A competência vira {@code MM/AAAA}.
+     * Ex.: {@code 9105 CUSTEIO ADM BENEFICIO 01/01/2016 -39,56} → {@code 39,56}
+     */
+    private static final Pattern SABESPREV_BENEFICIO_LINE_PATTERN = Pattern.compile(
+            "^([0-9]{4})\\s+(.+?)\\s+(\\d{2})/(\\d{2})/(\\d{4})\\s+(-?[0-9]{1,3}(?:\\.[0-9]{3})*,[0-9]{2})\\s*$");
+
+    /**
      * Representa uma linha de rubrica extraída do PDF.
      */
     public static class ParsedLine {
@@ -371,6 +379,7 @@ public class PdfLineParser {
             patternsToTry.add(FUNCEF_DEMONSTRATIVO_PATTERN);
             patternsToTry.add(FUNCEF_DEMONSTRATIVO_PATTERN_GLUED);
         } else if (documentType == DocumentType.SABESP) {
+            patternsToTry.add(SABESPREV_BENEFICIO_LINE_PATTERN);
             patternsToTry.add(SABESP_LINE_PATTERN);
         }
 
@@ -570,16 +579,25 @@ public class PdfLineParser {
                         log.info("      ├─ Descrição: [{}]", descricao);
                         log.info("      └─ Valor: [{}]", valorStr);
                     } else if (documentType == DocumentType.SABESP) {
-                        // SABESP: código(1), descrição(2), valor desconto(3) — referência vem do PERÍODO da página
                         descricao = lineMatcher.group(2) != null
                                 ? normalizer.normalizeDescription(lineMatcher.group(2))
                                 : null;
-                        valorStr = lineMatcher.group(3) != null ? lineMatcher.group(3).trim() : "";
-                        referencia = null;
+                        if (pattern == SABESPREV_BENEFICIO_LINE_PATTERN) {
+                            // código(1), descrição(2), dia(3), mês(4), ano(5), valor(6)
+                            referencia = lineMatcher.group(4) + "/" + lineMatcher.group(5);
+                            valorStr = lineMatcher.group(6) != null
+                                    ? lineMatcher.group(6).trim().replaceFirst("^-", "")
+                                    : "";
+                        } else {
+                            // SABESP ativo: código(1), descrição(2), valor(3) — mês vem do PERÍODO da página
+                            valorStr = lineMatcher.group(3) != null ? lineMatcher.group(3).trim() : "";
+                            referencia = null;
+                        }
 
                         log.info("  └─ ✅ RUBRICA SABESP EXTRAÍDA (filtro final = rubricas ativas no Mongo):");
                         log.info("      ├─ Código: [{}]", codigo);
                         log.info("      ├─ Descrição: [{}]", descricao != null ? descricao : "(não encontrada)");
+                        log.info("      ├─ Referência: [{}]", referencia != null ? referencia : "(página)");
                         log.info("      └─ Valor (último da linha): [{}]", valorStr);
                     } else {
                         // FUNCEF: código(1), referência(2), descrição(3), prazo(4 opcional), valor(5)

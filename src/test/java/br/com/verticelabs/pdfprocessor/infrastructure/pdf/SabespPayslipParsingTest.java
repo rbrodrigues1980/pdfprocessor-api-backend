@@ -141,4 +141,48 @@ class SabespPayslipParsingTest {
         assertEquals("2020-01", monthYear.detectMonthYear(page1).block().orElseThrow());
         assertEquals(null, SabespPayslipMetadataExtractor.extract(page1).orElseThrow().cpf());
     }
+
+    private static final String FIXTURE_BENEFICIO_JAN_2016 = """
+            SABESPREV - Fundação Sabesp de Seguridade Social
+            DEMONSTRATIVO DE PAGAMENTO - BENEFÍCIO BÁSICO
+            REFERÊNCIA
+            01/2016
+            ESTELA DOS SANTOS RODRIGUES PERES
+            CPF: 731.278.258-20 Dep.:0
+            PATROCINADORA:
+            COMPANHIA DE SANEAMENTO BASICO DO ESTADO DE SAO PAULO
+            COD DESCRIÇÃO Competência Proventos Descontos
+            VERBAS
+            1040 APOSENTADORIA ANTECIPADA 01/01/2016 9.807,70
+            9105 CUSTEIO ADM BENEFICIO 01/01/2016 -39,56
+            TOTAIS
+            Proventos Descontos Líquido
+            9.807,70 -4.716,00 5.091,70
+            """;
+
+    @Test
+    @DisplayName("Benefício SABESPREV: tipo SABESP, mês da REFERÊNCIA e desconto positivo")
+    void beneficioSabesprev_janeiro2016() {
+        assertEquals(DocumentType.SABESP, typeDetection.detectType(FIXTURE_BENEFICIO_JAN_2016).block());
+        assertEquals("2016-01", monthYear.detectMonthYear(FIXTURE_BENEFICIO_JAN_2016).block().orElseThrow());
+
+        List<PdfLineParser.ParsedLine> lines = parser.parseLines(FIXTURE_BENEFICIO_JAN_2016, DocumentType.SABESP);
+
+        PdfLineParser.ParsedLine provento = lines.stream()
+                .filter(l -> "1040".equals(l.getCodigo()))
+                .findFirst()
+                .orElseThrow();
+        assertEquals("9.807,70", provento.getValorStr());
+        assertEquals("01/2016", provento.getReferencia());
+        assertTrue(provento.getDescricao().toUpperCase().contains("APOSENTADORIA"));
+        assertTrue(!provento.getDescricao().contains("01/01/2016"));
+
+        PdfLineParser.ParsedLine desconto = lines.stream()
+                .filter(l -> "9105".equals(l.getCodigo()))
+                .findFirst()
+                .orElseThrow();
+        assertEquals("39,56", desconto.getValorStr());
+        assertEquals("01/2016", desconto.getReferencia());
+        assertTrue(!desconto.getDescricao().contains("01/01/2016"));
+    }
 }
