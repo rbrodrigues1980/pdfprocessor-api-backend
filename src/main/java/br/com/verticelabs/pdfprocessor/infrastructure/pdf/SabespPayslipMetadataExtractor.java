@@ -21,6 +21,11 @@ public final class SabespPayslipMetadataExtractor {
                     + "(\\d{2})/(\\d{4})",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
+    /** Benefício SABESPREV: {@code REFERÊNCIA} e {@code MM/AAAA} em linhas separadas. */
+    private static final Pattern REFERENCIA_LABEL = Pattern.compile(
+            "REFER[EÊ]NCIA\\s+(\\d{2})/(\\d{4})",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+
     private static final Pattern CPF_MASCARADO = Pattern.compile(
             "\\b(\\d{3}\\.\\d{3}\\.\\d{3}-\\d{2})\\b");
 
@@ -54,6 +59,12 @@ public final class SabespPayslipMetadataExtractor {
         Matcher periodo = PERIODO_NEAR_LABEL.matcher(pageText);
         if (periodo.find()) {
             String ym = toYm(periodo.group(2), periodo.group(1));
+            return Optional.of(new SabespMetadata(ym, null, null, cpf));
+        }
+
+        Matcher referencia = REFERENCIA_LABEL.matcher(pageText);
+        if (referencia.find()) {
+            String ym = toYm(referencia.group(2), referencia.group(1));
             return Optional.of(new SabespMetadata(ym, null, null, cpf));
         }
 
