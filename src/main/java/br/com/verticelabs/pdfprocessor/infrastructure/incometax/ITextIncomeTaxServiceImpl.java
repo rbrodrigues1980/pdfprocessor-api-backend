@@ -641,6 +641,9 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
      */
     private IncomeTaxDeclarationService.IncomeTaxInfo parseIncomeTaxInfo(String primeiraPageText,
             String resumoPageText, String allPagesText) {
+        primeiraPageText = normalizarValoresAmericanos(primeiraPageText);
+        resumoPageText = normalizarValoresAmericanos(resumoPageText);
+        allPagesText = normalizarValoresAmericanos(allPagesText);
         String combinedText = primeiraPageText + "\n" + resumoPageText;
 
         // Dados Básicos
@@ -890,6 +893,20 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
                 deducoesPensaoJudicial, deducoesPensaoEscritura, deducoesPensaoRRA, deducoesLivroCaixa);
         log.info("🔢 Total deduções (corrigido): {}", deducoes);
 
+        // Colunas do RESUMO intercaladas: o valor de "Imposto a restituir" cola em
+        // "Imposto devido" e em "Imposto devido I" (Eurípedes 2018: 3.746,44).
+        // Com o Imposto devido igual ao restituir, a correção abaixo não alinha o I ao total.
+        if (valorCopiadoDoImpostoARestituir(impostoDevido, impostoRestituir, totalImpostoDevido)) {
+            log.warn("⚠️ Imposto devido descartado (valor do Imposto a restituir {}): usando total {}",
+                    impostoRestituir, totalImpostoDevido);
+            impostoDevido = totalImpostoDevido;
+        }
+        if (valorCopiadoDoImpostoARestituir(impostoDevidoI, impostoRestituir, totalImpostoDevido)) {
+            log.warn("⚠️ Imposto devido I descartado (valor do Imposto a restituir {}): será alinhado ao total",
+                    impostoRestituir);
+            impostoDevidoI = null;
+        }
+
         CamposImpostoDevidoCorrigidos impostoDevidoCorrigido = corrigirCamposImpostoDevidoResumo(
                 resumoPageText, tipoTributacao, baseCalculoImposto, impostoDevido, deducaoIncentivo,
                 impostoDevidoI, impostoDevidoRRA, contribuicaoPrevEmpregadorDomestico, impostoDevidoII,
@@ -988,6 +1005,35 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
                 impostoDiferidoGanhosCapital, doacoesPartidosPoliticos,
                 // Doações efetuadas
                 doacoesEfetuadas);
+    }
+
+    /**
+     * Valor com centavos em ponto ({@code 186,721.08}, {@code 0.00}).
+     * O grupo com milhar pode colar no número seguinte ({@code 14,036.6639,931.20}).
+     * O grupo sem milhar não pode encostar em outro dígito ou ponto (CPF, CNPJ, recibo, lei).
+     */
+    private static final Pattern VALOR_AMERICANO_PATTERN = Pattern.compile(
+            "(?<![.,])\\d{1,3}(?:,\\d{3})+\\.\\d{2}(?![,.])|(?<![\\d.,])\\d{1,3}\\.\\d{2}(?![\\d.,])");
+
+    /**
+     * Troca o token americano pelo formato que os regex já leem ({@code 186.721,08}).
+     * Valor brasileiro, CPF, CNPJ, recibo e número de lei permanecem iguais.
+     */
+    static String normalizarValoresAmericanos(String text) {
+        if (text == null || text.isEmpty()) {
+            return text;
+        }
+        Matcher matcher = VALOR_AMERICANO_PATTERN.matcher(text);
+        StringBuilder out = new StringBuilder();
+        while (matcher.find()) {
+            String brasileiro = matcher.group()
+                    .replace(",", "\u0001")
+                    .replace(".", ",")
+                    .replace("\u0001", ".");
+            matcher.appendReplacement(out, Matcher.quoteReplacement(brasileiro));
+        }
+        matcher.appendTail(out);
+        return out.toString();
     }
 
     /**
@@ -2264,6 +2310,26 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
         }
         BigDecimal esperado = totalImpostoDevido.subtract(nvlBigDecimal(impostoDevidoRRA));
         return withinOneCent(impostoDevidoI, esperado);
+    }
+
+    /**
+     * O valor lido é o Imposto a restituir colado na coluna errada quando o total
+     * do imposto devido é outro número positivo.
+     */
+    private boolean valorCopiadoDoImpostoARestituir(
+            BigDecimal valor,
+            BigDecimal impostoRestituir,
+            BigDecimal totalImpostoDevido) {
+        if (valor == null || impostoRestituir == null || totalImpostoDevido == null) {
+            return false;
+        }
+        if (impostoRestituir.compareTo(BigDecimal.ZERO) <= 0) {
+            return false;
+        }
+        if (withinOneCent(impostoRestituir, totalImpostoDevido)) {
+            return false;
+        }
+        return withinOneCent(valor, impostoRestituir);
     }
 
     /**
