@@ -132,6 +132,18 @@ public class PdfLineParser {
     private static final Pattern CAIXA_RS_ANTES_VALOR = Pattern.compile(
             "\\s+R\\$\\s*(?=[0-9]{1,3}(?:\\.[0-9]{3})*,[0-9]{2}\\s*$)");
 
+    /**
+     * Demonstrativo CAIXA 2016: tipo e rubrica separados, sem competência na linha.
+     * {@code 2 0002 SALARIO PADRAO R$ 7101,00} grava código 2002.
+     * {@code 4 0313 INSS CONTRIBUICAO R$ -570,88} grava código 4313 e valor 570,88.
+     * O zero depois do tipo é preenchimento; {@code 4 416} do layout antigo não casa.
+     *
+     * Grupos: tipo(1), três dígitos(2), descrição(3), inteiros(4), centavos(5).
+     */
+    private static final Pattern CAIXA_PATTERN_TIPO_RUBRICA_2016 = Pattern.compile(
+            "^(\\d)\\s+0(\\d{3})\\s+(.+?)\\s+(?:R\\$\\s*)?-?"
+                    + "(\\d{1,3}(?:\\.\\d{3})+|\\d{1,6}),(\\d{2})\\s*$");
+
     // Padrão ULTRA FLEXÍVEL: código + valor (obrigatórios), descrição e competência
     // opcionais
     // Prioriza capturar código e valor, mesmo que descrição ou competência não
@@ -368,6 +380,7 @@ public class PdfLineParser {
         // Determina quais padrões usar baseado no tipo
         List<Pattern> patternsToTry = new ArrayList<>();
         if (documentType == DocumentType.CAIXA || documentType == DocumentType.CAIXA_FUNCEF) {
+            patternsToTry.add(CAIXA_PATTERN_TIPO_RUBRICA_2016);
             patternsToTry.add(CAIXA_PATTERN_LINHA_UNICA);
             patternsToTry.add(CAIXA_PATTERN_SIMPLES);
             patternsToTry.add(CAIXA_PATTERN_DATA_SEPARADA);
@@ -426,13 +439,24 @@ public class PdfLineParser {
 
                     if (documentType == DocumentType.CAIXA || documentType == DocumentType.CAIXA_FUNCEF) {
                         // Determinar qual padrão foi usado
+                        boolean isTipoRubrica2016 = pattern == CAIXA_PATTERN_TIPO_RUBRICA_2016;
                         boolean isLinhaUnicaPattern = pattern == CAIXA_PATTERN_LINHA_UNICA;
                         boolean isSimplesPattern = pattern == CAIXA_PATTERN_SIMPLES;
                         boolean isDataSeparadaPattern = pattern == CAIXA_PATTERN_DATA_SEPARADA;
                         boolean isNativePattern = pattern == CAIXA_PATTERN_NATIVE;
                         boolean isFlexivelPattern = pattern == CAIXA_PATTERN_FLEXIVEL;
 
-                        if (isLinhaUnicaPattern) {
+                        if (isTipoRubrica2016) {
+                            codigo = lineMatcher.group(1) + lineMatcher.group(2);
+                            descricao = normalizer.normalizeDescription(lineMatcher.group(3));
+                            referencia = null;
+                            valorStr = lineMatcher.group(4) + "," + lineMatcher.group(5);
+
+                            log.info("  └─ ✅ RUBRICA CAIXA EXTRAÍDA (TIPO/RUBRICA 2016):");
+                            log.info("      ├─ Código: [{}]", codigo);
+                            log.info("      ├─ Descrição: [{}]", descricao);
+                            log.info("      └─ Valor: [{}]", valorStr);
+                        } else if (isLinhaUnicaPattern) {
                             // Padrão Linha Única: código(1), descrição(2 opcional), [lookahead grupo 3],
                             // competência(4 opcional), prazo(5 opcional), valor(6)
                             // NOTA: O lookahead (?=...) contém grupo de captura que é grupo 3!
