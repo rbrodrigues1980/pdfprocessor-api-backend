@@ -552,7 +552,7 @@ public class GeminiResponseParser {
                 if (valorPago == null) {
                     continue;
                 }
-                result.add(new PagamentoEfetuado(codigo.trim(), nome, cpfCnpj, valorPago, parc, null));
+                result.add(new PagamentoEfetuado(codigo.trim(), nome, cpfCnpj, valorPago, parc, null, null));
             }
             log.info("Gemini pagamentos parse — {} item(ns)", result.size());
         } catch (Exception e) {

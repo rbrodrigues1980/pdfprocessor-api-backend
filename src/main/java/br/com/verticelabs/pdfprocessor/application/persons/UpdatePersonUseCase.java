@@ -21,6 +21,7 @@ public class UpdatePersonUseCase {
 
     private final PersonRepository personRepository;
     private final PersonEmpresaVinculoService personEmpresaVinculoService;
+    private final PersonAtorService personAtorService;
 
     public Mono<Person> execute(String personId, UpdatePersonRequest request) {
         log.info("Atualizando pessoa: ID={}, Nome={}, Matrícula={}, Empresa={}",
@@ -53,7 +54,8 @@ public class UpdatePersonUseCase {
                         person.getTenantId(), request.getEmpresaId(), request.getPercentualHonorarioId(), person)
                 .then(Mono.defer(() -> {
                     person.setUpdatedAt(Instant.now());
-                    return personRepository.save(person);
+                    return personAtorService.registrarAtualizacao(person)
+                            .flatMap(personRepository::save);
                 }))
                 .doOnSuccess(p -> log.info("Pessoa atualizada com sucesso: ID={}", p.getId()));
     }

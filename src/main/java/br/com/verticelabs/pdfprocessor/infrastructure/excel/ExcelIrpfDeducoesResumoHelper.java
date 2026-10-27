@@ -105,8 +105,9 @@ public class ExcelIrpfDeducoesResumoHelper {
         BigDecimal dependentes = resolverDependentes(request, data, params);
         BigDecimal instrucao = resolverInstrucao(request, data, params);
         BigDecimal medicas = valorOuFallback(request.getDespesasMedicas(), data.getDespesasMedicas());
-        BigDecimal pensaoJudicial = resolverPensaoJudicial(request, data);
-        BigDecimal pensaoEscritura = nvl(data.getPensaoAlimenticiaEscrituraPublica());
+        DeducoesPagamentosDTO agg = pagamentosAggregator.aggregate(data.getPagamentosEfetuados(), data);
+        BigDecimal pensaoJudicial = resolverPensaoJudicial(data, agg);
+        BigDecimal pensaoEscritura = resolverPensaoEscritura(data, agg);
         BigDecimal inssCredito = motorService.calcularInssDomesticoCredito(request, params);
 
         BigDecimal total = prevOficial
@@ -187,16 +188,26 @@ public class ExcelIrpfDeducoesResumoHelper {
         return total;
     }
 
-    private BigDecimal resolverPensaoJudicial(SimuladorIrpfRequest request, IrpfDeclaracaoData data) {
-        DeducoesPagamentosDTO agg = pagamentosAggregator.aggregate(
-                data.getPagamentosEfetuados(), data);
-        if (agg.isFonteGranular() && nvl(agg.getPensaoAlimenticia()).compareTo(BigDecimal.ZERO) > 0) {
-            return agg.getPensaoAlimenticia();
-        }
-        if (nvl(request.getPensaoAlimenticia()).compareTo(BigDecimal.ZERO) > 0) {
-            return request.getPensaoAlimenticia();
+    /**
+     * Códigos 30 e 31. Com pagamentos granulares e sem esses códigos, fica zero:
+     * o código 33 não pode cair nesta linha.
+     */
+    private BigDecimal resolverPensaoJudicial(IrpfDeclaracaoData data, DeducoesPagamentosDTO agg) {
+        if (agg.isFonteGranular()) {
+            return nvl(agg.getPensaoAlimenticia());
         }
         return nvl(data.getPensaoAlimenticiaJudicial());
+    }
+
+    /**
+     * Códigos 33 e 34 quando houver pagamento. Senão, o valor do resumo.
+     * Pagamento e resumo do mesmo valor não se somam.
+     */
+    private BigDecimal resolverPensaoEscritura(IrpfDeclaracaoData data, DeducoesPagamentosDTO agg) {
+        if (agg.isFonteGranular() && nvl(agg.getPensaoEscritura()).compareTo(BigDecimal.ZERO) > 0) {
+            return agg.getPensaoEscritura();
+        }
+        return nvl(data.getPensaoAlimenticiaEscrituraPublica());
     }
 
     private BigDecimal valorOuFallback(BigDecimal preferido, BigDecimal fallback) {

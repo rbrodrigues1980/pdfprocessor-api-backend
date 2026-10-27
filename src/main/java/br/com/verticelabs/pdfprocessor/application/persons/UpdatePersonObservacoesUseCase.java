@@ -17,6 +17,7 @@ import java.time.Instant;
 public class UpdatePersonObservacoesUseCase {
 
     private final PersonRepository personRepository;
+    private final PersonAtorService personAtorService;
 
     public Mono<Person> execute(String personId, String observacoes) {
         String normalized = (observacoes != null && !observacoes.isBlank()) ? observacoes.trim() : null;
@@ -34,7 +35,8 @@ public class UpdatePersonObservacoesUseCase {
                             .flatMap(person -> {
                                 person.setObservacoes(normalized);
                                 person.setUpdatedAt(Instant.now());
-                                return personRepository.save(person)
+                                return personAtorService.registrarAtualizacao(person)
+                                        .flatMap(personRepository::save)
                                         .doOnSuccess(p -> log.info(
                                                 "Observações do cliente atualizadas: ID={}", p.getId()));
                             });

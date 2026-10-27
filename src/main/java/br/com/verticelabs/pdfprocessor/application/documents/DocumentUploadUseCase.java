@@ -1,5 +1,6 @@
 package br.com.verticelabs.pdfprocessor.application.documents;
 
+import br.com.verticelabs.pdfprocessor.application.persons.PersonAtorService;
 import br.com.verticelabs.pdfprocessor.domain.exceptions.DocumentoDuplicadoException;
 import br.com.verticelabs.pdfprocessor.domain.exceptions.InvalidCpfException;
 import br.com.verticelabs.pdfprocessor.domain.exceptions.InvalidPdfException;
@@ -37,6 +38,7 @@ public class DocumentUploadUseCase {
     private final GridFsService gridFsService;
     private final CpfValidationService cpfValidationService;
     private final PersonRepository personRepository;
+    private final PersonAtorService personAtorService;
     private final PayrollDocumentRepository documentRepository;
     private final DocumentProcessUseCase documentProcessUseCase;
     private final DeleteDocumentUseCase deleteDocumentUseCase;
@@ -238,7 +240,9 @@ public class DocumentUploadUseCase {
                                     if (!person.getDocumentos().contains(savedDoc.getId())) {
                                         person.getDocumentos().add(savedDoc.getId());
                                         person.setUpdatedAt(Instant.now());
-                                        return personRepository.save(person).thenReturn(savedDoc);
+                                        return personAtorService.registrarAtualizacao(person)
+                                                .flatMap(personRepository::save)
+                                                .thenReturn(savedDoc);
                                     }
                                     return Mono.just(savedDoc);
                                 })
@@ -356,7 +360,8 @@ public class DocumentUploadUseCase {
                     if (needsUpdate) {
                         existingPerson.setUpdatedAt(Instant.now());
                         log.info("Salvando Person atualizada...");
-                        return personRepository.save(existingPerson)
+                        return personAtorService.registrarAtualizacao(existingPerson)
+                                .flatMap(personRepository::save)
                                 .doOnNext(saved -> {
                                     log.info("✅ Person atualizada com sucesso! CPF: {}, Nome: {}, Matrícula: {}", 
                                             saved.getCpf(), saved.getNome(), saved.getMatricula());
@@ -386,7 +391,8 @@ public class DocumentUploadUseCase {
                             log.info("Person criada (antes de salvar): Nome: {}, Matrícula: {}", 
                                     newPerson.getNome(), newPerson.getMatricula());
                             
-                            return personRepository.save(newPerson)
+                            return personAtorService.registrarCriacao(newPerson)
+                                    .flatMap(personRepository::save)
                                     .doOnNext(saved -> {
                                         log.info("✅ Person criada com sucesso! Nome: {}, Matrícula: {}", 
                                                 saved.getNome(), saved.getMatricula());

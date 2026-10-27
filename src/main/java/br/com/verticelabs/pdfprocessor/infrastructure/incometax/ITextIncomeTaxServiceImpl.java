@@ -1076,6 +1076,7 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
         if (doacoes > 0 && (bens < 0 || doacoes < bens)) endIdx = doacoes;
         else if (bens > 0) endIdx = bens;
         if (endIdx > 0) section = section.substring(0, endIdx);
+        section = normalizarSecaoPagamentos(section);
 
         log.debug("📋 Seção PAGAMENTOS EFETUADOS ({} chars): {}", section.length(),
                 section.substring(0, Math.min(400, section.length())).replace("\n", "\\n"));
@@ -1083,14 +1084,14 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
         // Tentar padrão estruturado multilinha
         Matcher m = PAGAMENTO_ENTRY_PATTERN.matcher(section);
         while (m.find()) {
-            pagamentos.add(buildPagamentoFromMatch(m));
+            pagamentos.add(buildPagamentoFromMatch(m, resolverNomePessoaVinculada(section, m.start())));
         }
 
         // Fallback: linha inline (layout SERPRO comum em PDFs 2016+)
         if (pagamentos.isEmpty()) {
             Matcher inline = PAGAMENTO_INLINE_PATTERN.matcher(section);
             while (inline.find()) {
-                pagamentos.add(buildPagamentoFromMatch(inline));
+                pagamentos.add(buildPagamentoFromMatch(inline, resolverNomePessoaVinculada(section, inline.start())));
             }
         }
 
@@ -1102,17 +1103,101 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
         return pagamentos;
     }
 
-    private PagamentoEfetuado buildPagamentoFromMatch(Matcher m) {
+    private PagamentoEfetuado buildPagamentoFromMatch(Matcher m, String nomePessoaVinculada) {
         String codigo = m.group(1).trim();
         String nome = m.group(2).trim();
-        String cnpj = m.group(3).trim();
+        String cnpj = m.group(3).replaceAll("\\s+", "");
         String nit = m.group(4) != null ? m.group(4).trim() : null;
         BigDecimal valor = parseMonetaryString(m.group(5));
         BigDecimal parcNaoDedutivel = m.group(6) != null ? parseMonetaryString(m.group(6)) : null;
-        log.info("💳 Pagamento encontrado: cód={}, nome={}, cnpj={}, valor={}, parc={}, nit={}",
-                codigo, nome, cnpj, valor, parcNaoDedutivel, nit);
-        return new PagamentoEfetuado(codigo, nome, cnpj, valor, parcNaoDedutivel, nit);
+        log.info("💳 Pagamento encontrado: cód={}, nome={}, cnpj={}, valor={}, parc={}, nit={}, vinculado={}",
+                codigo, nome, cnpj, valor, parcNaoDedutivel, nit, nomePessoaVinculada);
+        return new PagamentoEfetuado(codigo, nome, cnpj, valor, parcNaoDedutivel, nit, nomePessoaVinculada);
     }
+
+    /**
+     * Último cabeçalho {@code Titular} / {@code Dependente:} / {@code Alimentando:}
+     * antes da posição do pagamento. Repetição de "PAGAMENTOS EFETUADOS" não limpa o contexto.
+     */
+    static String resolverNomePessoaVinculada(String section, int posicaoPagamento) {
+        if (section == null || posicaoPagamento <= 0) {
+            return null;
+        }
+        String antes = section.substring(0, Math.min(posicaoPagamento, section.length()));
+        Matcher ctx = CONTEXTO_PESSOA_PAGAMENTO.matcher(antes);
+        String ultimo = null;
+        while (ctx.find()) {
+            if (ctx.group(1) != null) {
+                ultimo = null; // Titular
+            } else if (ctx.group(3) != null) {
+                String nome = ctx.group(3).trim();
+                ultimo = nome.isEmpty() ? null : nome;
+            }
+        }
+        return ultimo;
+    }
+
+    private static final Pattern CONTEXTO_PESSOA_PAGAMENTO = Pattern.compile(
+            "(?im)^\\s*(?:(Titular)\\s*$|(Dependente|Alimentando)\\s*:\\s*(.+?)\\s*$)",
+            Pattern.MULTILINE);
+
+    /** Dependente/alimentando em linha única: código, nome, nascimento, CPF. */
+    private static final Pattern PESSOA_RELACIONADA_INLINE = Pattern.compile(
+            "(?m)^\\s*(\\d{2})\\s+"
+                    + "([A-ZÁÉÍÓÚÀÈÌÒÙÂÊÎÔÛÃÕÇ][A-ZÁÉÍÓÚÀÈÌÒÙÂÊÎÔÛÃÕÇa-záéíóúàèìòùâêîôûãõç\\s]{2,}?)\\s+"
+                    + "(\\d{2}/\\d{2}/\\d{4})\\s+"
+                    + "(\\d{3}\\.\\d{3}\\.\\d{3}-\\d{2})\\s*$",
+            Pattern.UNICODE_CASE | Pattern.MULTILINE);
+
+    /** CPF/CNPJ quebrado e valor BR com espaço ({@code 3.453, 11}) na seção de pagamentos. */
+    static String normalizarSecaoPagamentos(String section) {
+        return juntarEspacosValorPagamento(juntarEspacosDocumentoPagamento(section));
+    }
+
+    /**
+     * CPF/CNPJ da seção de pagamentos às vezes saem com espaços no meio
+     * ({@code 7 41 .486 .484-72}). Junta só quando o resultado é um documento válido.
+     */
+    static String juntarEspacosDocumentoPagamento(String section) {
+        if (section == null || section.isEmpty()) {
+            return section;
+        }
+        Matcher matcher = DOCUMENTO_PAGAMENTO_COM_ESPACO.matcher(section);
+        StringBuilder out = new StringBuilder();
+        int cursor = 0;
+        while (cursor < section.length() && matcher.find(cursor)) {
+            String compacto = matcher.group().replaceAll("[ \\t]", "");
+            if (CPF_LIMPO.matcher(compacto).matches() || CNPJ_LIMPO.matcher(compacto).matches()) {
+                out.append(section, cursor, matcher.start());
+                out.append(compacto);
+                cursor = matcher.end();
+            } else {
+                out.append(section, cursor, matcher.start() + 1);
+                cursor = matcher.start() + 1;
+            }
+        }
+        out.append(section.substring(cursor));
+        return out.toString();
+    }
+
+    /** Valor BR com espaço após a vírgula ({@code 3.453, 11} → {@code 3.453,11}). */
+    static String juntarEspacosValorPagamento(String section) {
+        if (section == null || section.isEmpty()) {
+            return section;
+        }
+        return VALOR_BR_COM_ESPACO.matcher(section).replaceAll("$1,$2");
+    }
+
+    private static final Pattern DOCUMENTO_PAGAMENTO_COM_ESPACO = Pattern.compile(
+            "(?<![\\d./-])(?:"
+                    + "\\d[\\d \\t]{0,12}\\.[\\d \\t]{0,12}\\.[\\d \\t]{0,12}-[\\d \\t]{1,6}"
+                    + "|\\d[\\d \\t]{0,8}\\.[\\d \\t]{0,10}\\.[\\d \\t]{0,10}/[\\d \\t]{0,12}-[\\d \\t]{1,6}"
+                    + ")(?![\\d./-])");
+
+    private static final Pattern CPF_LIMPO = Pattern.compile("\\d{3}\\.\\d{3}\\.\\d{3}-\\d{2}");
+    private static final Pattern CNPJ_LIMPO = Pattern.compile("\\d{2}\\.\\d{3}\\.\\d{3}/\\d{4}-\\d{2}");
+    private static final Pattern VALOR_BR_COM_ESPACO = Pattern.compile(
+            "(\\d{1,3}(?:\\.\\d{3})*),\\s+(\\d{2})");
 
     /**
      * Extração posicional de pagamentos quando o regex estruturado falha.
@@ -1129,8 +1214,20 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
         Pattern nitFormattedLine = Pattern.compile("^\\s*([\\d]{3}\\.[\\d]{5}\\.[\\d]{2}-[\\d])\\s*$");
         Pattern nitPlainLine = Pattern.compile("^\\s*(\\d{11})\\s*$");
 
+        String nomePessoaVinculada = null;
         int i = 0;
         while (i < lines.length) {
+            Matcher ctx = CONTEXTO_PESSOA_PAGAMENTO.matcher(lines[i]);
+            if (ctx.matches()) {
+                if (ctx.group(1) != null) {
+                    nomePessoaVinculada = null;
+                } else if (ctx.group(3) != null) {
+                    String nome = ctx.group(3).trim();
+                    nomePessoaVinculada = nome.isEmpty() ? null : nome;
+                }
+                i++;
+                continue;
+            }
             Matcher codM = codigoLine.matcher(lines[i]);
             if (codM.matches()) {
                 String codigo = codM.group(1);
@@ -1179,8 +1276,10 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
                     }
                 }
 
-                pagamentos.add(new PagamentoEfetuado(codigo, nome, cnpj, valor, parcNaoDedutivel, nit));
-                log.info("💳 Pagamento posicional: cód={}, nome={}, cnpj={}, valor={}, parc={}, nit={}", codigo, nome, cnpj, valor, parcNaoDedutivel, nit);
+                pagamentos.add(new PagamentoEfetuado(
+                        codigo, nome, cnpj, valor, parcNaoDedutivel, nit, nomePessoaVinculada));
+                log.info("💳 Pagamento posicional: cód={}, nome={}, cnpj={}, valor={}, parc={}, nit={}, vinculado={}",
+                        codigo, nome, cnpj, valor, parcNaoDedutivel, nit, nomePessoaVinculada);
                 i = l + 1;
                 continue;
             }
@@ -1716,6 +1815,21 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
             return result;
         }
 
+        // Layout inline: "21 DEBORA SANTOS ... 09/10/1998 101.130.924-66"
+        Matcher inlinePessoa = PESSOA_RELACIONADA_INLINE.matcher(section);
+        while (inlinePessoa.find()) {
+            String code = inlinePessoa.group(1);
+            String name = inlinePessoa.group(2).trim();
+            String date = inlinePessoa.group(3);
+            String cpf = inlinePessoa.group(4);
+            result.add(new DependenteInfo(code, name, date, cpf));
+            log.info("👤 Pessoa '{}' (inline) extraída: código={}, nome={}, nasc={}, cpf={}",
+                    sectionMarker, code, name, date, cpf);
+        }
+        if (!result.isEmpty()) {
+            return result;
+        }
+
         // Coletar códigos (números de 2 dígitos que não fazem parte de datas/CPFs)
         // Os códigos típicos são: 21 (filho), 22 (filho universitário), 31 (pai/mãe), 41 (menor pobre), etc.
         List<String> codes = new ArrayList<>();
@@ -1762,7 +1876,12 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
         Matcher nameMatcher = namePattern.matcher(section);
         while (nameMatcher.find()) {
             String candidate = nameMatcher.group(1).trim();
-            if (!SKIP_NAMES.contains(candidate.toUpperCase())
+            String upperName = candidate.toUpperCase();
+            if (upperName.contains("CÓDIGO") || upperName.contains("CODIGO")
+                    || upperName.contains("NASCIMENTO")) {
+                continue;
+            }
+            if (!SKIP_NAMES.contains(upperName)
                     && !candidate.matches("[\\d\\s.,/-]+")
                     && candidate.length() >= 5) {
                 names.add(candidate);
@@ -2155,7 +2274,8 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
         boolean antesRotuloNaoEImposto = deducaoAntesRotulo != null
                 && (impostoDevido == null || deducaoAntesRotulo.compareTo(impostoDevido) != 0)
                 && (totalImpostoDevido == null || deducaoAntesRotulo.compareTo(totalImpostoDevido) != 0)
-                && (impostoDevidoI == null || deducaoAntesRotulo.compareTo(impostoDevidoI) != 0);
+                && (impostoDevidoI == null || deducaoAntesRotulo.compareTo(impostoDevidoI) != 0)
+                && !isCopiaContribuicaoDomestico(deducaoAntesRotulo, contribuicaoPrevEmpregadorDomestico);
         if (nvlBigDecimal(deducaoIncentivo).compareTo(BigDecimal.ZERO) == 0
                 && deducaoAntesRotulo != null
                 && deducaoAntesRotulo.compareTo(BigDecimal.ZERO) > 0
@@ -2197,6 +2317,7 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
             // deriva deducaoIncentivo = impostoDevido − (total − RRA) e impostoDevidoI = total − RRA.
             // Ex.: doações ECA/Idoso que abatem o "Total do imposto devido".
             // II igual ao total (cópia de I sem INSS doméstico) não bloqueia a derivação — Ilka 2017.
+            // Alice 2016: devido − total = INSS doméstico (I − II), não incentivo.
             boolean iiNaoBloqueia = impostoDevidoII == null
                     || impostoDevidoII.compareTo(BigDecimal.ZERO) == 0
                     || (totalImpostoDevido != null && withinOneCent(impostoDevidoII, totalImpostoDevido));
@@ -2205,7 +2326,8 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
                 BigDecimal impostoIDerivado = totalImpostoDevido.subtract(rra);
                 BigDecimal incentivoDerivado = impostoDevido.subtract(impostoIDerivado);
                 boolean plausivel = incentivoDerivado.compareTo(BigDecimal.ZERO) > 0
-                        && incentivoDerivado.compareTo(impostoDevido) < 0;
+                        && incentivoDerivado.compareTo(impostoDevido) < 0
+                        && !isCopiaContribuicaoDomestico(incentivoDerivado, contribuicaoPrevEmpregadorDomestico);
                 if (plausivel && nvlBigDecimal(deducaoIncentivo).compareTo(BigDecimal.ZERO) == 0) {
                     deducaoIncentivo = incentivoDerivado.setScale(2, RoundingMode.HALF_UP);
                     impostoDevidoI = impostoIDerivado.setScale(2, RoundingMode.HALF_UP);
@@ -2220,11 +2342,17 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
                     && isImpostoDevidoIConsistenteComTotal(impostoDevidoI, totalImpostoDevido, impostoDevidoRRA)) {
                 BigDecimal incentivoDerivado = impostoDevido.subtract(impostoDevidoI);
                 if (incentivoDerivado.compareTo(BigDecimal.ZERO) > 0
-                        && incentivoDerivado.compareTo(impostoDevido) < 0) {
+                        && incentivoDerivado.compareTo(impostoDevido) < 0
+                        && !isCopiaContribuicaoDomestico(incentivoDerivado, contribuicaoPrevEmpregadorDomestico)) {
                     deducaoIncentivo = incentivoDerivado.setScale(2, RoundingMode.HALF_UP);
                     log.info("✅ Dedução de incentivo derivada (impostoDevido − impostoDevidoI): {}", deducaoIncentivo);
                 }
             }
+        }
+
+        if (isCopiaContribuicaoDomestico(deducaoIncentivo, contribuicaoPrevEmpregadorDomestico)) {
+            log.warn("⚠️ Dedução de incentivo descartada (cópia do INSS doméstico): {}", deducaoIncentivo);
+            deducaoIncentivo = BigDecimal.ZERO;
         }
 
         BigDecimal saldoInline = extractValorMonetario(resumoPageText, SALDO_IMPOSTO_PAGAR_PATTERN);
@@ -2233,6 +2361,13 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
         }
 
         return new CamposImpostoDevidoCorrigidos(base, deducaoIncentivo, impostoDevidoI, saldoPagar);
+    }
+
+    /** Alice 2016: devido − total = Contribuição Prev. Empregador Doméstico, não incentivo. */
+    private boolean isCopiaContribuicaoDomestico(BigDecimal valor, BigDecimal contribuicaoDomestico) {
+        return nvlBigDecimal(contribuicaoDomestico).compareTo(BigDecimal.ZERO) > 0
+                && valor != null
+                && withinOneCent(valor, contribuicaoDomestico);
     }
 
     private boolean isBaseCalculoPlausivel(BigDecimal base, BigDecimal rendimentos) {

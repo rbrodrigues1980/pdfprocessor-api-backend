@@ -64,7 +64,13 @@ public class Person {
     private String observacoes;
     
     private Instant createdAt;
-    
+
+    /** Nome do usuário que cadastrou o cliente. Nulo em registros anteriores a esse campo. */
+    private String criadoPorNome;
+
     private Instant updatedAt;
+
+    /** Nome do usuário da última alteração feita por uma pessoa. Nulo em registros antigos. */
+    private String atualizadoPorNome;
 }
 

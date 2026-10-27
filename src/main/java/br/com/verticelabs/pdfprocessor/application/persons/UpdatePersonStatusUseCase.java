@@ -18,6 +18,7 @@ import java.time.Instant;
 public class UpdatePersonStatusUseCase {
 
     private final PersonRepository personRepository;
+    private final PersonAtorService personAtorService;
 
     public Mono<Person> execute(String personId, PersonStatus status) {
         log.info("Atualizando status do cliente: ID={}, status={}", personId, status);
@@ -34,7 +35,8 @@ public class UpdatePersonStatusUseCase {
                             .flatMap(person -> {
                                 person.setStatus(status);
                                 person.setUpdatedAt(Instant.now());
-                                return personRepository.save(person)
+                                return personAtorService.registrarAtualizacao(person)
+                                        .flatMap(personRepository::save)
                                         .doOnSuccess(p -> log.info(
                                                 "Status do cliente atualizado: ID={}, status={}",
                                                 p.getId(), p.getStatus()));

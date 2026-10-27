@@ -17,6 +17,7 @@ import java.time.Instant;
 public class ActivatePersonUseCase {
 
     private final PersonRepository personRepository;
+    private final PersonAtorService personAtorService;
 
     public Mono<Person> execute(String personId) {
         log.info("Ativando pessoa: ID={}", personId);
@@ -31,7 +32,8 @@ public class ActivatePersonUseCase {
                                     person.setAtivo(true);
                                     person.setUpdatedAt(Instant.now());
                                     
-                                    return personRepository.save(person)
+                                    return personAtorService.registrarAtualizacao(person)
+                                            .flatMap(personRepository::save)
                                             .doOnSuccess(p -> log.info("Pessoa ativada com sucesso: ID={}", p.getId()));
                                 });
                     } else {
@@ -43,7 +45,8 @@ public class ActivatePersonUseCase {
                                             person.setAtivo(true);
                                             person.setUpdatedAt(Instant.now());
                                             
-                                            return personRepository.save(person)
+                                            return personAtorService.registrarAtualizacao(person)
+                                                    .flatMap(personRepository::save)
                                                     .doOnSuccess(p -> log.info("Pessoa ativada com sucesso: ID={}", p.getId()));
                                         }));
                     }

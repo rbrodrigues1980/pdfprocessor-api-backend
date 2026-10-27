@@ -389,4 +389,66 @@ class IncomeTaxGeminiHelperTest {
         assertEquals(0, new BigDecimal("546.94").compareTo(enriched.getDeducaoIncentivo()));
         assertEquals(0, new BigDecimal("17684.61").compareTo(enriched.getImpostoDevidoI()));
     }
+
+    @Test
+    void enrichNaoDerivaIncentivoQuandoDiferencaEInssDomestico_alice2016() {
+        // Imposto devido 10.092,47 − total 8.998,70 = 1.093,77 = doméstico (não incentivo).
+        IncomeTaxInfo parcial = new IncomeTaxInfo(
+                "ALICE EUSTAQUIA RODRIGUES BARBOSA", "227.356.666-20", "2016", "2017",
+                new BigDecimal("74635.62"), new BigDecimal("10092.47"), BigDecimal.ZERO,
+                new BigDecimal("10092.47"),
+                new BigDecimal("1093.77"), new BigDecimal("8998.70"), BigDecimal.ZERO,
+                new BigDecimal("8998.70"), null,
+                new BigDecimal("89224.33"), new BigDecimal("14588.71"),
+                null, null, null,
+                null, null, new BigDecimal("2723.36"), new BigDecimal("2275.08"), null,
+                new BigDecimal("9590.27"), null, null, null, null,
+                null, null, null, null, null, null, null,
+                null, new BigDecimal("10.09"),
+                "COMPLETO", null, null, null, null,
+                null, null, null, null,
+                null, null,
+                Collections.emptyList(), Collections.emptyList(),
+                null, Collections.emptyList(), null, Collections.emptyList(),
+                null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null, null, null,
+                Collections.emptyList());
+
+        IncomeTaxInfo enriched = IncomeTaxGeminiHelper.enrich(parcial);
+
+        assertTrue(enriched.getDeducaoIncentivo() == null
+                        || enriched.getDeducaoIncentivo().compareTo(BigDecimal.ZERO) == 0,
+                "incentivo não pode ser o doméstico 1.093,77; era=" + enriched.getDeducaoIncentivo());
+        assertEquals(0, new BigDecimal("1093.77").compareTo(enriched.getContribuicaoPrevEmpregadorDomestico()));
+        assertEquals(0, new BigDecimal("10092.47").compareTo(enriched.getImpostoDevidoI()));
+    }
+
+    @Test
+    void enrichZeraIncentivoQuandoGeminiCopiaValorDoDomestico_alice2016() {
+        IncomeTaxInfo parcial = new IncomeTaxInfo(
+                "ALICE EUSTAQUIA RODRIGUES BARBOSA", "227.356.666-20", "2016", "2017",
+                new BigDecimal("74635.62"), new BigDecimal("10092.47"), new BigDecimal("1093.77"),
+                new BigDecimal("10092.47"),
+                new BigDecimal("1093.77"), new BigDecimal("8998.70"), BigDecimal.ZERO,
+                new BigDecimal("8998.70"), null,
+                new BigDecimal("89224.33"), new BigDecimal("14588.71"),
+                null, null, null,
+                null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null,
+                null, null,
+                "COMPLETO", null, null, null, null,
+                null, null, null, null,
+                null, null,
+                Collections.emptyList(), Collections.emptyList(),
+                null, Collections.emptyList(), null, Collections.emptyList(),
+                null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null, null, null,
+                Collections.emptyList());
+
+        IncomeTaxInfo enriched = IncomeTaxGeminiHelper.enrich(parcial);
+
+        assertEquals(0, BigDecimal.ZERO.compareTo(
+                enriched.getDeducaoIncentivo() == null ? BigDecimal.ZERO : enriched.getDeducaoIncentivo()));
+        assertEquals(0, new BigDecimal("1093.77").compareTo(enriched.getContribuicaoPrevEmpregadorDomestico()));
+    }
 }

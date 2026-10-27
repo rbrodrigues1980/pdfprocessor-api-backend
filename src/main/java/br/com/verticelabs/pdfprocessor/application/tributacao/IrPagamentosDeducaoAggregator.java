@@ -31,7 +31,8 @@ public class IrPagamentosDeducaoAggregator {
         }
 
         BigDecimal despesasMedicas = BigDecimal.ZERO;
-        BigDecimal pensaoAlimenticia = BigDecimal.ZERO;
+        BigDecimal pensaoJudicial = BigDecimal.ZERO;
+        BigDecimal pensaoEscritura = BigDecimal.ZERO;
         BigDecimal previdenciaPrivada = BigDecimal.ZERO;
         BigDecimal previdenciaEmpregadoDomestico = BigDecimal.ZERO;
         BigDecimal instrucaoTitular = BigDecimal.ZERO;
@@ -61,8 +62,10 @@ public class IrPagamentosDeducaoAggregator {
 
             switch (codigo.getTipoRegra()) {
                 case SEM_LIMITE -> {
-                    if (codigo.isPensao()) {
-                        pensaoAlimenticia = pensaoAlimenticia.add(valor);
+                    if (codigo.isPensaoJudicial()) {
+                        pensaoJudicial = pensaoJudicial.add(valor);
+                    } else if (codigo.isPensaoEscritura()) {
+                        pensaoEscritura = pensaoEscritura.add(valor);
                     } else {
                         despesasMedicas = despesasMedicas.add(valor);
                     }
@@ -89,7 +92,8 @@ public class IrPagamentosDeducaoAggregator {
                 .despesasInstrucaoTitular(instrucaoTitular)
                 .despesasInstrucaoDependentes(listaPorIndices(dependentes.size(), instrucaoDependentes))
                 .despesasInstrucaoAlimentandos(listaPorIndices(alimentandos.size(), instrucaoAlimentandos))
-                .pensaoAlimenticia(pensaoAlimenticia)
+                .pensaoAlimenticia(pensaoJudicial)
+                .pensaoEscritura(pensaoEscritura)
                 .previdenciaPrivada(previdenciaPrivada)
                 .previdenciaEmpregadoDomestico(previdenciaEmpregadoDomestico)
                 .fonteGranular(true)
@@ -147,30 +151,65 @@ public class IrPagamentosDeducaoAggregator {
             List<PessoaRelacionada> alimentandos) {
 
         String cpfBeneficiario = normalizarCpf(pagamento.getCpfCnpj());
-        if (cpfBeneficiario.length() != 11) {
-            log.debug("CPF de beneficiário de instrução ausente/inválido ({}); alocando ao titular",
-                    pagamento.getCpfCnpj());
-            return -1;
+        if (cpfBeneficiario.length() == 11) {
+            if (!cpfTitular.isEmpty() && cpfBeneficiario.equals(cpfTitular)) {
+                return -1;
+            }
+            for (int i = 0; i < dependentes.size(); i++) {
+                if (cpfBeneficiario.equals(normalizarCpf(dependentes.get(i).getCpf()))) {
+                    return i;
+                }
+            }
+            for (int i = 0; i < alimentandos.size(); i++) {
+                if (cpfBeneficiario.equals(normalizarCpf(alimentandos.get(i).getCpf()))) {
+                    return -(100 + i);
+                }
+            }
         }
 
-        if (!cpfTitular.isEmpty() && cpfBeneficiario.equals(cpfTitular)) {
-            return -1;
+        // Escola (CNPJ) ou CPF sem match: usa cabeçalho Dependente:/Alimentando: do PDF.
+        Integer porNome = resolverBucketPorNome(
+                pagamento.getNomePessoaVinculada(), dependentes, alimentandos);
+        if (porNome != null) {
+            return porNome;
         }
 
+        log.debug("Instrução sem CPF/nome de pessoa vinculada ({}/{}); alocando ao titular",
+                pagamento.getCpfCnpj(), pagamento.getNomePessoaVinculada());
+        return -1;
+    }
+
+    /**
+     * @return índice dependente/alimentando, ou null se nome vazio (titular) / não encontrado
+     */
+    Integer resolverBucketPorNome(
+            String nomeVinculado,
+            List<PessoaRelacionada> dependentes,
+            List<PessoaRelacionada> alimentandos) {
+        String alvo = normalizarNome(nomeVinculado);
+        if (alvo.isEmpty()) {
+            return null;
+        }
         for (int i = 0; i < dependentes.size(); i++) {
-            if (cpfBeneficiario.equals(normalizarCpf(dependentes.get(i).getCpf()))) {
+            if (alvo.equals(normalizarNome(dependentes.get(i).getNome()))) {
                 return i;
             }
         }
-
         for (int i = 0; i < alimentandos.size(); i++) {
-            if (cpfBeneficiario.equals(normalizarCpf(alimentandos.get(i).getCpf()))) {
+            if (alvo.equals(normalizarNome(alimentandos.get(i).getNome()))) {
                 return -(100 + i);
             }
         }
+        return null;
+    }
 
-        log.debug("CPF {} de instrução não identificado; alocando ao titular", cpfBeneficiario);
-        return -1;
+    static String normalizarNome(String nome) {
+        if (nome == null || nome.isBlank()) {
+            return "";
+        }
+        String n = java.text.Normalizer.normalize(nome.trim(), java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}+", "");
+        return n.replaceAll("\\s+", " ").toUpperCase(java.util.Locale.ROOT);
     }
 
     private List<BigDecimal> listaPorIndices(int qtd, Map<Integer, BigDecimal> valores) {
