@@ -110,7 +110,10 @@ public final class IncomeTaxGeminiHelper {
                 && impostoDevido.compareTo(totalImpostoDevido) > 0) {
             BigDecimal derivado = impostoDevido.subtract(totalImpostoDevido)
                     .setScale(2, RoundingMode.HALF_UP);
-            if (derivado.compareTo(TOLERANCE) > 0 && derivado.compareTo(impostoDevido) < 0) {
+            // Alice AC 2016: diferença = Contribuição Prev. Empregador Doméstico, não incentivo.
+            if (derivado.compareTo(TOLERANCE) > 0
+                    && derivado.compareTo(impostoDevido) < 0
+                    && !isCopiaContribuicaoDomestico(derivado, contribuicaoPrevEmpregadorDomestico)) {
                 deducaoIncentivo = derivado;
             }
         }
@@ -142,6 +145,10 @@ public final class IncomeTaxGeminiHelper {
             totalImpostoDevido = isPositive(impostoDevidoRRA)
                     ? impostoDevidoI.add(impostoDevidoRRA)
                     : impostoDevidoI;
+        }
+        // Gemini às vezes copia o INSS doméstico em "Dedução de incentivo".
+        if (isCopiaContribuicaoDomestico(deducaoIncentivo, contribuicaoPrevEmpregadorDomestico)) {
+            deducaoIncentivo = BigDecimal.ZERO;
         }
 
         BigDecimal impostoPagoTotal = source.getImpostoPagoTotal();
@@ -361,6 +368,16 @@ public final class IncomeTaxGeminiHelper {
 
     private static BigDecimal nvl(BigDecimal value) {
         return value != null ? value : BigDecimal.ZERO;
+    }
+
+    /**
+     * Imposto devido − total (ou valor no campo incentivo) que coincide com a
+     * Contribuição Prev. Empregador Doméstico — não é dedução de incentivo.
+     */
+    private static boolean isCopiaContribuicaoDomestico(BigDecimal valor, BigDecimal contribuicaoDomestico) {
+        return isPositive(contribuicaoDomestico)
+                && valor != null
+                && valor.subtract(contribuicaoDomestico).abs().compareTo(TOLERANCE) <= 0;
     }
 
     /**

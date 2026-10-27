@@ -99,11 +99,14 @@ class IrPagamentosDeducaoAggregatorTest {
         IrpfDeclaracaoData data = IrpfDeclaracaoData.builder().build();
         List<PagamentoEfetuadoIrpf> pagamentos = List.of(
                 pagamento("30", "5000.00", null),
-                pagamento("33", "1000.00", null));
+                pagamento("31", "200.00", null),
+                pagamento("33", "1000.00", null),
+                pagamento("34", "50.00", null));
 
         DeducoesPagamentosDTO agg = aggregator.aggregate(pagamentos, data);
 
-        assertEquals(new BigDecimal("6000.00"), agg.getPensaoAlimenticia());
+        assertEquals(new BigDecimal("5200.00"), agg.getPensaoAlimenticia());
+        assertEquals(new BigDecimal("1050.00"), agg.getPensaoEscritura());
     }
 
     @Test
@@ -125,6 +128,39 @@ class IrPagamentosDeducaoAggregatorTest {
     void listaVazia_naoEhGranular() {
         DeducoesPagamentosDTO agg = aggregator.aggregate(List.of(), IrpfDeclaracaoData.builder().build());
         assertFalse(agg.isFonteGranular());
+    }
+
+    @Test
+    void instrucaoComCnpjEscolaUsaNomePessoaVinculada() {
+        IrpfDeclaracaoData data = IrpfDeclaracaoData.builder()
+                .cpfTitular("40890953449")
+                .dependentes(List.of(
+                        PessoaRelacionada.builder().nome("DEBORA SANTOS DANTAS GOMES").cpf("101.130.924-66").build(),
+                        PessoaRelacionada.builder().nome("BRUNA SANTOS DANTAS GOMES").cpf("100.459.204-35").build()))
+                .build();
+
+        List<PagamentoEfetuadoIrpf> pagamentos = List.of(
+                PagamentoEfetuadoIrpf.builder()
+                        .codigo("01")
+                        .nomeBeneficiario("FACULDADE MARISTA")
+                        .cpfCnpj("10.847.382/0024-33")
+                        .valorPago(new BigDecimal("9109.80"))
+                        .nomePessoaVinculada("BRUNA SANTOS DANTAS GOMES")
+                        .build(),
+                PagamentoEfetuadoIrpf.builder()
+                        .codigo("01")
+                        .nomeBeneficiario("COLEGIO UNICO")
+                        .cpfCnpj("10.435.695/0001-98")
+                        .valorPago(new BigDecimal("12460.80"))
+                        .nomePessoaVinculada("DEBORA SANTOS DANTAS GOMES")
+                        .build());
+
+        DeducoesPagamentosDTO agg = aggregator.aggregate(pagamentos, data);
+
+        assertEquals(BigDecimal.ZERO, agg.getDespesasInstrucaoTitular());
+        assertEquals(2, agg.getDespesasInstrucaoDependentes().size());
+        assertEquals(0, new BigDecimal("12460.80").compareTo(agg.getDespesasInstrucaoDependentes().get(0)));
+        assertEquals(0, new BigDecimal("9109.80").compareTo(agg.getDespesasInstrucaoDependentes().get(1)));
     }
 
     private PagamentoEfetuadoIrpf pagamento(String codigo, String valor, String parc) {

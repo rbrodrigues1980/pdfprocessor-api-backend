@@ -84,8 +84,16 @@ public enum IrCodigoDeducao {
                 && codigo.compareTo("26") <= 0;
     }
 
+    public boolean isPensaoJudicial() {
+        return this == C_30 || this == C_31;
+    }
+
+    public boolean isPensaoEscritura() {
+        return this == C_33 || this == C_34;
+    }
+
     public boolean isPensao() {
-        return this == C_30 || this == C_31 || this == C_33 || this == C_34;
+        return isPensaoJudicial() || isPensaoEscritura();
     }
 
     public boolean isIncentivoGlobal() {

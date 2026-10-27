@@ -25,6 +25,7 @@ public class CreatePersonUseCase {
     private final PersonRepository personRepository;
     private final CpfValidationService cpfValidationService;
     private final PersonEmpresaVinculoService personEmpresaVinculoService;
+    private final PersonAtorService personAtorService;
 
     public Mono<Person> execute(CreatePersonRequest request) {
         log.info("Criando pessoa: CPF={}, Nome={}, Matrícula={}, Empresa={}",
@@ -73,7 +74,8 @@ public class CreatePersonUseCase {
 
                     return personEmpresaVinculoService.validateAndApply(
                                     tenantId, request.getEmpresaId(), request.getPercentualHonorarioId(), person)
-                            .then(personRepository.save(person))
+                            .then(personAtorService.registrarCriacao(person))
+                            .flatMap(personRepository::save)
                             .doOnSuccess(p -> log.info("Pessoa criada com sucesso: ID={}, CPF={}, Matrícula={}",
                                     p.getId(), p.getCpf(), p.getMatricula()));
                 });

@@ -20,6 +20,7 @@ public class MarkPersonAsValidatedUseCase {
 
     private final PersonRepository personRepository;
     private final CreateDeveloperRepasseService createDeveloperRepasseService;
+    private final PersonAtorService personAtorService;
 
     public Mono<Person> execute(String personId) {
         log.info("Marcando cliente como validado: ID={}", personId);
@@ -43,7 +44,8 @@ public class MarkPersonAsValidatedUseCase {
                                 person.setValidadoEm(now);
                                 person.setUpdatedAt(now);
 
-                                return personRepository.save(person)
+                                return personAtorService.registrarAtualizacao(person)
+                                        .flatMap(personRepository::save)
                                         .flatMap(saved -> createDeveloperRepasseService.createForValidatedPerson(saved)
                                                 .thenReturn(saved))
                                         .doOnSuccess(p -> log.info("Cliente marcado como validado: ID={}", p.getId()));

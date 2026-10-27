@@ -221,6 +221,11 @@ public class IrpfDeclaracaoData {
         private BigDecimal valorPago;
         private BigDecimal parcNaoDedutivel;
         private String nitEmpregadoDomestico;
+        /**
+         * Nome do titular/dependente/alimentando do bloco do PDF
+         * ({@code Dependente: BRUNA...}), ou null quando for do titular / ausente.
+         */
+        private String nomePessoaVinculada;
     }
 
     /**

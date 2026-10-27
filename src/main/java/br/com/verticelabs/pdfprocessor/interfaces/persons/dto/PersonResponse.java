@@ -36,5 +36,9 @@ public class PersonResponse {
     /** Observações em texto livre sobre o cliente. */
     private String observacoes;
     private Instant createdAt;
+    /** Nome completo de quem cadastrou. A lista mostra só o primeiro nome. */
+    private String criadoPorNome;
     private Instant updatedAt;
+    /** Nome completo de quem fez a última alteração. A lista mostra só o primeiro nome. */
+    private String atualizadoPorNome;
 }

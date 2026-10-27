@@ -24,7 +24,10 @@ public class DeducoesPagamentosDTO {
     private List<BigDecimal> despesasInstrucaoDependentes = new ArrayList<>();
     @Builder.Default
     private List<BigDecimal> despesasInstrucaoAlimentandos = new ArrayList<>();
+    /** Códigos 30 e 31 (pensão judicial). */
     private BigDecimal pensaoAlimenticia;
+    /** Códigos 33 e 34 (pensão por escritura pública). */
+    private BigDecimal pensaoEscritura;
     private BigDecimal previdenciaPrivada;
     private BigDecimal previdenciaEmpregadoDomestico;
 

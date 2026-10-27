@@ -77,6 +77,7 @@ public class IrpfDeclaracaoDataMapper {
                         .valorPago(p.getValorPago())
                         .parcNaoDedutivel(p.getParcNaoDedutivel())
                         .nitEmpregadoDomestico(p.getNitEmpregadoDomestico())
+                        .nomePessoaVinculada(p.getNomePessoaVinculada())
                         .build());
             }
         }

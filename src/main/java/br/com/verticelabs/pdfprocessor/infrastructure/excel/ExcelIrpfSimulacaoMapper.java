@@ -86,7 +86,7 @@ public class ExcelIrpfSimulacaoMapper {
                     .despesasInstrucaoTitular(nvl(agg.getDespesasInstrucaoTitular()))
                     .despesasInstrucaoDependentes(agg.getDespesasInstrucaoDependentes())
                     .despesasInstrucaoAlimentandos(agg.getDespesasInstrucaoAlimentandos())
-                    .pensaoAlimenticia(nvl(agg.getPensaoAlimenticia()))
+                    .pensaoAlimenticia(nvl(agg.getPensaoAlimenticia()).add(nvl(agg.getPensaoEscritura())))
                     .previdenciaEmpregadoDomestico(nvl(agg.getPrevidenciaEmpregadoDomestico()))
                     .previdenciaPrivada(previdenciaPrivada != null
                             ? previdenciaPrivada
@@ -149,6 +149,13 @@ public class ExcelIrpfSimulacaoMapper {
         if (incentivoResumo.compareTo(BigDecimal.ZERO) > 0
                 && (incentivoResumo.compareTo(nvl(data.getImpostoDevidoI())) == 0
                         || incentivoResumo.compareTo(nvl(data.getTotalImpostoDevido())) == 0)) {
+            incentivoResumo = BigDecimal.ZERO;
+        }
+        // Alice AC 2016: Gemini/enrich copiou INSS doméstico em dedução de incentivo.
+        BigDecimal domestico = nvl(data.getContribuicaoPatronalPrevidenciaSocial());
+        if (incentivoResumo.compareTo(BigDecimal.ZERO) > 0
+                && domestico.compareTo(BigDecimal.ZERO) > 0
+                && incentivoResumo.compareTo(domestico) == 0) {
             incentivoResumo = BigDecimal.ZERO;
         }
         // Individuais (ECA 40 + Idoso 43) conferidos com o RESUMO: o maior prevalece

@@ -114,6 +114,11 @@ public interface IncomeTaxDeclarationService {
             private final BigDecimal parcNaoDedutivel;
             /** NIT do empregado doméstico (coluna "NIT EMPREGADO DOMÉSTICO" do PDF, pode ser null). */
             private final String nitEmpregadoDomestico;
+            /**
+             * Nome do titular/dependente/alimentando do bloco do PDF
+             * ({@code Dependente: BRUNA...}), ou null quando for do titular / ausente.
+             */
+            private final String nomePessoaVinculada;
         }
 
         /**

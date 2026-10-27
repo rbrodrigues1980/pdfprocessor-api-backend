@@ -35,7 +35,9 @@ public class PersonMapper {
                 .statusLabel(status.getLabel())
                 .observacoes(person.getObservacoes())
                 .createdAt(person.getCreatedAt())
+                .criadoPorNome(person.getCriadoPorNome())
                 .updatedAt(person.getUpdatedAt())
+                .atualizadoPorNome(person.getAtualizadoPorNome())
                 .build();
     }
     
