@@ -85,7 +85,7 @@ public class ClientesExcelReportServiceImpl implements ClientesExcelReportServic
                 statusCell.setCellStyle(textStyle);
 
                 Cell observacoesCell = row.createCell(4);
-                observacoesCell.setCellValue(nullToEmpty(rowData.observacoes()));
+                observacoesCell.setCellValue(stripHtmlToPlainText(rowData.observacoes()));
                 observacoesCell.setCellStyle(textStyle);
 
                 Cell pctCell = row.createCell(5);
@@ -176,6 +176,26 @@ public class ClientesExcelReportServiceImpl implements ClientesExcelReportServic
 
     private static String nullToEmpty(String value) {
         return value != null ? value : "";
+    }
+
+    /** Anotações podem vir com HTML da barra de formatação do frontend. */
+    private static String stripHtmlToPlainText(String value) {
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+        return value
+                .replaceAll("(?i)<br\\s*/?>", "\n")
+                .replaceAll("(?i)</p>", "\n")
+                .replaceAll("(?i)</div>", "\n")
+                .replaceAll("(?i)</li>", "\n")
+                .replaceAll("<[^>]+>", "")
+                .replace("&nbsp;", " ")
+                .replace("&amp;", "&")
+                .replace("&lt;", "<")
+                .replace("&gt;", ">")
+                .replaceAll("[ \\t]+\\n", "\n")
+                .replaceAll("\\n{3,}", "\n\n")
+                .trim();
     }
 
     private static double toDouble(BigDecimal value) {
