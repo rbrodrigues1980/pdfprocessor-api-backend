@@ -40,6 +40,7 @@ public class CreateConversationUseCase {
             List<String> recipientUserIds,
             String tenantId,
             boolean allSystem,
+            boolean repliesAllowed,
             List<FilePart> files) {
         if (title == null || title.isBlank()) {
             return Mono.error(new IllegalArgumentException("Título é obrigatório"));
@@ -99,6 +100,7 @@ public class CreateConversationUseCase {
                                                                     preview,
                                                                     resolveScope(allSystem, tenantId),
                                                                     blankToNull(tenantId),
+                                                                    repliesAllowed,
                                                                     attachments,
                                                                     now);
                                                         });
@@ -114,6 +116,7 @@ public class CreateConversationUseCase {
             String preview,
             String scope,
             String tenantId,
+            boolean repliesAllowed,
             List<Attachment> attachments,
             Instant now) {
         List<String> participantIds = new ArrayList<>();
@@ -139,6 +142,7 @@ public class CreateConversationUseCase {
                 .lastMessagePreview(preview)
                 .lastSenderNome(sender.getNome())
                 .lastReadAtByUser(readMap)
+                .repliesAllowed(repliesAllowed)
                 .build();
 
         return conversationRepository.save(conversation)

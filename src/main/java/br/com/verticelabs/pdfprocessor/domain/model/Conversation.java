@@ -52,6 +52,17 @@ public class Conversation {
     @Builder.Default
     private Map<String, Instant> lastReadAtByUser = new HashMap<>();
 
+    /**
+     * Se false, a conversa é um aviso somente leitura (ninguém pode responder).
+     * null em documentos antigos = true (compatível).
+     */
+    @Builder.Default
+    private Boolean repliesAllowed = true;
+
+    public boolean areRepliesAllowed() {
+        return repliesAllowed == null || repliesAllowed;
+    }
+
     public boolean isUnreadFor(String userId) {
         if (lastMessageAt == null) {
             return false;

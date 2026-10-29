@@ -18,6 +18,9 @@ import java.util.List;
 public class ConversationMessagesResponse {
     private String conversationId;
     private String title;
+    private String createdByUserId;
+    @Builder.Default
+    private boolean repliesAllowed = true;
     @Builder.Default
     private List<ConversationMessageResponse> items = new ArrayList<>();
     private long total;

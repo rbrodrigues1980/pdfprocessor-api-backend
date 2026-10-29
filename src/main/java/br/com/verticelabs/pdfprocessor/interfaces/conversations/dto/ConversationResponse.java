@@ -31,6 +31,8 @@ public class ConversationResponse {
     private String lastMessagePreview;
     private String lastSenderNome;
     private boolean unread;
+    @Builder.Default
+    private boolean repliesAllowed = true;
 
     @JsonGetter("participantUserIds")
     public List<String> getParticipantUserIds() {

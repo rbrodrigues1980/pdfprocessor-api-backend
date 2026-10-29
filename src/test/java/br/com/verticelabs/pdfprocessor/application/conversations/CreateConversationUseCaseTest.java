@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -89,7 +90,7 @@ class CreateConversationUseCaseTest {
         when(messageRepository.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
 
         Mono<CreateConversationUseCase.CreateResult> result = useCase
-                .execute("Olá", "Primeira mensagem", List.of("recipient-1"), null, false, List.of())
+                .execute("Olá", "Primeira mensagem", List.of("recipient-1"), null, false, true, List.of())
                 .contextWrite(securityContext("sender-1", "TENANT_USER"));
 
         StepVerifier.create(result)
@@ -103,8 +104,35 @@ class CreateConversationUseCaseTest {
         verify(conversationRepository).save(captor.capture());
         Conversation saved = captor.getValue();
         assertEquals("DIRECT", saved.getScope());
+        assertTrue(saved.areRepliesAllowed());
         assertTrue(saved.getParticipantUserIds().contains("sender-1"));
         assertTrue(saved.getParticipantUserIds().contains("recipient-1"));
+    }
+
+    @Test
+    @DisplayName("cria aviso geral com repliesAllowed=false")
+    void criaAvisoSemRespostas() {
+        when(userRepository.findById("sender-1")).thenReturn(Mono.just(sender));
+        when(userRepository.findById("recipient-1")).thenReturn(Mono.just(recipient));
+        when(conversationRepository.existsRecentDuplicate(anyString(), anyString(), anyString(), any()))
+                .thenReturn(Mono.just(false));
+        when(conversationRepository.save(any())).thenAnswer(inv -> {
+            Conversation c = inv.getArgument(0);
+            c.setId("conv-aviso");
+            return Mono.just(c);
+        });
+        when(messageRepository.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+
+        StepVerifier.create(useCase
+                        .execute("Aviso", "Somente leitura", List.of("recipient-1"), null, false, false, List.of())
+                        .contextWrite(securityContext("sender-1", "TENANT_USER")))
+                .assertNext(r -> assertEquals("conv-aviso", r.conversationId()))
+                .verifyComplete();
+
+        ArgumentCaptor<Conversation> captor = ArgumentCaptor.forClass(Conversation.class);
+        verify(conversationRepository).save(captor.capture());
+        assertFalse(captor.getValue().areRepliesAllowed());
+        assertEquals(Boolean.FALSE, captor.getValue().getRepliesAllowed());
     }
 
     @Test
@@ -113,7 +141,7 @@ class CreateConversationUseCaseTest {
         when(userRepository.findById("sender-1")).thenReturn(Mono.just(sender));
 
         Mono<CreateConversationUseCase.CreateResult> result = useCase
-                .execute("Broadcast", "Msg", null, null, true, List.of())
+                .execute("Broadcast", "Msg", null, null, true, true, List.of())
                 .contextWrite(securityContext("sender-1", "TENANT_USER"));
 
         StepVerifier.create(result)
@@ -146,7 +174,7 @@ class CreateConversationUseCaseTest {
         when(messageRepository.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
 
         Mono<CreateConversationUseCase.CreateResult> result = useCase
-                .execute("Sistema", "Aviso geral", null, null, true, List.of())
+                .execute("Sistema", "Aviso geral", null, null, true, true, List.of())
                 .contextWrite(securityContext("admin-1", "SUPER_ADMIN"));
 
         StepVerifier.create(result)
@@ -174,7 +202,7 @@ class CreateConversationUseCaseTest {
         when(messageRepository.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
 
         StepVerifier.create(useCase
-                        .execute("Time", "Oi time", null, "tenant-a", false, List.of())
+                        .execute("Time", "Oi time", null, "tenant-a", false, true, List.of())
                         .contextWrite(securityContext("sender-1", "TENANT_USER")))
                 .assertNext(r -> assertEquals(2, r.participantCount()))
                 .verifyComplete();
@@ -202,7 +230,7 @@ class CreateConversationUseCaseTest {
                 .thenReturn(Flux.just(existing));
 
         StepVerifier.create(useCase
-                        .execute("Olá", "Primeira mensagem", List.of("recipient-1"), null, false, List.of())
+                        .execute("Olá", "Primeira mensagem", List.of("recipient-1"), null, false, true, List.of())
                         .contextWrite(securityContext("sender-1", "TENANT_USER")))
                 .assertNext(r -> assertEquals("existing", r.conversationId()))
                 .verifyComplete();

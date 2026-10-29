@@ -123,6 +123,56 @@ class ReplyConversationUseCaseTest {
         verify(messageRepository, never()).save(any());
     }
 
+    @Test
+    @DisplayName("aviso com repliesAllowed=false rejeita resposta de destinatário")
+    void replyBlockedOnNotice() {
+        conversation.setRepliesAllowed(false);
+        conversation.setCreatedByUserId("sender-1");
+        when(userRepository.findById("recipient-1")).thenReturn(Mono.just(bob));
+        when(conversationRepository.findById("conv-1")).thenReturn(Mono.just(conversation));
+
+        StepVerifier.create(useCase.execute("conv-1", "Tentativa", List.of())
+                        .contextWrite(securityContext("recipient-1")))
+                .expectErrorMatches(e -> e instanceof SecurityException
+                        && e.getMessage().contains("não permite respostas"))
+                .verify();
+
+        verify(messageRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("autor pode seguir postando mesmo com repliesAllowed=false")
+    void creatorCanPostOnNotice() {
+        conversation.setRepliesAllowed(false);
+        conversation.setCreatedByUserId("sender-1");
+        User alice = User.builder()
+                .id("sender-1")
+                .nome("Alice")
+                .email("alice@test.com")
+                .tenantId("tenant-a")
+                .ativo(true)
+                .roles(Set.of("TENANT_USER"))
+                .build();
+        when(userRepository.findById("sender-1")).thenReturn(Mono.just(alice));
+        when(conversationRepository.findById("conv-1")).thenReturn(Mono.just(conversation));
+        when(messageRepository.existsRecentDuplicate(anyString(), anyString(), anyString(), any()))
+                .thenReturn(Mono.just(false));
+        when(messageRepository.save(any())).thenAnswer(inv -> {
+            ConversationMessage m = inv.getArgument(0);
+            m.setId("msg-author");
+            return Mono.just(m);
+        });
+        when(conversationRepository.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+
+        StepVerifier.create(useCase.execute("conv-1", "Atualização do aviso", List.of())
+                        .contextWrite(securityContext("sender-1")))
+                .assertNext(m -> {
+                    assertEquals("msg-author", m.getId());
+                    assertEquals("sender-1", m.getSenderUserId());
+                })
+                .verifyComplete();
+    }
+
     private static Context securityContext(String userId) {
         var auth = new UsernamePasswordAuthenticationToken(
                 userId, "n/a", List.of(new SimpleGrantedAuthority("ROLE_TENANT_USER")));
