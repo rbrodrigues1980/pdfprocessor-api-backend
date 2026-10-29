@@ -81,6 +81,7 @@ class EvaluatorAuthorizationFilterTest {
         assertTrue(allowed(HttpMethod.GET, "/api/v1/conversations/abc/messages"));
         assertTrue(allowed(HttpMethod.POST, "/api/v1/conversations/abc/messages"));
         assertTrue(allowed(HttpMethod.POST, "/api/v1/conversations/abc/read"));
+        assertTrue(allowed(HttpMethod.PATCH, "/api/v1/conversations/abc/replies-allowed"));
         assertTrue(allowed(HttpMethod.GET, "/api/v1/conversations/abc/messages/m1/attachments/f1"));
     }
 }

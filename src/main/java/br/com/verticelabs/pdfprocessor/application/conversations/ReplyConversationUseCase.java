@@ -45,6 +45,11 @@ public class ReplyConversationUseCase {
                                         return Mono.error(new SecurityException(
                                                 "Sem permissão para responder nesta conversa"));
                                     }
+                                    boolean isCreator = userId.equals(conversation.getCreatedByUserId());
+                                    if (!conversation.areRepliesAllowed() && !isCreator) {
+                                        return Mono.error(new SecurityException(
+                                                "Este aviso não permite respostas"));
+                                    }
                                     Instant now = Instant.now();
                                     Instant dedupeStart = now.minusSeconds(DUPLICATE_WINDOW_SECONDS);
                                     return messageRepository.existsRecentDuplicate(

@@ -34,6 +34,7 @@ public class ConversationMapper {
                 .lastMessagePreview(c.getLastMessagePreview())
                 .lastSenderNome(c.getLastSenderNome())
                 .unread(c.isUnreadFor(currentUserId))
+                .repliesAllowed(c.areRepliesAllowed())
                 .build();
     }
 

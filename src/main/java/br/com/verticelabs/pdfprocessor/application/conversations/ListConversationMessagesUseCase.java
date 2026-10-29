@@ -38,7 +38,9 @@ public class ListConversationMessagesUseCase {
                                     safePage,
                                     safeSize,
                                     conversation.getId(),
-                                    conversation.getTitle()));
+                                    conversation.getTitle(),
+                                    conversation.getCreatedByUserId(),
+                                    conversation.areRepliesAllowed()));
                         }));
     }
 
@@ -48,6 +50,8 @@ public class ListConversationMessagesUseCase {
             int page,
             int size,
             String conversationId,
-            String title) {
+            String title,
+            String createdByUserId,
+            boolean repliesAllowed) {
     }
 }

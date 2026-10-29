@@ -7,6 +7,7 @@ import br.com.verticelabs.pdfprocessor.application.conversations.ListConversatio
 import br.com.verticelabs.pdfprocessor.application.conversations.ListConversationsUseCase;
 import br.com.verticelabs.pdfprocessor.application.conversations.MarkConversationReadUseCase;
 import br.com.verticelabs.pdfprocessor.application.conversations.ReplyConversationUseCase;
+import br.com.verticelabs.pdfprocessor.application.conversations.UpdateConversationRepliesAllowedUseCase;
 import br.com.verticelabs.pdfprocessor.infrastructure.security.ReactiveSecurityContextHelper;
 import br.com.verticelabs.pdfprocessor.interfaces.conversations.dto.ConversationListResponse;
 import br.com.verticelabs.pdfprocessor.interfaces.conversations.dto.ConversationMessagesResponse;
@@ -23,8 +24,10 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.codec.multipart.FilePart;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
@@ -51,6 +54,7 @@ public class ConversationController {
     private final ListConversationMessagesUseCase listConversationMessagesUseCase;
     private final ReplyConversationUseCase replyConversationUseCase;
     private final MarkConversationReadUseCase markConversationReadUseCase;
+    private final UpdateConversationRepliesAllowedUseCase updateConversationRepliesAllowedUseCase;
     private final DownloadConversationAttachmentUseCase downloadConversationAttachmentUseCase;
     private final ConversationMapper conversationMapper;
     private final ObjectMapper objectMapper;
@@ -62,14 +66,17 @@ public class ConversationController {
             @RequestPart(value = "recipientUserIds", required = false) String recipientUserIdsJson,
             @RequestPart(value = "tenantId", required = false) String tenantId,
             @RequestPart(value = "allSystem", required = false) String allSystemRaw,
+            @RequestPart(value = "repliesAllowed", required = false) String repliesAllowedRaw,
             @RequestPart(value = "files", required = false) List<FilePart> files) {
         log.info("📥 POST /api/v1/conversations - title={}", title);
         boolean allSystem = "true".equalsIgnoreCase(allSystemRaw);
+        // Omitido ou qualquer valor diferente de "false" → true (compatível)
+        boolean repliesAllowed = !"false".equalsIgnoreCase(repliesAllowedRaw);
         List<String> recipientIds = parseRecipientIds(recipientUserIdsJson);
         List<FilePart> fileParts = files != null ? files : Collections.emptyList();
 
         return createConversationUseCase
-                .execute(title, body, recipientIds, blankToNull(tenantId), allSystem, fileParts)
+                .execute(title, body, recipientIds, blankToNull(tenantId), allSystem, repliesAllowed, fileParts)
                 .map(result -> ResponseEntity.status(HttpStatus.CREATED)
                         .body((Object) CreateConversationResponse.builder()
                                 .conversationId(result.conversationId())
@@ -117,6 +124,8 @@ public class ConversationController {
                         .map(result -> ResponseEntity.ok((Object) ConversationMessagesResponse.builder()
                                 .conversationId(result.conversationId())
                                 .title(result.title())
+                                .createdByUserId(result.createdByUserId())
+                                .repliesAllowed(result.repliesAllowed())
                                 .items(result.items().stream()
                                         .map(m -> conversationMapper.toMessageResponse(m, userId))
                                         .collect(Collectors.toList()))
@@ -124,6 +133,23 @@ public class ConversationController {
                                 .page(result.page())
                                 .size(result.size())
                                 .build())))
+                .onErrorResume(e -> errorResponse(e, statusFor(e)));
+    }
+
+    @PatchMapping("/{id}/replies-allowed")
+    public Mono<ResponseEntity<Object>> updateRepliesAllowed(
+            @PathVariable String id,
+            @RequestBody Map<String, Object> body) {
+        Object raw = body != null ? body.get("repliesAllowed") : null;
+        if (!(raw instanceof Boolean)) {
+            return errorResponse(
+                    new IllegalArgumentException("repliesAllowed (boolean) é obrigatório"),
+                    HttpStatus.BAD_REQUEST);
+        }
+        boolean repliesAllowed = (Boolean) raw;
+        return ReactiveSecurityContextHelper.getUserId()
+                .flatMap(userId -> updateConversationRepliesAllowedUseCase.execute(id, repliesAllowed)
+                        .map(c -> ResponseEntity.ok((Object) conversationMapper.toResponse(c, userId))))
                 .onErrorResume(e -> errorResponse(e, statusFor(e)));
     }
 
