@@ -55,7 +55,7 @@ public class TenantFilter implements WebFilter {
                                 return chain.filter(exchange);
                             });
                 })
-                .switchIfEmpty(chain.filter(exchange)); // Se não tem SecurityContext, deixar passar
+                .switchIfEmpty(Mono.defer(() -> chain.filter(exchange))); // lazy: evita side-effect eager
     }
     
     private Mono<String> resolveTenant(ServerWebExchange exchange) {

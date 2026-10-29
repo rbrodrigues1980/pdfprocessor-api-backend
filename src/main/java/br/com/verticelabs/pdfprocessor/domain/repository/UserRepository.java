@@ -20,6 +20,9 @@ public interface UserRepository {
     Flux<User> findAllByTenantId(String tenantId);
     
     Flux<User> findAllByTenantIdAndAtivo(String tenantId, Boolean ativo);
+
+    /** Todos os usuários ativos do sistema (qualquer tenant + SUPER_ADMIN). */
+    Flux<User> findAllByAtivo(Boolean ativo);
     
     Mono<Long> countByTenantId(String tenantId);
     

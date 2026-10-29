@@ -189,19 +189,28 @@ public class GlobalExceptionHandler {
     }
 
     private void logCommittedResponseError(Throwable ex, ServerHttpRequest request) {
+        // Resposta já foi enviada ao cliente — logar WARN aqui só gasta CPU/Cloud Logging 24/7.
+        // UnsupportedOperationException pós-commit (coleção imutável no encode/cleanup) é ruído conhecido.
+        if (ex instanceof UnsupportedOperationException) {
+            if (log.isTraceEnabled()) {
+                log.trace(
+                        "Committed response + UnsupportedOperationException (ignorado). method={} path={}",
+                        request.getMethod(),
+                        request.getPath().value(),
+                        ex);
+            }
+            return;
+        }
         String message = ex.getMessage();
         if (message == null || message.isBlank()) {
             message = "(sem mensagem)";
         }
-        log.warn(
+        log.debug(
                 "Response already committed — cannot write error body. method={} path={} exception={} message={}",
                 request.getMethod(),
                 request.getPath().value(),
                 ex.getClass().getSimpleName(),
                 message);
-        if (log.isDebugEnabled()) {
-            log.debug("Committed response error stack trace", ex);
-        }
     }
 
     private ResponseEntity<ApiErrorResponse> createErrorResponse(HttpStatus status, String message,

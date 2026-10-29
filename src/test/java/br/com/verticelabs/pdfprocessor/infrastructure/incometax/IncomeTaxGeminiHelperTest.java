@@ -451,4 +451,68 @@ class IncomeTaxGeminiHelperTest {
                 enriched.getDeducaoIncentivo() == null ? BigDecimal.ZERO : enriched.getDeducaoIncentivo()));
         assertEquals(0, new BigDecimal("1093.77").compareTo(enriched.getContribuicaoPrevEmpregadorDomestico()));
     }
+
+    @Test
+    void enrichSomaPfAluguelNoTotalQuandoTotalVeioSoComoPj_celia2016() {
+        // Total e PJ = 67.963,80; PF/aluguéis = 6.120,00; desconto simplificado.
+        BigDecimal desconto = new BigDecimal("14816.76"); // 20% de 74.083,80
+        IncomeTaxInfo parcial = new IncomeTaxInfo(
+                "CELIA DONOLA CARVALHO E CASTRO", "000.000.000-00", "2016", "2017",
+                new BigDecimal("53147.04"), null, null, null,
+                null, null, null,
+                null, null,
+                new BigDecimal("67963.80"), null,
+                null, null, null,
+                null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null,
+                desconto, null,
+                "SIMPLIFICADO", null, null, null, null,
+                null, null, null, null,
+                null, null,
+                Collections.emptyList(), Collections.emptyList(),
+                null, Collections.emptyList(), null, Collections.emptyList(),
+                new BigDecimal("67963.80"), null, new BigDecimal("6120.00"), null,
+                null, null, null,
+                null, null, null, null, null, null, null, null, null, null, null,
+                Collections.emptyList());
+
+        IncomeTaxInfo enriched = IncomeTaxGeminiHelper.enrich(parcial);
+
+        assertEquals(0, new BigDecimal("74083.80").compareTo(enriched.getRendimentosTributaveis()),
+                "total deve incluir PF/aluguéis; era=" + enriched.getRendimentosTributaveis());
+        assertEquals(0, new BigDecimal("6120.00").compareTo(enriched.getRendimentosTributaveisTitularPF()));
+        assertEquals(0, new BigDecimal("59267.04").compareTo(enriched.getBaseCalculoImposto()),
+                "base = 74.083,80 − desconto; era=" + enriched.getBaseCalculoImposto());
+    }
+
+    @Test
+    void enrichCorrigeImpostoDevidoIQuandoGeminiCopiaRestituicao_euripedes() {
+        IncomeTaxInfo parcial = new IncomeTaxInfo(
+                "EURIPEDES", "000.000.000-00", "2018", "2019",
+                new BigDecimal("200000.00"), new BigDecimal("3746.44"), BigDecimal.ZERO,
+                new BigDecimal("3746.44"),
+                null, null, null,
+                new BigDecimal("29586.27"), null,
+                new BigDecimal("250000.00"), null,
+                null, null, new BigDecimal("3746.44"),
+                null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null,
+                null, null,
+                "COMPLETO", null, null, null, null,
+                null, null, null, null,
+                null, null,
+                Collections.emptyList(), Collections.emptyList(),
+                null, Collections.emptyList(), null, Collections.emptyList(),
+                null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null, null, null,
+                Collections.emptyList());
+
+        IncomeTaxInfo enriched = IncomeTaxGeminiHelper.enrich(parcial);
+
+        assertEquals(0, new BigDecimal("29586.27").compareTo(enriched.getImpostoDevidoI()),
+                "I não pode ser a restituição; era=" + enriched.getImpostoDevidoI());
+        assertEquals(0, new BigDecimal("29586.27").compareTo(enriched.getImpostoDevido()),
+                "devido não pode ser a restituição; era=" + enriched.getImpostoDevido());
+        assertEquals(0, new BigDecimal("3746.44").compareTo(enriched.getImpostoRestituir()));
+    }
 }
