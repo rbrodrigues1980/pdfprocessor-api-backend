@@ -34,10 +34,11 @@ public class JwtService {
     @SuppressWarnings("unchecked")
     public List<String> extractRoles(String token) {
         Object rolesObj = extractClaim(token, claims -> claims.get("roles"));
-        if (rolesObj instanceof List) {
-            return (List<String>) rolesObj;
+        if (rolesObj instanceof List<?> list) {
+            // Cópia mutável: claims JWT costumam ser listas imutáveis
+            return new java.util.ArrayList<>((List<String>) list);
         }
-        return Collections.emptyList();
+        return new java.util.ArrayList<>();
     }
     
     public String extractJti(String token) {

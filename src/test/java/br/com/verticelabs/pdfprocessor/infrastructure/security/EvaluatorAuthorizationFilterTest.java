@@ -56,12 +56,31 @@ class EvaluatorAuthorizationFilterTest {
         // Excluir documento
         assertFalse(allowed(HttpMethod.DELETE, "/api/v1/persons/abc123/documents/doc123"));
         // Gestão de usuários/tenants/empresas/rubricas
-        assertFalse(allowed(HttpMethod.GET, "/api/v1/users"));
         assertFalse(allowed(HttpMethod.POST, "/api/v1/users"));
         assertFalse(allowed(HttpMethod.GET, "/api/v1/tenants"));
+        assertFalse(allowed(HttpMethod.GET, "/api/v1/empresas"));
         assertFalse(allowed(HttpMethod.POST, "/api/v1/empresas"));
         assertFalse(allowed(HttpMethod.POST, "/api/v1/rubricas"));
         // Dashboard não é acessível ao avaliador
         assertFalse(allowed(HttpMethod.GET, "/api/v1/dashboard"));
+    }
+
+    @Test
+    void permiteAvisosEListaUsuariosParaDestinatarios() throws Exception {
+        assertTrue(allowed(HttpMethod.GET, "/api/v1/notifications"));
+        assertTrue(allowed(HttpMethod.GET, "/api/v1/notifications/unread-count"));
+        assertTrue(allowed(HttpMethod.GET, "/api/v1/notifications/abc/attachments/file1"));
+        assertTrue(allowed(HttpMethod.PATCH, "/api/v1/notifications/abc/read"));
+        assertTrue(allowed(HttpMethod.POST, "/api/v1/notifications/read-all"));
+        assertTrue(allowed(HttpMethod.POST, "/api/v1/notifications"));
+        assertTrue(allowed(HttpMethod.GET, "/api/v1/users"));
+        // Conversas
+        assertTrue(allowed(HttpMethod.GET, "/api/v1/conversations"));
+        assertTrue(allowed(HttpMethod.GET, "/api/v1/conversations/unread-count"));
+        assertTrue(allowed(HttpMethod.POST, "/api/v1/conversations"));
+        assertTrue(allowed(HttpMethod.GET, "/api/v1/conversations/abc/messages"));
+        assertTrue(allowed(HttpMethod.POST, "/api/v1/conversations/abc/messages"));
+        assertTrue(allowed(HttpMethod.POST, "/api/v1/conversations/abc/read"));
+        assertTrue(allowed(HttpMethod.GET, "/api/v1/conversations/abc/messages/m1/attachments/f1"));
     }
 }

@@ -877,6 +877,21 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
                     rendimentosTributaveisTitularPF, rendimentosTributaveisDependentesPF,
                     rendimentosAcumuladosTitular, rendimentosAcumuladosDependentes, resultadoAtividadeRural);
         }
+        // Fallback quando o breakdown falha: total = PJ (regex) mas PF/aluguéis nas linhas.
+        BigDecimal totalReconciliado = IncomeTaxRendimentosReconciler.reconciliarTotal(
+                rendimentosTributaveis,
+                rendimentosTributaveisTitularPJ, rendimentosTributaveisDependentesPJ,
+                rendimentosTributaveisTitularPF, rendimentosTributaveisDependentesPF,
+                rendimentosAcumuladosTitular, rendimentosAcumuladosDependentes,
+                resultadoAtividadeRural);
+        if (totalReconciliado != null
+                && (rendimentosTributaveis == null
+                        || !IncomeTaxRendimentosReconciler.withinTolerance(
+                                rendimentosTributaveis, totalReconciliado))) {
+            log.warn("⚠️ Total de rendimentos reconciliado pela soma das linhas: {} → {}",
+                    rendimentosTributaveis, totalReconciliado);
+            rendimentosTributaveis = totalReconciliado;
+        }
 
         // Desconto simplificado — só declaração Simplificada (regex simples captura o cabeçalho)
         if ("SIMPLIFICADO".equals(tipoTributacao)) {

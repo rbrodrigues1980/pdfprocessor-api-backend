@@ -62,6 +62,12 @@ public class MongoUserRepositoryAdapter implements UserRepository {
     }
 
     @Override
+    public Flux<User> findAllByAtivo(Boolean ativo) {
+        return repository.findByAtivo(ativo)
+                .map(this::ensureMutableCollections);
+    }
+
+    @Override
     public Mono<Long> countByTenantId(String tenantId) {
         return repository.countByTenantId(tenantId);
     }

@@ -10,6 +10,7 @@ import br.com.verticelabs.pdfprocessor.domain.service.IncomeTaxDeclarationServic
 import br.com.verticelabs.pdfprocessor.domain.service.IncomeTaxDeclarationService.IncomeTaxInfo.DoacaoEfetuada;
 import br.com.verticelabs.pdfprocessor.domain.service.IncomeTaxDeclarationService.IncomeTaxInfo.FontePagadora;
 import br.com.verticelabs.pdfprocessor.domain.service.IncomeTaxDeclarationService.IncomeTaxInfo.PagamentoEfetuado;
+import br.com.verticelabs.pdfprocessor.infrastructure.incometax.IncomeTaxRendimentosReconciler;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -94,6 +95,16 @@ public class IrpfDeclaracaoDataMapper {
             }
         }
 
+        BigDecimal rendimentosTributaveisTotal = IncomeTaxRendimentosReconciler.reconciliarTotal(
+                info.getRendimentosTributaveis(),
+                info.getRendimentosTributaveisTitularPJ(),
+                info.getRendimentosTributaveisDependentesPJ(),
+                info.getRendimentosTributaveisTitularPF(),
+                info.getRendimentosTributaveisDependentesPF(),
+                info.getRendimentosAcumuladosTitular(),
+                info.getRendimentosAcumuladosDependentes(),
+                info.getResultadoAtividadeRural());
+
         return IrpfDeclaracaoData.builder()
                 .nomeTitular(info.getNome())
                 .cpfTitular(info.getCpf())
@@ -122,9 +133,9 @@ public class IrpfDeclaracaoDataMapper {
                 .pensaoAlimenticiaEscrituraPublica(info.getDeducoesPensaoEscritura())
                 .livroCaixa(info.getDeducoesLivroCaixa())
                 .contribuicaoPatronalPrevidenciaSocial(info.getContribuicaoPrevEmpregadorDomestico())
-                .rendimentosTributaveisTotal(info.getRendimentosTributaveis())
+                .rendimentosTributaveisTotal(rendimentosTributaveisTotal)
                 .deducoesTotal(info.getDeducoes())
-                .baseCalculoImposto(resolverBaseCalculo(info))
+                .baseCalculoImposto(resolverBaseCalculo(info, rendimentosTributaveisTotal))
                 .impostoDevido(info.getImpostoDevido())
                 .deducaoIncentivo(info.getDeducaoIncentivo())
                 .impostoDevidoI(info.getImpostoDevidoI())
@@ -175,10 +186,16 @@ public class IrpfDeclaracaoDataMapper {
      * ou omite dependentes).
      */
     static BigDecimal resolverBaseCalculo(IncomeTaxInfo info) {
+        return resolverBaseCalculo(info, info != null ? info.getRendimentosTributaveis() : null);
+    }
+
+    static BigDecimal resolverBaseCalculo(IncomeTaxInfo info, BigDecimal rendimentosReconciliados) {
         if (info == null) {
             return null;
         }
-        BigDecimal rendimentos = info.getRendimentosTributaveis();
+        BigDecimal rendimentos = rendimentosReconciliados != null
+                ? rendimentosReconciliados
+                : info.getRendimentosTributaveis();
         if (rendimentos == null) {
             return info.getBaseCalculoImposto();
         }
@@ -186,7 +203,7 @@ public class IrpfDeclaracaoDataMapper {
                 && info.getDescontoSimplificado() != null) {
             return baseCalculoRendimentosMenosDeducoes(rendimentos, info.getDescontoSimplificado());
         }
-        BigDecimal total = totalDeducoesParaBase(info);
+        BigDecimal total = totalDeducoesParaBase(info, rendimentos);
         if (total != null && total.compareTo(BigDecimal.ZERO) >= 0
                 && total.compareTo(rendimentos) < 0) {
             return baseCalculoRendimentosMenosDeducoes(rendimentos, total);
@@ -199,6 +216,10 @@ public class IrpfDeclaracaoDataMapper {
      * quando o RESUMO veio zerado. Se o TOTAL extraído for maior (linha que o regex perdeu), usa o TOTAL.
      */
     static BigDecimal totalDeducoesParaBase(IncomeTaxInfo info) {
+        return totalDeducoesParaBase(info, info != null ? info.getRendimentosTributaveis() : null);
+    }
+
+    static BigDecimal totalDeducoesParaBase(IncomeTaxInfo info, BigDecimal rendimentosParaTeto) {
         BigDecimal somaLinhas = nvl(info.getDeducoesContribPrevOficial())
                 .add(nvl(info.getDeducoesContribPrevRRA()))
                 .add(nvl(info.getDeducoesContribPrevCompl()))
@@ -210,10 +231,13 @@ public class IrpfDeclaracaoDataMapper {
                 .add(nvl(info.getDeducoesPensaoRRA()))
                 .add(nvl(info.getDeducoesLivroCaixa()));
         BigDecimal extraido = info.getDeducoes();
+        BigDecimal tetoRendimentos = rendimentosParaTeto != null
+                ? rendimentosParaTeto
+                : info.getRendimentosTributaveis();
         if (extraido != null
                 && extraido.compareTo(somaLinhas) > 0
-                && info.getRendimentosTributaveis() != null
-                && extraido.compareTo(info.getRendimentosTributaveis()) < 0) {
+                && tetoRendimentos != null
+                && extraido.compareTo(tetoRendimentos) < 0) {
             return extraido;
         }
         return somaLinhas;

@@ -74,6 +74,22 @@ public final class IncomeTaxGeminiHelper {
         BigDecimal descontoSimplificado = source.getDescontoSimplificado();
         BigDecimal baseCalculoImposto = source.getBaseCalculoImposto();
 
+        if (rendTitularPJ == null && isPositive(rendimentosTributaveis) && allNullOrZero(
+                rendDepPJ, rendTitularPF, rendDepPF, rendAcumTitular, rendAcumDep, resultadoRural)) {
+            rendTitularPJ = rendimentosTributaveis;
+        }
+
+        // Célia AC 2016+: total às vezes = só PJ; PF/aluguéis ficam nas linhas.
+        BigDecimal totalReconciliado = IncomeTaxRendimentosReconciler.reconciliarTotal(
+                rendimentosTributaveis, rendTitularPJ, rendDepPJ, rendTitularPF, rendDepPF,
+                rendAcumTitular, rendAcumDep, resultadoRural);
+        if (totalReconciliado != null
+                && (rendimentosTributaveis == null
+                        || !IncomeTaxRendimentosReconciler.withinTolerance(
+                                rendimentosTributaveis, totalReconciliado))) {
+            rendimentosTributaveis = totalReconciliado;
+        }
+
         DeducoesReconciled reconciled = reconcileDeducoes(
                 rendimentosTributaveis, baseCalculoImposto, source.getDeducoes(),
                 deducoesContribPrevOficial, deducoesContribPrevRRA, deducoesContribPrevCompl,
@@ -83,9 +99,19 @@ public final class IncomeTaxGeminiHelper {
         BigDecimal deducoesTotal = reconciled.deducoesTotal();
         deducoesContribPrevCompl = reconciled.prevComplementar();
         baseCalculoImposto = reconciled.baseCalculoImposto(baseCalculoImposto);
-        if (rendTitularPJ == null && isPositive(rendimentosTributaveis) && allNullOrZero(
-                rendDepPJ, rendTitularPF, rendDepPF, rendAcumTitular, rendAcumDep, resultadoRural)) {
-            rendTitularPJ = rendimentosTributaveis;
+        if (isPositive(descontoSimplificado)
+                && isPositive(rendimentosTributaveis)
+                && rendimentosTributaveis.compareTo(descontoSimplificado) > 0
+                && (baseCalculoImposto == null
+                        || !IncomeTaxRendimentosReconciler.withinTolerance(
+                                baseCalculoImposto,
+                                rendimentosTributaveis.subtract(descontoSimplificado)))) {
+            // Preferir base = total reconciliado − desconto (simplificado).
+            String tipoHint = source.getTipoTributacao();
+            if (tipoHint == null || tipoHint.isBlank() || "SIMPLIFICADO".equalsIgnoreCase(tipoHint)) {
+                baseCalculoImposto = rendimentosTributaveis.subtract(descontoSimplificado)
+                        .setScale(2, RoundingMode.HALF_UP);
+            }
         }
 
         if (deducoesTotal == null) {
@@ -103,6 +129,17 @@ public final class IncomeTaxGeminiHelper {
         BigDecimal impostoDevidoRRA = source.getImpostoDevidoRRA();
         BigDecimal totalImpostoDevido = source.getTotalImpostoDevido();
         BigDecimal contribuicaoPrevEmpregadorDomestico = source.getContribuicaoPrevEmpregadorDomestico();
+        BigDecimal impostoRestituir = source.getImpostoRestituir();
+
+        // Eurípedes / Célia 2022–2023: Gemini cola Imposto a restituir em devido / devido I.
+        if (IncomeTaxRendimentosReconciler.valorCopiadoDoImpostoARestituir(
+                impostoDevido, impostoRestituir, totalImpostoDevido)) {
+            impostoDevido = totalImpostoDevido;
+        }
+        if (IncomeTaxRendimentosReconciler.valorCopiadoDoImpostoARestituir(
+                impostoDevidoI, impostoRestituir, totalImpostoDevido)) {
+            impostoDevidoI = null;
+        }
 
         if (!isPositive(deducaoIncentivo)
                 && isPositive(impostoDevido)
@@ -135,8 +172,16 @@ public final class IncomeTaxGeminiHelper {
                 impostoDevidoRRA = rraDerivado;
             }
         }
-        if (!isPositive(impostoDevidoI) && isPositive(totalImpostoDevido) && !isPositive(impostoDevidoRRA)) {
-            impostoDevidoI = totalImpostoDevido;
+        if (isPositive(totalImpostoDevido)) {
+            BigDecimal impostoIEsperado = totalImpostoDevido.subtract(nvl(impostoDevidoRRA))
+                    .setScale(2, RoundingMode.HALF_UP);
+            if (!isPositive(impostoDevidoI)) {
+                impostoDevidoI = impostoIEsperado;
+            } else if (isPositive(impostoRestituir)
+                    && IncomeTaxRendimentosReconciler.withinTolerance(impostoDevidoI, impostoRestituir)
+                    && !IncomeTaxRendimentosReconciler.withinTolerance(impostoDevidoI, impostoIEsperado)) {
+                impostoDevidoI = impostoIEsperado;
+            }
         }
         if (impostoDevido == null && isPositive(impostoDevidoI) && deducaoIncentivo != null) {
             impostoDevido = impostoDevidoI.add(deducaoIncentivo);
@@ -189,7 +234,7 @@ public final class IncomeTaxGeminiHelper {
                 contribuicaoPrevEmpregadorDomestico, impostoDevidoII, impostoDevidoRRA,
                 totalImpostoDevido, source.getSaldoImpostoPagar(),
                 rendimentosTributaveis, deducoesTotal,
-                source.getImpostoRetidoFonteTitular(), impostoPagoTotal, source.getImpostoRestituir(),
+                source.getImpostoRetidoFonteTitular(), impostoPagoTotal, impostoRestituir,
                 deducoesContribPrevOficial, deducoesContribPrevRRA,
                 deducoesContribPrevCompl, deducoesDependentes,
                 deducoesInstrucao, deducoesMedicas,

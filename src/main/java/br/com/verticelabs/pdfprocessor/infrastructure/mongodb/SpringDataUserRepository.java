@@ -24,6 +24,8 @@ public interface SpringDataUserRepository extends ReactiveMongoRepository<User, 
     Flux<User> findAllByTenantId(String tenantId);
     
     Flux<User> findAllByTenantIdAndAtivo(String tenantId, Boolean ativo);
+
+    Flux<User> findByAtivo(Boolean ativo);
     
     Mono<Boolean> existsByEmail(String email);
     

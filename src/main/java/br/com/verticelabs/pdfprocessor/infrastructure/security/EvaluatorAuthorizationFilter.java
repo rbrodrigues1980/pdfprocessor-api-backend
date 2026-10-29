@@ -50,7 +50,25 @@ public class EvaluatorAuthorizationFilter implements WebFilter {
             new AllowedRule(HttpMethod.POST, "^/api/v1/persons/[^/]+/income-tax/(upload|bulk-upload)/?$"),
             // Leitura de documentos por id
             new AllowedRule(HttpMethod.GET,
-                    "^/api/v1/documents/[^/]+(/(entries|entries/paged|pages|summary|processing-status|irpf-data))?/?$")
+                    "^/api/v1/documents/[^/]+(/(entries|entries/paged|pages|summary|processing-status|irpf-data))?/?$"),
+            // Avisos legados (mantidos)
+            new AllowedRule(HttpMethod.GET, "^/api/v1/notifications/?$"),
+            new AllowedRule(HttpMethod.GET, "^/api/v1/notifications/unread-count/?$"),
+            new AllowedRule(HttpMethod.GET, "^/api/v1/notifications/[^/]+/attachments/[^/]+/?$"),
+            new AllowedRule(HttpMethod.PATCH, "^/api/v1/notifications/[^/]+/read/?$"),
+            new AllowedRule(HttpMethod.POST, "^/api/v1/notifications/read-all/?$"),
+            new AllowedRule(HttpMethod.POST, "^/api/v1/notifications/?$"),
+            // Conversas / chat de avisos
+            new AllowedRule(HttpMethod.GET, "^/api/v1/conversations/?$"),
+            new AllowedRule(HttpMethod.GET, "^/api/v1/conversations/unread-count/?$"),
+            new AllowedRule(HttpMethod.POST, "^/api/v1/conversations/?$"),
+            new AllowedRule(HttpMethod.GET, "^/api/v1/conversations/[^/]+/messages/?$"),
+            new AllowedRule(HttpMethod.POST, "^/api/v1/conversations/[^/]+/messages/?$"),
+            new AllowedRule(HttpMethod.POST, "^/api/v1/conversations/[^/]+/read/?$"),
+            new AllowedRule(HttpMethod.GET,
+                    "^/api/v1/conversations/[^/]+/messages/[^/]+/attachments/[^/]+/?$"),
+            // Lista de usuários para escolher destinatários na nova mensagem
+            new AllowedRule(HttpMethod.GET, "^/api/v1/users/?$")
     );
 
     @Override
@@ -81,7 +99,7 @@ public class EvaluatorAuthorizationFilter implements WebFilter {
                     exchange.getResponse().setStatusCode(HttpStatus.FORBIDDEN);
                     return exchange.getResponse().setComplete();
                 })
-                .switchIfEmpty(chain.filter(exchange)); // sem autenticação: Spring Security trata
+                .switchIfEmpty(Mono.defer(() -> chain.filter(exchange))); // lazy: evita side-effect eager
     }
 
     private boolean isAllowedForEvaluator(HttpMethod method, String path) {
