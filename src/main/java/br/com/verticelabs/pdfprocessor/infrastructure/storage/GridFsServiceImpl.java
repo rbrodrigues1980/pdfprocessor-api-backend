@@ -1,8 +1,10 @@
 package br.com.verticelabs.pdfprocessor.infrastructure.storage;
 
 import br.com.verticelabs.pdfprocessor.domain.service.GridFsService;
+import br.com.verticelabs.pdfprocessor.domain.service.StoredFile;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import com.mongodb.client.gridfs.model.GridFSFile;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.springframework.core.io.buffer.DataBuffer;
@@ -111,6 +113,44 @@ public class GridFsServiceImpl implements GridFsService {
                         return new ByteArrayInputStream(bytes);
                     });
         });
+    }
+
+    @Override
+    public Mono<StoredFile> openFile(String fileId) {
+        return Mono.defer(() -> {
+            ObjectId objectId;
+            try {
+                objectId = new ObjectId(fileId);
+            } catch (IllegalArgumentException ex) {
+                return Mono.error(new IllegalArgumentException("Identificador de arquivo inválido"));
+            }
+
+            Query query = Query.query(Criteria.where("_id").is(objectId));
+            return gridFsTemplate.findOne(query)
+                    .flatMap(file -> gridFsTemplate.getResource(file)
+                            .flatMap(resource -> DataBufferUtils.join(resource.getDownloadStream())
+                                    .map(dataBuffer -> {
+                                        byte[] bytes = new byte[dataBuffer.readableByteCount()];
+                                        dataBuffer.read(bytes);
+                                        DataBufferUtils.release(dataBuffer);
+                                        return new StoredFile(
+                                                new ByteArrayInputStream(bytes),
+                                                file.getFilename(),
+                                                contentTypeOf(file),
+                                                bytes.length);
+                                    })));
+        });
+    }
+
+    private static String contentTypeOf(GridFSFile file) {
+        Document metadata = file.getMetadata();
+        if (metadata != null) {
+            Object value = metadata.get("_contentType");
+            if (value instanceof String && !((String) value).isBlank()) {
+                return (String) value;
+            }
+        }
+        return "application/pdf";
     }
 
     @Override

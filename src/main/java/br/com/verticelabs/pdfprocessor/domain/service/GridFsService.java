@@ -20,6 +20,11 @@ public interface GridFsService {
     Mono<String> storeFileWithHash(InputStream inputStream, String filename, String contentType, String fileHash);
     
     Mono<InputStream> retrieveFile(String fileId);
+
+    /**
+     * Lê o arquivo e os metadados gravados no upload (nome e tipo).
+     */
+    Mono<StoredFile> openFile(String fileId);
     
     Mono<Void> deleteFile(String fileId);
 }
