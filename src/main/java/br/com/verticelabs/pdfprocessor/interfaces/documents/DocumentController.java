@@ -2,6 +2,7 @@ package br.com.verticelabs.pdfprocessor.interfaces.documents;
 
 import br.com.verticelabs.pdfprocessor.application.documents.BulkDocumentUploadUseCase;
 import br.com.verticelabs.pdfprocessor.application.documents.DeleteDocumentUseCase;
+import br.com.verticelabs.pdfprocessor.application.documents.DownloadDocumentFileUseCase;
 import br.com.verticelabs.pdfprocessor.application.documents.DocumentProcessUseCase;
 import br.com.verticelabs.pdfprocessor.application.documents.DocumentQueryUseCase;
 import br.com.verticelabs.pdfprocessor.application.documents.DocumentSummaryUseCase;
@@ -15,6 +16,8 @@ import br.com.verticelabs.pdfprocessor.interfaces.entries.dto.EntryResponse;
 import br.com.verticelabs.pdfprocessor.interfaces.entries.dto.PagedEntriesResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -23,6 +26,8 @@ import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 @Slf4j
@@ -35,6 +40,7 @@ public class DocumentController {
         private final BulkDocumentUploadUseCase bulkDocumentUploadUseCase;
         private final DocumentProcessUseCase documentProcessUseCase;
         private final DeleteDocumentUseCase deleteDocumentUseCase;
+        private final DownloadDocumentFileUseCase downloadDocumentFileUseCase;
         private final DocumentQueryUseCase documentQueryUseCase;
         private final DocumentSummaryUseCase documentSummaryUseCase;
         private final EntryQueryUseCase entryQueryUseCase;
@@ -84,6 +90,40 @@ public class DocumentController {
                 return documentProcessUseCase.processDocument(id)
                                 .<ResponseEntity<Object>>map(response -> ResponseEntity.status(HttpStatus.ACCEPTED)
                                                 .body((Object) response));
+        }
+
+        /**
+         * GET /api/v1/documents/{id}/file
+         * Baixa o PDF original enviado no upload.
+         */
+        @GetMapping("/{id}/file")
+        public Mono<ResponseEntity<Object>> downloadFile(@PathVariable String id) {
+                return downloadDocumentFileUseCase.execute(id)
+                                .map(result -> {
+                                        String encoded = URLEncoder.encode(result.fileName(), StandardCharsets.UTF_8)
+                                                        .replace("+", "%20");
+                                        String asciiName = result.fileName().replaceAll("[^A-Za-z0-9._-]", "_");
+                                        if (asciiName.isBlank()) {
+                                                asciiName = "documento.pdf";
+                                        }
+                                        MediaType mediaType;
+                                        try {
+                                                mediaType = MediaType.parseMediaType(result.contentType());
+                                        } catch (Exception ex) {
+                                                mediaType = MediaType.APPLICATION_PDF;
+                                        }
+                                        InputStreamResource resource = new InputStreamResource(result.inputStream());
+                                        ResponseEntity.BodyBuilder builder = ResponseEntity.ok()
+                                                        .header(HttpHeaders.CONTENT_DISPOSITION,
+                                                                        "attachment; filename=\"" + asciiName
+                                                                                        + "\"; filename*=UTF-8''"
+                                                                                        + encoded)
+                                                        .contentType(mediaType);
+                                        if (result.sizeBytes() > 0) {
+                                                builder.contentLength(result.sizeBytes());
+                                        }
+                                        return builder.body((Object) resource);
+                                });
         }
 
         @DeleteMapping("/{id}")
