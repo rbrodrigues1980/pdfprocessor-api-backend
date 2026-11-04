@@ -22,6 +22,9 @@ public final class ConsolidationAnoTotalsHelper {
         String origem = consolidatedResponse != null ? consolidatedResponse.getOrigem() : null;
 
         for (ConsolidationRow rubrica : consolidatedResponse.getRubricas()) {
+            if (IrJudicialExcelHelper.ehLinhaJudicial(rubrica)) {
+                continue;
+            }
             BigDecimal somaAno = BigDecimal.ZERO;
             for (int mes = 1; mes <= 12; mes++) {
                 String mesStr = String.format("%02d", mes);

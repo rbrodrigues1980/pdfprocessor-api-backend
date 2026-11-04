@@ -68,6 +68,36 @@ class IrDoacoesDeducaoCalculatorTest {
     }
 
     @Test
+    void diretaEca_limitadaA3PctDoImposto() {
+        DoacoesBrutasDTO brutas = calculator.fromRequestBrutas(
+                null, new BigDecimal("3822.40"), null, null, null);
+
+        DoacoesEfetivasDTO efetivas = calculator.calcularEfetivas(new BigDecimal("125298.96"), brutas);
+
+        assertEquals(new BigDecimal("3758.97"), efetivas.getDeducaoIncentivoEfetiva());
+    }
+
+    @Test
+    void diretaAbaixoDoTeto_mantemValor() {
+        DoacoesBrutasDTO brutas = calculator.fromRequestBrutas(
+                null, new BigDecimal("200.00"), new BigDecimal("100.00"), null, null);
+
+        DoacoesEfetivasDTO efetivas = calculator.calcularEfetivas(new BigDecimal("10000.00"), brutas);
+
+        assertEquals(new BigDecimal("300.00"), efetivas.getDeducaoIncentivoEfetiva());
+    }
+
+    @Test
+    void diretaMaisDuranteAno_limitadaA6PctGlobal() {
+        DoacoesBrutasDTO brutas = calculator.fromRequestBrutas(
+                new BigDecimal("500.00"), new BigDecimal("300.00"), new BigDecimal("300.00"), null, null);
+
+        DoacoesEfetivasDTO efetivas = calculator.calcularEfetivas(new BigDecimal("10000.00"), brutas);
+
+        assertEquals(new BigDecimal("600.00"), efetivas.getDeducaoIncentivoEfetiva());
+    }
+
+    @Test
     void inssDomestico_2016_aplicaTeto() {
         BigDecimal efetivo = IrDoacoesDeducaoCalculator.calcularInssDomesticoEfetivo(
                 new BigDecimal("1500.00"), 2016, null);

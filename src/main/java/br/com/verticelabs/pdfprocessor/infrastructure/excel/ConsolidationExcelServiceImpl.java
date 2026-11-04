@@ -3,6 +3,7 @@ package br.com.verticelabs.pdfprocessor.infrastructure.excel;
 import br.com.verticelabs.pdfprocessor.application.excel.ExcelExportService;
 import br.com.verticelabs.pdfprocessor.application.incometax.AjusteSimulacaoIrpf;
 import br.com.verticelabs.pdfprocessor.application.incometax.IrpfPrevidenciaOficialResolver;
+import br.com.verticelabs.pdfprocessor.application.incometax.IrpfDeclaracaoConsistencia;
 import br.com.verticelabs.pdfprocessor.application.incometax.IrpfDeclaracaoDataMapper;
 import br.com.verticelabs.pdfprocessor.application.tributacao.IrCalculoProgressivoService;
 import br.com.verticelabs.pdfprocessor.application.tributacao.IrDoacoesDeducaoCalculator;
@@ -823,22 +824,7 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
 
         // Total geral do ano: soma dos totais das rubricas (com regra NOV - FEV
         // aplicada)
-        BigDecimal totalGeralAno = BigDecimal.ZERO;
-        for (ConsolidationRow rubrica : consolidatedResponse.getRubricas()) {
-            if (IrJudicialExcelHelper.ehLinhaJudicial(rubrica)) {
-                continue;
-            }
-            // Calcular a soma simples para este ano
-            BigDecimal somaAno = BigDecimal.ZERO;
-            for (int mes = 1; mes <= 12; mes++) {
-                String mesStr = String.format("%02d", mes);
-                String referencia = ano + "-" + mesStr;
-                somaAno = somaAno.add(rubrica.getValores().getOrDefault(referencia, BigDecimal.ZERO));
-            }
-            // Aplicar regra Funcef (FEV+NOV → NOV) se origem for FUNCEF
-            totalGeralAno = totalGeralAno.add(
-                    calcularTotalRubricaAno(rubrica, ano, somaAno, consolidatedResponse.getOrigem()));
-        }
+        BigDecimal totalGeralAno = calcularTotalContracheques(consolidatedResponse, ano);
 
         Cell totalGeralCell = totalRow.createCell(colNum);
         totalGeralCell.setCellValue(totalGeralAno.doubleValue());
@@ -1011,24 +997,8 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
         // Total geral consolidado: soma dos totais das rubricas (com regra NOV - FEV
         // aplicada)
         BigDecimal totalGeralConsolidado = BigDecimal.ZERO;
-        for (ConsolidationRow rubrica : consolidatedResponse.getRubricas()) {
-            if (IrJudicialExcelHelper.ehLinhaJudicial(rubrica)) {
-                continue;
-            }
-            BigDecimal totalRubrica = BigDecimal.ZERO;
-            for (String ano : anos) {
-                // Calcular a soma simples para este ano
-                BigDecimal somaAno = BigDecimal.ZERO;
-                for (int mes = 1; mes <= 12; mes++) {
-                    String mesStr = String.format("%02d", mes);
-                    String referencia = ano + "-" + mesStr;
-                    somaAno = somaAno.add(rubrica.getValores().getOrDefault(referencia, BigDecimal.ZERO));
-                }
-                // Aplicar regra Funcef (FEV+NOV → NOV) se origem for FUNCEF
-                totalRubrica = totalRubrica.add(
-                        calcularTotalRubricaAno(rubrica, ano, somaAno, consolidatedResponse.getOrigem()));
-            }
-            totalGeralConsolidado = totalGeralConsolidado.add(totalRubrica);
+        for (String ano : anos) {
+            totalGeralConsolidado = totalGeralConsolidado.add(calcularTotalContracheques(consolidatedResponse, ano));
         }
 
         Cell totalGeralCell = totalRow.createCell(colNum);
@@ -1184,7 +1154,7 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
                 .map(docs -> {
                     Map<String, IrpfDeclaracaoData> map = new HashMap<>();
                     for (var doc : docs) {
-                        IrpfDeclaracaoData data = doc.getIrpfData();
+                        IrpfDeclaracaoData data = IrpfDeclaracaoConsistencia.aplicar(doc.getIrpfData());
                         String anoCalendario = data.getAnoCalendario();
                         if (anoCalendario != null && !anoCalendario.isBlank()) {
                             map.put(anoCalendario.trim(), data);
@@ -1429,35 +1399,43 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
         row = addSimTituloBloco(sheet, row, "IMPOSTO DEVIDO", sectionHeaderStyle);
         BigDecimal baseSim = IrpfDeclaracaoDataMapper.baseCalculoRendimentosMenosDeducoes(
                 simulacao.getRendimentosTributaveisTotal(), deducoes.getTotalDeducoes());
-        BigDecimal impostoSim = modelo.getImpostoDevidoFinal();
+        BigDecimal creditoDomestico = nvl(modelo.getCreditoInssDomestico());
+        BigDecimal impostoDevidoSim = modelo.getImpostoDevidoAposReducao();
+        BigDecimal incentivoSim = nvl(modelo.getDeducoesEspeciais());
+        BigDecimal impostoISim = modelo.getImpostoDevidoFinal();
+        BigDecimal impostoIISim = modelo.getImpostoDevidoII();
         if (baseSim != null && (modelo.getBaseCalculo() == null
                 || modelo.getBaseCalculo().compareTo(baseSim) != 0)) {
             BigDecimal recalculado = calcularImpostoComTabelaBanco(
                     baseSim, ano, tabelasTributacao, parametrosTributacao);
             if (recalculado.compareTo(BigDecimal.ZERO) > 0) {
-                impostoSim = recalculado;
+                impostoDevidoSim = recalculado;
+                incentivoSim = simuladorMotorService.calcularDoacoesEfetivas(recalculado, request).totalEfetivo();
+                impostoISim = recalculado.subtract(incentivoSim).max(BigDecimal.ZERO)
+                        .setScale(2, java.math.RoundingMode.DOWN);
+                impostoIISim = creditoDomestico.compareTo(BigDecimal.ZERO) > 0
+                        ? impostoISim.subtract(creditoDomestico).max(BigDecimal.ZERO)
+                                .setScale(2, java.math.RoundingMode.DOWN)
+                        : null;
             }
         }
         row = addSimDetalhe(sheet, row, "Base de cálculo do imposto", baseSim, subLabelStyle, valueStyle);
-        row = addSimDetalhe(sheet, row, "Imposto devido", impostoSim, subLabelStyle, valueStyle);
-        row = addSimDetalhe(sheet, row, "Dedução de incentivo", modelo.getDeducoesEspeciais(), subLabelStyle, valueStyle);
-        row = addSimDetalhe(sheet, row, "Imposto devido I", impostoSim, subLabelStyle, valueStyle);
+        row = addSimDetalhe(sheet, row, "Imposto devido", impostoDevidoSim, subLabelStyle, valueStyle);
+        row = addSimDetalhe(sheet, row, "Dedução de incentivo", incentivoSim, subLabelStyle, valueStyle);
+        row = addSimDetalhe(sheet, row, "Imposto devido I", impostoISim, subLabelStyle, valueStyle);
 
-        if (nvl(modelo.getCreditoInssDomestico()).compareTo(BigDecimal.ZERO) > 0) {
+        if (creditoDomestico.compareTo(BigDecimal.ZERO) > 0) {
             row = addSimDetalhe(sheet, row, "Contribuição Prev. Empregador Doméstico",
-                    modelo.getCreditoInssDomestico(), subLabelStyle, valueStyle);
+                    creditoDomestico, subLabelStyle, valueStyle);
         }
+        // Imposto devido II só tem valor quando há crédito INSS doméstico (RESUMO IRPF).
         row = addSimDetalhe(sheet, row, "Imposto devido II",
-                resolverImpostoDevidoIIExibicao(modelo), subLabelStyle, valueStyle);
+                impostoIISim != null ? impostoIISim : BigDecimal.ZERO, subLabelStyle, valueStyle);
         row = addSimDetalhe(sheet, row, "Imposto devido RRA", nvl(data.getImpostoSobreRRA()), subLabelStyle, valueStyle);
         row = addSimAliquotaDeclaracaoRow(sheet, row, "Aliquota efetiva (%)", modelo.getAliquotaEfetiva(),
                 subLabelStyle, valueStyle);
 
-        BigDecimal impostoProgressivoTotal = modelo.getImpostoDevidoII() != null
-                && modelo.getBaseCalculo() != null && baseSim != null
-                && modelo.getBaseCalculo().compareTo(baseSim) == 0
-                ? modelo.getImpostoDevidoII()
-                : impostoSim;
+        BigDecimal impostoProgressivoTotal = impostoIISim != null ? impostoIISim : impostoISim;
         BigDecimal totalDevido = nvl(impostoProgressivoTotal).add(nvl(data.getImpostoSobreRRA()));
         row = addSimDestaqueRow(sheet, row, "Total do imposto devido", totalDevido, totalStyle, totalLabelStyle);
 
@@ -1529,14 +1507,6 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
         val.setCellValue(valor != null ? valor.doubleValue() : 0.0);
         val.setCellStyle(valueStyle);
         return row + 1;
-    }
-
-    /** Imposto devido II só tem valor quando há crédito INSS doméstico (RESUMO IRPF). */
-    private BigDecimal resolverImpostoDevidoIIExibicao(ModeloTributacaoResultDTO modelo) {
-        if (modelo != null && modelo.getImpostoDevidoII() != null) {
-            return modelo.getImpostoDevidoII();
-        }
-        return BigDecimal.ZERO;
     }
 
     // =============================================

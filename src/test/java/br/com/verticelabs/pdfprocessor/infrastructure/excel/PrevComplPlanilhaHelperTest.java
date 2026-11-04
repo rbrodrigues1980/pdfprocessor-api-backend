@@ -291,6 +291,120 @@ class PrevComplPlanilhaHelperTest {
                 PrevComplPlanilhaHelper.calcularPrevComplSimulacao(consolidated, "2017", null));
     }
 
+    /**
+     * Helena 2018 (FUNCEF): IR 4327/4326/4426 fica na aba IR Judicial e não pode inflar a prev. complementar.
+     * Abono anual (4459/4482/4364) em FEV+NOV conta só NOV.
+     */
+    @Test
+    void helena2018_ignoraLinhasIrJudicial_igualAoTotalDaAba() {
+        List<ConsolidationRow> rubricas = List.of(
+                mensal("2018", "4430", "CONTRIBUIÇÃO EXTRAORDINARIA 2014",
+                        "251.83", "251.83", "251.83", "231.90", "231.90", "231.90",
+                        "231.90", "231.90", "231.90", "231.90", "231.90", "231.90"),
+                mensal("2018", "4477", "CONTRIBUIÇÃO EXTRAORDINARIA 2015",
+                        "712.01", "712.01", "712.01", "664.00", "664.00", "664.00",
+                        "664.00", "664.00", "664.00", "664.00", "664.00", "664.00"),
+                mensal("2018", "4513", "CONTRIBUIÇÃO EXTRAORDINARIA 2016",
+                        "0", "0", "0", "0", "868.72", "868.72",
+                        "868.72", "868.72", "868.72", "868.72", "868.72", "868.72"),
+                fevNov("2018", "4459", "CONT. EXTRAORDINARIA ABONO ANUAL - 2014", "125.92", "231.90"),
+                fevNov("2018", "4482", "CONT. EXTRAORDINARIA ABONO ANUAL - 2015", "356.00", "664.00"),
+                fevNov("2018", "4514", "CONT. EXTRAORDINARIA ABONO ANUAL - 2016", "0", "868.72"),
+                mensal("2018", "4362", "TAXA ADMINISTRATIVA - SALDADO",
+                        "72.47", "72.47", "72.47", "72.47", "72.47", "72.47",
+                        "72.47", "72.47", "72.47", "72.47", "72.47", "72.47"),
+                fevNov("2018", "4364", "TAXA ADM. AB. ANUAL FUNCEF - SALDADO", "36.23", "72.47"),
+                mensal("2018", "4327", "IMPOSTO RENDA FONTE (FUNCEF)",
+                        "2523.96", "2523.96", "2258.90", "2277.58", "2038.69", "2038.69",
+                        "2038.69", "2038.69", "2038.69", "2038.69", "2038.69", "2038.69"),
+                mensal("2018", "4326", "IMPOSTO RENDA ACAO JUDICIAL",
+                        "0", "0", "265.06", "246.37", "485.27", "485.27",
+                        "485.27", "485.27", "485.27", "485.27", "485.27", "485.27"),
+                fevNov("2018", "4426", "IR AB. AN. FUNCEF AC. JUDIC", "0", "485.27"));
+        ConsolidatedResponse consolidated = ConsolidatedResponse.builder()
+                .origem("FUNCEF")
+                .rubricas(rubricas)
+                .build();
+
+        BigDecimal totalAba = BigDecimal.ZERO;
+        for (ConsolidationRow row : rubricas) {
+            if (IrJudicialExcelHelper.ehLinhaJudicial(row)) {
+                continue;
+            }
+            BigDecimal soma = row.getValores().values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+            totalAba = totalAba.add(ConsolidationAnoTotalsHelper.calcularTotalRubricaAno(row, "2018", soma, "FUNCEF"));
+        }
+
+        assertEquals(new BigDecimal("20611.11"), totalAba.setScale(2));
+        assertEquals(totalAba.setScale(2),
+                ConsolidationAnoTotalsHelper.calcularTotalContracheques(consolidated, "2018").setScale(2));
+        assertEquals(new BigDecimal("20611.11"),
+                PrevComplPlanilhaHelper.calcularPrevComplSimulacao(consolidated, "2018", null));
+    }
+
+    /**
+     * Sandra 2019 (FUNCEF): 4326 (1.041,66) fica só na aba IR Judicial; a simulação usava 12.847,51.
+     * FUNCEF cód. 36 da declaração é patronal e não soma como extra.
+     */
+    @Test
+    void sandra2019_ignoraIrJudicial_igualAoTotalDaAba() {
+        List<ConsolidationRow> rubricas = List.of(
+                mensal("2019", "4309", "FUNCEF CONTRIBUICAO",
+                        "219.54", "219.54", "219.54", "219.54", "219.54", "219.54",
+                        "219.54", "219.54", "246.63", "246.63", "246.63", "246.63"),
+                mensal("2019", "4483", "CONTRIBUIÇÃO EXTRAORDINARIA - REPLAN - 2015",
+                        "382.82", "382.82", "382.82", "382.82", "382.82", "382.82",
+                        "382.82", "384.75", "432.22", "432.22", "432.22", "432.22"),
+                mensal("2019", "4484", "CONT. EXTRAORDINARIA ABONO ANUAL - REPLAN - 2015",
+                        "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "432.22", "0"),
+                mensal("2019", "4515", "CONTRIBUIÇÃO EXTRAORDINARIA - REPLAN - 2016",
+                        "281.01", "281.01", "281.01", "281.01", "281.01", "281.01",
+                        "281.01", "282.65", "317.54", "317.54", "317.54", "317.54"),
+                mensal("2019", "4516", "CONT. EXTRAORDINARIA ABONO ANUAL - REPLAN - 2016",
+                        "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "317.54", "0"),
+                mensal("2019", "4326", "IMPOSTO RENDA ACAO JUDICIAL",
+                        "0", "173.61", "173.61", "173.61", "173.61", "173.61",
+                        "173.61", "0", "0", "0", "0", "0"),
+                mensal("2019", "4327", "IMPOSTO RENDA FONTE (FUNCEF)",
+                        "373.16", "373.16", "373.16", "373.16", "373.16", "373.16",
+                        "546.77", "546.77", "694.46", "694.46", "694.46", "694.46"));
+        ConsolidatedResponse consolidated = ConsolidatedResponse.builder()
+                .origem("FUNCEF")
+                .rubricas(rubricas)
+                .build();
+        IrpfDeclaracaoData declaracao = IrpfDeclaracaoData.builder()
+                .anoCalendario("2019")
+                .exercicio("2020")
+                .pagamentosEfetuados(List.of(PagamentoEfetuadoIrpf.builder()
+                        .codigo("36")
+                        .nomeBeneficiario("FUNDACAO DOS ECONOMIARIOS FEDERAIS FUNCEF")
+                        .cpfCnpj("00.436.923/0001-90")
+                        .valorPago(new BigDecimal("6061.99"))
+                        .build()))
+                .build();
+
+        BigDecimal totalAba = ConsolidationAnoTotalsHelper.calcularTotalContracheques(consolidated, "2019")
+                .setScale(2);
+        assertEquals(new BigDecimal("11805.85"), totalAba);
+        assertEquals(totalAba,
+                PrevComplPlanilhaHelper.calcularPrevComplSimulacao(consolidated, "2019", declaracao));
+    }
+
+    private static ConsolidationRow mensal(String ano, String codigo, String descricao, String... meses) {
+        Map<String, BigDecimal> valores = new HashMap<>();
+        for (int i = 0; i < meses.length; i++) {
+            valores.put(String.format("%s-%02d", ano, i + 1), new BigDecimal(meses[i]));
+        }
+        return ConsolidationRow.builder().codigo(codigo).descricao(descricao).valores(valores).build();
+    }
+
+    private static ConsolidationRow fevNov(String ano, String codigo, String descricao, String fev, String nov) {
+        Map<String, BigDecimal> valores = new HashMap<>();
+        valores.put(ano + "-02", new BigDecimal(fev));
+        valores.put(ano + "-11", new BigDecimal(nov));
+        return ConsolidationRow.builder().codigo(codigo).descricao(descricao).valores(valores).build();
+    }
+
     private static IrpfDeclaracaoData margaridaAc2016Pagamentos() {
         List<PagamentoEfetuadoIrpf> pagamentos = new ArrayList<>();
         pagamentos.add(PagamentoEfetuadoIrpf.builder()

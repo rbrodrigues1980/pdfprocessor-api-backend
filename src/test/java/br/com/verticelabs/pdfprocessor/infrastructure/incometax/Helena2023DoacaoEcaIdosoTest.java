@@ -90,7 +90,11 @@ class Helena2023DoacaoEcaIdosoTest {
 
         ExcelIrpfSimulacaoMapper mapper = new ExcelIrpfSimulacaoMapper(new IrPagamentosDeducaoAggregator());
         SimuladorIrpfRequest request = mapper.fromDeclaracao(data, BigDecimal.ZERO);
-        assertEquals(0, RESUMO.compareTo(request.getDeducaoIncentivo()),
+        assertEquals(0, ECA.compareTo(request.getIncentivoDiretoEca()));
+        BigDecimal totalIncentivo = request.getDeducaoIncentivo()
+                .add(request.getIncentivoDiretoEca())
+                .add(request.getIncentivoDiretoIdoso());
+        assertEquals(0, RESUMO.compareTo(totalIncentivo),
                 "Se a extração granular perdeu o Idoso, o RESUMO 543,48 prevalece sobre 271,74");
     }
 

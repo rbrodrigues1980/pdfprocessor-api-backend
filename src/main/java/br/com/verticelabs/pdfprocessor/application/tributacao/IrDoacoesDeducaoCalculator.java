@@ -10,12 +10,15 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 
 /**
- * Aplica travas legais sobre doações (6% global incentivo, 1% PRONON/PRONAS).
+ * Aplica travas legais sobre doações (6% global incentivo, 3% ECA/Idoso direto na declaração,
+ * 1% PRONON/PRONAS).
  */
 @Component
 public class IrDoacoesDeducaoCalculator {
 
     private static final BigDecimal LIMITE_INCENTIVO_PCT = new BigDecimal("0.06");
+    /** ECA e Pessoa Idosa informados diretamente na declaração: 3% cada (Lei 8.069 art. 260-A; Lei 10.741). */
+    private static final BigDecimal LIMITE_DIRETA_DECLARACAO_PCT = new BigDecimal("0.03");
     private static final BigDecimal LIMITE_PRONON_PCT = new BigDecimal("0.01");
     private static final BigDecimal LIMITE_PRONAS_PCT = new BigDecimal("0.01");
     private static final RoundingMode RM = RoundingMode.HALF_UP;
@@ -27,11 +30,16 @@ public class IrDoacoesDeducaoCalculator {
 
         BigDecimal base = nvl(impostoAposReducao);
         BigDecimal tetoIncentivo = base.multiply(LIMITE_INCENTIVO_PCT).setScale(2, RM);
+        BigDecimal tetoDireta = base.multiply(LIMITE_DIRETA_DECLARACAO_PCT).setScale(2, RM);
         BigDecimal tetoPronon = base.multiply(LIMITE_PRONON_PCT).setScale(2, RM);
         BigDecimal tetoPronas = base.multiply(LIMITE_PRONAS_PCT).setScale(2, RM);
 
+        BigDecimal incentivo = nvl(brutas.getDeducaoIncentivoBruta())
+                .add(nvl(brutas.getIncentivoDiretoEcaBruto()).min(tetoDireta))
+                .add(nvl(brutas.getIncentivoDiretoIdosoBruto()).min(tetoDireta));
+
         return DoacoesEfetivasDTO.builder()
-                .deducaoIncentivoEfetiva(nvl(brutas.getDeducaoIncentivoBruta()).min(tetoIncentivo).setScale(2, RM))
+                .deducaoIncentivoEfetiva(incentivo.min(tetoIncentivo).setScale(2, RM))
                 .dedPrononEfetiva(nvl(brutas.getDedPrononBruta()).min(tetoPronon).setScale(2, RM))
                 .dedPronasEfetiva(nvl(brutas.getDedPronasBruta()).min(tetoPronas).setScale(2, RM))
                 .build();
@@ -41,8 +49,19 @@ public class IrDoacoesDeducaoCalculator {
             BigDecimal deducaoIncentivo,
             BigDecimal dedPronon,
             BigDecimal dedPronas) {
+        return fromRequestBrutas(deducaoIncentivo, null, null, dedPronon, dedPronas);
+    }
+
+    public DoacoesBrutasDTO fromRequestBrutas(
+            BigDecimal deducaoIncentivo,
+            BigDecimal incentivoDiretoEca,
+            BigDecimal incentivoDiretoIdoso,
+            BigDecimal dedPronon,
+            BigDecimal dedPronas) {
         return DoacoesBrutasDTO.builder()
                 .deducaoIncentivoBruta(nvl(deducaoIncentivo))
+                .incentivoDiretoEcaBruto(nvl(incentivoDiretoEca))
+                .incentivoDiretoIdosoBruto(nvl(incentivoDiretoIdoso))
                 .dedPrononBruta(nvl(dedPronon))
                 .dedPronasBruta(nvl(dedPronas))
                 .build();
