@@ -1,5 +1,7 @@
 package br.com.verticelabs.pdfprocessor.infrastructure.incometax;
 
+import br.com.verticelabs.pdfprocessor.application.incometax.IrpfDeclaracaoConsistencia;
+import br.com.verticelabs.pdfprocessor.domain.model.IrpfDeclaracaoData;
 import br.com.verticelabs.pdfprocessor.domain.service.ITextIncomeTaxService;
 import br.com.verticelabs.pdfprocessor.domain.service.IncomeTaxDeclarationService;
 import com.itextpdf.kernel.pdf.PdfDocument;
@@ -184,7 +186,7 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
     private static final Pattern DEDUCOES_PENSAO_JUDICIAL_PATTERN = Pattern.compile(
-            "(?i)pens[ãa]o\\s+aliment[íi]cia\\s+judicial(?!\\s*\\()?[\\s\\S]*?([\\d]{1,3}(?:[.]\\d{3})*,\\d{2})",
+            "(?i)pens[ãa]o\\s+aliment[íi]cia\\s+judicial(?!\\s*\\()[\\s\\S]*?([\\d]{1,3}(?:[.]\\d{3})*,\\d{2})",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
     private static final Pattern DEDUCOES_PENSAO_ESCRITURA_PATTERN = Pattern.compile(
@@ -637,6 +639,15 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
     }
 
     /**
+     * Mesmo parsing de {@link #extractIncomeTaxInfo(InputStream)} a partir dos textos já extraídos
+     * (página de identificação, RESUMO vigente e todas as páginas com marcadores {@code === PAGINA n ===}).
+     */
+    IncomeTaxDeclarationService.IncomeTaxInfo parseFromPageTexts(
+            String identPageText, String resumoPageText, String allPagesText) {
+        return parseIncomeTaxInfo(identPageText, resumoPageText, recortarUltimaDeclaracao(allPagesText));
+    }
+
+    /**
      * Faz o parsing das informações de IR a partir do texto extraído.
      */
     private IncomeTaxDeclarationService.IncomeTaxInfo parseIncomeTaxInfo(String primeiraPageText,
@@ -985,6 +996,39 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
         // Alimentandos
         List<DependenteInfo> alimentandos = extractAlimentandos(primeiraPageText);
         log.info("🍽️ Alimentandos: {} encontrados", alimentandos.size());
+
+        IrpfDeclaracaoData conferido = IrpfDeclaracaoConsistencia.aplicar(IrpfDeclaracaoData.builder()
+                .cpfTitular(cpf)
+                .anoCalendario(anoCalendario)
+                .tipoTributacao(tipoTributacao)
+                .rendimentosTributaveisTotal(rendimentosTributaveis)
+                .rendimentosTributaveisTitularPJ(rendimentosTributaveisTitularPJ)
+                .rendimentosTributaveisDependentesPJ(rendimentosTributaveisDependentesPJ)
+                .rendimentosTributaveisTitularPF(rendimentosTributaveisTitularPF)
+                .rendimentosTributaveisDependentesPF(rendimentosTributaveisDependentesPF)
+                .rendimentosAcumuladosTitular(rendimentosAcumuladosTitular)
+                .rendimentosAcumuladosDependentes(rendimentosAcumuladosDependentes)
+                .resultadoAtividadeRural(resultadoAtividadeRural)
+                .descontoSimplificado(descontoSimplificado)
+                .deducoesTotal(deducoes)
+                .baseCalculoImposto(baseCalculoImposto)
+                .impostoDevido(impostoDevido)
+                .deducaoIncentivo(deducaoIncentivo)
+                .impostoDevidoI(impostoDevidoI)
+                .contribuicaoPatronalPrevidenciaSocial(contribuicaoPrevEmpregadorDomestico)
+                .impostoSobreRRA(impostoDevidoRRA)
+                .totalImpostoDevido(totalImpostoDevido)
+                .impostoPagoTotal(impostoPagoTotal)
+                .impostoRestituir(impostoRestituir)
+                .saldoImpostoPagar(saldoImpostoPagar)
+                .build());
+        rendimentosTributaveis = conferido.getRendimentosTributaveisTotal();
+        rendimentosTributaveisTitularPF = conferido.getRendimentosTributaveisTitularPF();
+        baseCalculoImposto = conferido.getBaseCalculoImposto();
+        impostoDevido = conferido.getImpostoDevido();
+        impostoDevidoI = conferido.getImpostoDevidoI();
+        impostoRestituir = conferido.getImpostoRestituir();
+        saldoImpostoPagar = conferido.getSaldoImpostoPagar();
 
         return new IncomeTaxDeclarationService.IncomeTaxInfo(
                 nome, cpf, anoCalendario, exercicio,

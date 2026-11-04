@@ -1,6 +1,7 @@
 package br.com.verticelabs.pdfprocessor.application.excel;
 
 import br.com.verticelabs.pdfprocessor.application.consolidation.ConsolidationUseCase;
+import br.com.verticelabs.pdfprocessor.application.incometax.IrpfDeclaracaoConsistencia;
 import br.com.verticelabs.pdfprocessor.application.security.EvaluatorAccessService;
 import br.com.verticelabs.pdfprocessor.domain.exceptions.NoEntriesFoundException;
 import br.com.verticelabs.pdfprocessor.domain.exceptions.PersonNotFoundException;
@@ -101,7 +102,7 @@ public class ResumoGeralUseCase {
                 .map(docs -> {
                     Map<String, IrpfDeclaracaoData> map = new HashMap<>();
                     for (var doc : docs) {
-                        IrpfDeclaracaoData data = doc.getIrpfData();
+                        IrpfDeclaracaoData data = IrpfDeclaracaoConsistencia.aplicar(doc.getIrpfData());
                         String anoCalendario = data.getAnoCalendario();
                         if (anoCalendario != null && !anoCalendario.isBlank()) {
                             map.put(anoCalendario.trim(), data);

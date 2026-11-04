@@ -105,7 +105,7 @@ public class IrpfDeclaracaoDataMapper {
                 info.getRendimentosAcumuladosDependentes(),
                 info.getResultadoAtividadeRural());
 
-        return IrpfDeclaracaoData.builder()
+        return IrpfDeclaracaoConsistencia.aplicar(IrpfDeclaracaoData.builder()
                 .nomeTitular(info.getNome())
                 .cpfTitular(info.getCpf())
                 .exercicio(info.getExercicio())
@@ -176,7 +176,7 @@ public class IrpfDeclaracaoDataMapper {
                 .depositosJudiciais(info.getDepositosJudiciais())
                 .impostoDiferidoGanhosCapital(info.getImpostoDiferidoGanhosCapital())
                 .doacoesPartidosPoliticos(info.getDoacoesPartidosPoliticos())
-                .build();
+                .build());
     }
 
     /**

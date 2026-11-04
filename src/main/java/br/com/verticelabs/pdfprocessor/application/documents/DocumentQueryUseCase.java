@@ -1,5 +1,6 @@
 package br.com.verticelabs.pdfprocessor.application.documents;
 
+import br.com.verticelabs.pdfprocessor.application.incometax.IrpfDeclaracaoConsistencia;
 import br.com.verticelabs.pdfprocessor.application.security.EvaluatorAccessService;
 import br.com.verticelabs.pdfprocessor.domain.exceptions.DocumentNotFoundException;
 import br.com.verticelabs.pdfprocessor.domain.exceptions.PersonNotFoundException;
@@ -320,7 +321,7 @@ public class DocumentQueryUseCase {
                     if (doc.getIrpfData() == null) {
                         throw new IllegalStateException("Dados de IRPF não disponíveis para este documento");
                     }
-                    return doc.getIrpfData();
+                    return IrpfDeclaracaoConsistencia.aplicar(doc.getIrpfData());
                 });
     }
 

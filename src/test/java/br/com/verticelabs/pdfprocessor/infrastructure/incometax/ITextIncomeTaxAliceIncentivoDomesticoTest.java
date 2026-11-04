@@ -1,5 +1,6 @@
 package br.com.verticelabs.pdfprocessor.infrastructure.incometax;
 
+import br.com.verticelabs.pdfprocessor.domain.service.IncomeTaxDeclarationService.IncomeTaxInfo;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -74,5 +75,23 @@ class ITextIncomeTaxAliceIncentivoDomesticoTest {
                 "Incentivo não pode ser 1.093,77 (doméstico); era=" + deducao);
         assertEquals(0, new BigDecimal("10092.47").compareTo(impostoI),
                 "Imposto devido I permanece 10.092,47; era=" + impostoI);
+    }
+
+    @Test
+    @DisplayName("declaração real: incentivo 0, doméstico 1.093,77 e restituição 6.875,58")
+    void declaracaoReal2016() {
+        IncomeTaxInfo info = IrpfFixtures.parse("alice-2016");
+
+        assertValor("0.00", info.getDeducaoIncentivo());
+        assertValor("10092.47", info.getImpostoDevidoI());
+        assertValor("1093.77", info.getContribuicaoPrevEmpregadorDomestico());
+        assertValor("8998.70", info.getTotalImpostoDevido());
+        assertValor("74635.62", info.getBaseCalculoImposto());
+        assertValor("6875.58", info.getImpostoRestituir());
+    }
+
+    private static void assertValor(String esperado, BigDecimal atual) {
+        assertEquals(0, new BigDecimal(esperado).compareTo(atual != null ? atual : BigDecimal.ZERO),
+                () -> "esperado " + esperado + ", obtido " + atual);
     }
 }

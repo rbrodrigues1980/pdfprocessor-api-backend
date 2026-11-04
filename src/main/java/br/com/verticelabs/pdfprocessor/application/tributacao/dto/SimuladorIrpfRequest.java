@@ -58,6 +58,10 @@ public class SimuladorIrpfRequest {
 
     // Deduções especiais (item 5)
     private BigDecimal deducaoIncentivo;
+    /** ECA direto na declaração (teto 3% do imposto). */
+    private BigDecimal incentivoDiretoEca;
+    /** Pessoa Idosa direto na declaração (teto 3% do imposto). */
+    private BigDecimal incentivoDiretoIdoso;
     private BigDecimal dedPronas;
     private BigDecimal dedPronon;
 

@@ -13,14 +13,9 @@ import br.com.verticelabs.pdfprocessor.domain.service.IncomeTaxDeclarationServic
 import br.com.verticelabs.pdfprocessor.infrastructure.config.IrTributacaoParametrosUtil;
 import br.com.verticelabs.pdfprocessor.infrastructure.excel.ExcelIrpfDeducoesResumoHelper;
 import br.com.verticelabs.pdfprocessor.infrastructure.excel.ExcelIrpfSimulacaoMapper;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 
-import java.io.FileInputStream;
 import java.math.BigDecimal;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -32,8 +27,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class Alessandra2016InstrucaoDependentesTest {
 
-    private static final Path PDF = Paths.get(
-            "temp/PASTADOCUMENTOS/Alessandra Christine Barros dos Santos - APCEF PE/DeclaraçãodeImpostodeRenda_2016RET1.pdf");
     private static final BigDecimal INSTRUCAO = new BigDecimal("7123.00");
     private static final BigDecimal LIMITE = new BigDecimal("3561.50");
 
@@ -58,11 +51,8 @@ class Alessandra2016InstrucaoDependentesTest {
     }
 
     @Test
-    void pdf2016SimulacaoInstrucao7123() throws Exception {
-        Assumptions.assumeTrue(Files.isRegularFile(PDF), "PDF Alessandra 2016 não encontrado: " + PDF.toAbsolutePath());
-
-        ITextIncomeTaxServiceImpl service = new ITextIncomeTaxServiceImpl();
-        IncomeTaxInfo info = service.extractIncomeTaxInfo(new FileInputStream(PDF.toFile())).block();
+    void declaracao2016SimulacaoInstrucao7123() {
+        IncomeTaxInfo info = IrpfFixtures.parse("alessandra-2016");
 
         List<PagamentoEfetuado> instrucao = info.getPagamentosEfetuados().stream()
                 .filter(p -> "01".equals(p.getCodigo()))

@@ -40,6 +40,8 @@ public class IrSimuladorMotorService {
 
         DoacoesBrutasDTO doacoesBrutas = doacoesCalculator.fromRequestBrutas(
                 request.getDeducaoIncentivo(),
+                request.getIncentivoDiretoEca(),
+                request.getIncentivoDiretoIdoso(),
                 request.getDedPronon(),
                 request.getDedPronas());
 
@@ -104,6 +106,16 @@ public class IrSimuladorMotorService {
         efetiva = efetiva.add(somarEducacaoPorPessoa(request.getDespesasInstrucaoDependentes(), dependentes, limiteEducacao));
         efetiva = efetiva.add(somarEducacaoPorPessoa(request.getDespesasInstrucaoAlimentandos(), alimentandos, limiteEducacao));
         return efetiva.setScale(2, RM);
+    }
+
+    /** Travas legais das doações do request sobre um imposto apurado fora do motor (ex.: recálculo pela tabela). */
+    public DoacoesEfetivasDTO calcularDoacoesEfetivas(BigDecimal impostoAposReducao, SimuladorIrpfRequest request) {
+        return doacoesCalculator.calcularEfetivas(impostoAposReducao, doacoesCalculator.fromRequestBrutas(
+                request.getDeducaoIncentivo(),
+                request.getIncentivoDiretoEca(),
+                request.getIncentivoDiretoIdoso(),
+                request.getDedPronon(),
+                request.getDedPronas()));
     }
 
     /** INSS patronal empregador doméstico efetivo (crédito ou dedução conforme flag do request). */

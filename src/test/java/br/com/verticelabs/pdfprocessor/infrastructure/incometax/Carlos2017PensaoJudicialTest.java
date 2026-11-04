@@ -11,14 +11,9 @@ import br.com.verticelabs.pdfprocessor.domain.service.IncomeTaxDeclarationServic
 import br.com.verticelabs.pdfprocessor.domain.service.IncomeTaxDeclarationService.IncomeTaxInfo.PagamentoEfetuado;
 import br.com.verticelabs.pdfprocessor.infrastructure.excel.ExcelIrpfDeducoesResumoHelper;
 import br.com.verticelabs.pdfprocessor.infrastructure.excel.ExcelIrpfSimulacaoMapper;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 
-import java.io.FileInputStream;
 import java.math.BigDecimal;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -29,11 +24,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * faziam a pensão do Alessandro sumir da simulação (2017 e 2018).
  */
 class Carlos2017PensaoJudicialTest {
-
-    private static final Path PDF_2017 = Paths.get(
-            "temp/PASTADOCUMENTOS/Carlos Alberto de Melo Silva - AEA PE/DeclaraçãodeImpostodeRenda_2017.pdf");
-    private static final Path PDF_2018 = Paths.get(
-            "temp/PASTADOCUMENTOS/Carlos Alberto de Melo Silva - AEA PE/DeclaraçãodeImpostodeRenda_2018.pdf");
 
     @Test
     void normalizaCpfQuebradoEValorComEspaco() {
@@ -52,29 +42,26 @@ class Carlos2017PensaoJudicialTest {
     }
 
     @Test
-    void pdf2017SomaAsDuasPensoesJudiciais() throws Exception {
+    void declaracao2017SomaAsDuasPensoesJudiciais() {
         assertPensaoSimulacao(
-                PDF_2017,
+                "carlos-2017",
                 new BigDecimal("3966.93"),
                 new BigDecimal("17178.73"),
                 new BigDecimal("21145.66"));
     }
 
     @Test
-    void pdf2018SomaAsDuasPensoesJudiciais() throws Exception {
+    void declaracao2018SomaAsDuasPensoesJudiciais() {
         assertPensaoSimulacao(
-                PDF_2018,
+                "carlos-2018",
                 new BigDecimal("3453.11"),
                 new BigDecimal("15746.65"),
                 new BigDecimal("19199.76"));
     }
 
     private static void assertPensaoSimulacao(
-            Path pdf, BigDecimal alessandro, BigDecimal nair, BigDecimal pensao) throws Exception {
-        Assumptions.assumeTrue(Files.isRegularFile(pdf), "PDF não encontrado: " + pdf.toAbsolutePath());
-
-        ITextIncomeTaxServiceImpl service = new ITextIncomeTaxServiceImpl();
-        IncomeTaxInfo info = service.extractIncomeTaxInfo(new FileInputStream(pdf.toFile())).block();
+            String fixture, BigDecimal alessandro, BigDecimal nair, BigDecimal pensao) {
+        IncomeTaxInfo info = IrpfFixtures.parse(fixture);
 
         List<PagamentoEfetuado> pensoes = info.getPagamentosEfetuados().stream()
                 .filter(p -> "30".equals(p.getCodigo()))
