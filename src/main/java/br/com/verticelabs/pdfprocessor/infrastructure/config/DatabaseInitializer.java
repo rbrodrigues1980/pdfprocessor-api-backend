@@ -38,6 +38,11 @@ public class DatabaseInitializer implements CommandLineRunner {
         
         // Inicializar collection users com índice único em email
         initializeUsersCollection();
+
+        // Lookup IR / SELIC / conversas — anotações @Indexed não criam índice (auto-index off)
+        initializeIrTabelaTributacaoCollection();
+        initializeTaxaSelicCollection();
+        initializeConversationsCollection();
     }
 
     private void initializeRubricasCollection() {
@@ -178,12 +183,19 @@ public class DatabaseInitializer implements CommandLineRunner {
                             
                             // Índice simples em tenantId para consultas rápidas
                             Index tenantIdIndex = new Index().on("tenantId", org.springframework.data.domain.Sort.Direction.ASC);
+
+                            // Filtro listagem: tenant + validado (regex em nome ainda varre o subconjunto)
+                            Index tenantValidadoIndex = new Index()
+                                    .on("tenantId", org.springframework.data.domain.Sort.Direction.ASC)
+                                    .on("validado", org.springframework.data.domain.Sort.Direction.ASC);
                             
                             return Mono.when(
                                     indexOps.ensureIndex(tenantCpfIndex),
-                                    indexOps.ensureIndex(tenantIdIndex)
+                                    indexOps.ensureIndex(tenantIdIndex),
+                                    indexOps.ensureIndex(tenantValidadoIndex)
                             )
-                            .doOnSuccess(v -> log.info("Collection '{}' inicializada. Índices criados: (tenantId, cpf) único, tenantId", 
+                            .doOnSuccess(v -> log.info(
+                                    "Collection '{}' inicializada. Índices: (tenantId, cpf) único, tenantId, (tenantId, validado)",
                                     collectionName))
                             .doOnError(error -> {
                                 if (error.getMessage() != null && error.getMessage().contains("duplicate")) {
@@ -204,12 +216,18 @@ public class DatabaseInitializer implements CommandLineRunner {
                                     .unique();
                             
                             Index tenantIdIndex = new Index().on("tenantId", org.springframework.data.domain.Sort.Direction.ASC);
+
+                            Index tenantValidadoIndex = new Index()
+                                    .on("tenantId", org.springframework.data.domain.Sort.Direction.ASC)
+                                    .on("validado", org.springframework.data.domain.Sort.Direction.ASC);
                             
                             return Mono.when(
                                     indexOps.ensureIndex(tenantCpfIndex),
-                                    indexOps.ensureIndex(tenantIdIndex)
+                                    indexOps.ensureIndex(tenantIdIndex),
+                                    indexOps.ensureIndex(tenantValidadoIndex)
                             )
-                            .doOnSuccess(v -> log.info("Collection '{}' inicializada. Índices criados: (tenantId, cpf) único, tenantId", 
+                            .doOnSuccess(v -> log.info(
+                                    "Collection '{}' inicializada. Índices: (tenantId, cpf) único, tenantId, (tenantId, validado)",
                                     collectionName))
                             .doOnError(error -> {
                                 if (error.getMessage() != null && error.getMessage().contains("duplicate")) {
@@ -264,6 +282,68 @@ public class DatabaseInitializer implements CommandLineRunner {
                         log.warn("Aviso ao criar índice na collection '{}': {}", collectionName, error.getMessage());
                     }
                 })
+                .onErrorResume(error -> Mono.empty())
+                .subscribe();
+    }
+
+    private void initializeIrTabelaTributacaoCollection() {
+        String collectionName = "ir_tabela_tributacao";
+        log.info("Criando índices para collection '{}'...", collectionName);
+
+        ReactiveIndexOperations indexOps = mongoTemplate.indexOps(collectionName);
+        Index anoTipoFaixaIndex = new Index()
+                .named("idx_ano_tipo_faixa")
+                .on("anoCalendario", org.springframework.data.domain.Sort.Direction.ASC)
+                .on("tipoIncidencia", org.springframework.data.domain.Sort.Direction.ASC)
+                .on("faixa", org.springframework.data.domain.Sort.Direction.ASC)
+                .unique();
+
+        indexOps.ensureIndex(anoTipoFaixaIndex)
+                .doOnSuccess(name -> log.info(
+                        "Collection '{}' inicializada. Índice único 'idx_ano_tipo_faixa' criado: {}",
+                        collectionName, name))
+                .doOnError(error -> log.warn("Aviso ao criar índices na collection '{}': {}", collectionName, error.getMessage()))
+                .onErrorResume(error -> Mono.empty())
+                .subscribe();
+    }
+
+    private void initializeTaxaSelicCollection() {
+        String collectionName = "taxa_selic";
+        log.info("Criando índices para collection '{}'...", collectionName);
+
+        ReactiveIndexOperations indexOps = mongoTemplate.indexOps(collectionName);
+        Index reuniaoIndex = new Index()
+                .on("numeroReuniaoCopom", org.springframework.data.domain.Sort.Direction.ASC)
+                .unique();
+        Index vigenciaIndex = new Index()
+                .on("dataInicioVigencia", org.springframework.data.domain.Sort.Direction.ASC);
+
+        Mono.when(
+                        indexOps.ensureIndex(reuniaoIndex),
+                        indexOps.ensureIndex(vigenciaIndex))
+                .doOnSuccess(v -> log.info(
+                        "Collection '{}' inicializada. Índices: numeroReuniaoCopom único, dataInicioVigencia",
+                        collectionName))
+                .doOnError(error -> log.warn("Aviso ao criar índices na collection '{}': {}", collectionName, error.getMessage()))
+                .onErrorResume(error -> Mono.empty())
+                .subscribe();
+    }
+
+    private void initializeConversationsCollection() {
+        String collectionName = "conversations";
+        log.info("Criando índices para collection '{}'...", collectionName);
+
+        ReactiveIndexOperations indexOps = mongoTemplate.indexOps(collectionName);
+        Index participantLastMessageIndex = new Index()
+                .named("participant_last_message")
+                .on("participantUserIds", org.springframework.data.domain.Sort.Direction.ASC)
+                .on("lastMessageAt", org.springframework.data.domain.Sort.Direction.DESC);
+
+        indexOps.ensureIndex(participantLastMessageIndex)
+                .doOnSuccess(name -> log.info(
+                        "Collection '{}' inicializada. Índice 'participant_last_message' criado: {}",
+                        collectionName, name))
+                .doOnError(error -> log.warn("Aviso ao criar índices na collection '{}': {}", collectionName, error.getMessage()))
                 .onErrorResume(error -> Mono.empty())
                 .subscribe();
     }

@@ -48,13 +48,10 @@ public class DownloadDocumentFileUseCase {
         return ReactiveSecurityContextHelper.isSuperAdmin()
                 .flatMap(isSuperAdmin -> {
                     if (Boolean.TRUE.equals(isSuperAdmin)) {
-                        return ReactiveSecurityContextHelper.getTenantId()
-                                .flatMap(tenantId -> documentRepository.findByTenantIdAndId(tenantId, documentId))
-                                .onErrorResume(IllegalStateException.class, e -> {
-                                    @SuppressWarnings("deprecation")
-                                    var result = documentRepository.findById(documentId);
-                                    return result;
-                                });
+                        // SUPER_ADMIN: sempre cross-tenant (JWT pode ter tenantId legado)
+                        @SuppressWarnings("deprecation")
+                        var result = documentRepository.findById(documentId);
+                        return result;
                     }
                     return ReactiveSecurityContextHelper.getTenantId()
                             .flatMap(tenantId -> documentRepository.findByTenantIdAndId(tenantId, documentId));

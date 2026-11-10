@@ -86,6 +86,29 @@ class DownloadDocumentFileUseCaseTest {
     }
 
     @Test
+    void superAdminComTenantNoJwt_baixaDocumentoDeOutroTenant() {
+        var useCase = new DownloadDocumentFileUseCase(documentRepository, gridFsService);
+        PayrollDocument document = PayrollDocument.builder()
+                .id("doc-2")
+                .tenantId("outro-tenant")
+                .tipo(DocumentType.FUNCEF)
+                .anoDetectado(2016)
+                .originalFileId("507f1f77bcf86cd799439011")
+                .build();
+        when(documentRepository.findById("doc-2")).thenReturn(Mono.just(document));
+        when(gridFsService.openFile("507f1f77bcf86cd799439011"))
+                .thenReturn(Mono.just(new StoredFile(
+                        new ByteArrayInputStream(new byte[] {1, 2, 3}),
+                        "contracheque-2016.pdf",
+                        "application/pdf",
+                        3)));
+
+        StepVerifier.create(useCase.execute("doc-2").contextWrite(security("jwt-tenant", "SUPER_ADMIN")))
+                .assertNext(result -> assertEquals("contracheque-2016.pdf", result.fileName()))
+                .verifyComplete();
+    }
+
+    @Test
     void nomeDoArquivoRemoveCaminho() {
         assertEquals("informe.pdf", DownloadDocumentFileUseCase.safeFileName("C:\\pasta\\informe.pdf", "fallback.pdf"));
         assertEquals("fallback.pdf", DownloadDocumentFileUseCase.safeFileName("   ", "fallback.pdf"));
