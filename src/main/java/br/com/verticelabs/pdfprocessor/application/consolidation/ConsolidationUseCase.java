@@ -10,6 +10,7 @@ import br.com.verticelabs.pdfprocessor.domain.model.Rubrica;
 import br.com.verticelabs.pdfprocessor.domain.repository.PayrollDocumentRepository;
 import br.com.verticelabs.pdfprocessor.domain.repository.PersonRepository;
 import br.com.verticelabs.pdfprocessor.infrastructure.excel.IrJudicialExcelHelper;
+import br.com.verticelabs.pdfprocessor.infrastructure.excel.SabesprevFichaTotaisHelper;
 import br.com.verticelabs.pdfprocessor.infrastructure.security.ReactiveSecurityContextHelper;
 import br.com.verticelabs.pdfprocessor.interfaces.consolidation.dto.ConsolidatedResponse;
 import br.com.verticelabs.pdfprocessor.interfaces.consolidation.dto.ConsolidationRow;
@@ -595,7 +596,10 @@ public class ConsolidationUseCase {
             for (String month : meses) {
                 String referencia = year + "-" + month;
                 BigDecimal totalMes = rubricas.stream()
-                        .map(row -> row.getValores().getOrDefault(referencia, BigDecimal.ZERO))
+                        .map(row -> {
+                            BigDecimal v = row.getValores().getOrDefault(referencia, BigDecimal.ZERO);
+                            return SabesprevFichaTotaisHelper.ehCodigoDevolucao(row.getCodigo()) ? v.negate() : v;
+                        })
                         .reduce(BigDecimal.ZERO, BigDecimal::add);
                 totaisMensais.put(referencia, totalMes);
                 if (totalMes.compareTo(BigDecimal.ZERO) > 0) {

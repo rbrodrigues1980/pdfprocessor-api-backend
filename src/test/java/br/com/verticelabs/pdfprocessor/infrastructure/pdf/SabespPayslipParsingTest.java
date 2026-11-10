@@ -161,6 +161,112 @@ class SabespPayslipParsingTest {
             """;
 
     @Test
+    @DisplayName("Antares 13º: 4412 unit+venc+qtde colados → valor = vencimentos 30.596,70")
+    void antares_4412_usaVencimentos() {
+        String page = """
+                DEMONSTRATIVO DE PAGAMENTO - DÉCIMO TERCEIRO SALÁRIO
+                COMPANHIA DE SANEAMENTO BÁSICO DO ESTADO DE SÃO PAULO - SABESP
+                4412 13 SAL.INTEGRAL 2.549,72 30.596,7012,00
+                4414 SU.AP.S/13SALAR. 1.065,93
+                4415 INSS-13 SALARIO 570,88
+                """;
+
+        List<PdfLineParser.ParsedLine> lines = parser.parseLines(page, DocumentType.SABESP);
+
+        PdfLineParser.ParsedLine r4412 = lines.stream()
+                .filter(l -> "4412".equals(l.getCodigo()))
+                .findFirst()
+                .orElseThrow();
+        assertEquals("30.596,70", r4412.getValorStr());
+        assertTrue(r4412.getDescricao().toUpperCase().contains("SAL.INTEGRAL"));
+
+        assertTrue(lines.stream().anyMatch(l ->
+                "4414".equals(l.getCodigo()) && "1.065,93".equals(l.getValorStr())));
+    }
+
+    @Test
+    @DisplayName("Antares PDFBox: várias rubricas coladas na mesma linha")
+    void antares_rubricasColadasPdfBox() {
+        String page = """
+                DEMONSTRATIVO DE PAGAMENTO - DÉCIMO TERCEIRO SALÁRIO
+                4412 13 SAL.INTEGRAL 2.549,72 30.596,7012,004414 SU.AP.S/13SALAR. 1.065,934415 INSS-13 SALARIO 570,884416 IRRF 13 SALARIO 6.758,054417 DESC ANTEC.13SAL 15.298,35
+                """;
+
+        List<PdfLineParser.ParsedLine> lines = parser.parseLines(page, DocumentType.SABESP);
+        assertTrue(lines.stream().anyMatch(l ->
+                "4412".equals(l.getCodigo()) && "30.596,70".equals(l.getValorStr())));
+        assertTrue(lines.stream().anyMatch(l ->
+                "4414".equals(l.getCodigo()) && "1.065,93".equals(l.getValorStr())));
+        assertTrue(lines.stream().anyMatch(l ->
+                "4417".equals(l.getCodigo()) && "15.298,35".equals(l.getValorStr())));
+    }
+
+    @Test
+    @DisplayName("PDF real Antonio 2016: extrai 4412 = 30.596,70")
+    void extract_pdfRealAntonio2016_quandoDisponivel() throws Exception {
+        Path pdf = Path.of(
+                "temp/PASTADOCUMENTOS/ANTONIO JAVIER GARCIA PEREZ",
+                "ContraChequesSABESPREV2016.pdf");
+        assumeTrue(Files.isRegularFile(pdf), "PDF Antonio 2016 não está no workspace");
+
+        PdfServiceImpl pdfService = new PdfServiceImpl();
+        String text = pdfService.extractText(Files.newInputStream(pdf)).block();
+        assumeTrue(text != null && text.contains("4412"), "PDFBox não extraiu linha 4412");
+        List<PdfLineParser.ParsedLine> lines = parser.parseLines(text, DocumentType.SABESP);
+        assertTrue(lines.stream().anyMatch(l ->
+                "4412".equals(l.getCodigo()) && "30.596,70".equals(l.getValorStr())),
+                "Esperado 4412=30.596,70; amostra: " + lines.stream()
+                        .filter(l -> "4412".equals(l.getCodigo()))
+                        .map(l -> l.getCodigo() + "=" + l.getValorStr())
+                        .toList());
+    }
+
+    @Test
+    @DisplayName("Benefício sem data na linha (Antonio jan–abr/2021): 7400 negativo → positivo")
+    void beneficioSemCompetenciaNaLinha_7400desconto() {
+        String page = """
+                SABESPREV - Fundação Sabesp de Seguridade Social
+                DEMONSTRATIVO DE PAGAMENTO
+                REFERÊNCIA
+                01/2021
+                ANTONIO JAVIER GARCIA PEREZ
+                COD DESCRIÇÃO Parâmetros Proventos Descontos
+                VERBAS
+                1030 APOSENTADORIA NORMAL 16.943,00
+                7400 CONTRIBUIÇÃO DEFICIT -1.401,71
+                9607 ASSOC. APOS. E PENS. DA SABESP -68,30
+                9001 IMPOSTO DE RENDA -2.880,90
+                """;
+
+        assertEquals("2021-01", monthYear.detectMonthYear(page).block().orElseThrow());
+
+        List<PdfLineParser.ParsedLine> lines = parser.parseLines(page, DocumentType.SABESP);
+        assertTrue(lines.stream().anyMatch(l ->
+                "1030".equals(l.getCodigo()) && "16.943,00".equals(l.getValorStr())));
+        assertTrue(lines.stream().anyMatch(l ->
+                "7400".equals(l.getCodigo()) && "1.401,71".equals(l.getValorStr())),
+                "7400 com sinal deve ser capturado como 1.401,71");
+        assertTrue(lines.stream().anyMatch(l ->
+                "9607".equals(l.getCodigo()) && "68,30".equals(l.getValorStr())));
+    }
+
+    @Test
+    @DisplayName("PDF real Antonio 2021 p.1: 7400 = 1.401,71")
+    void extract_pdfRealAntonio2021jan_quandoDisponivel() throws Exception {
+        Path pdf = Path.of(
+                "temp/PASTADOCUMENTOS/ANTONIO JAVIER GARCIA PEREZ",
+                "ContraChequesSABESPREV2021.pdf");
+        assumeTrue(Files.isRegularFile(pdf), "PDF Antonio 2021 não está no workspace");
+
+        PdfServiceImpl pdfService = new PdfServiceImpl();
+        String page1 = pdfService.extractTextFromPage(Files.newInputStream(pdf), 1).block();
+        assertEquals("2021-01", monthYear.detectMonthYear(page1).block().orElseThrow());
+        List<PdfLineParser.ParsedLine> lines = parser.parseLines(page1, DocumentType.SABESP);
+        assertTrue(lines.stream().anyMatch(l ->
+                "7400".equals(l.getCodigo()) && "1.401,71".equals(l.getValorStr())));
+    }
+
+    @Test
     @DisplayName("Benefício SABESPREV: tipo SABESP, mês da REFERÊNCIA e desconto positivo")
     void beneficioSabesprev_janeiro2016() {
         assertEquals(DocumentType.SABESP, typeDetection.detectType(FIXTURE_BENEFICIO_JAN_2016).block());

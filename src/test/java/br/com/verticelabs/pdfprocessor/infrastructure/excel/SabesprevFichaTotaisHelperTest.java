@@ -109,6 +109,29 @@ class SabesprevFichaTotaisHelperTest {
         assertEquals(new BigDecimal("84.50"), resumo.totalLiquido().totalAno());
     }
 
+    @Test
+    void antonio2020_anoMisto_devolucaoSubtraiNoTotalContracheques() {
+        // Jan–Jun holerite 3347; Jul devoluções 7404/9100/9102 — isAnoFichaFinanceira=false
+        List<ConsolidationRow> rubricas = List.of(
+                row("3347", map("2020-01", "2343.47", "2020-07", "0")),
+                row("7400", map("2020-07", "1401.71")),
+                row("7404", map("2020-07", "1189.09")),
+                row("9100", map("2020-07", "2513.45")),
+                row("9102", map("2020-07", "22.48")));
+        assertFalse(SabesprevFichaTotaisHelper.isAnoFichaFinanceira(rubricas, "2020"));
+        assertTrue(SabesprevFichaTotaisHelper.ehCodigoDevolucao("7404"));
+        assertTrue(SabesprevFichaTotaisHelper.ehCodigoDevolucao("9100"));
+        assertTrue(SabesprevFichaTotaisHelper.ehCodigoDevolucao("9102"));
+
+        var consolidated = br.com.verticelabs.pdfprocessor.interfaces.consolidation.dto.ConsolidatedResponse.builder()
+                .origem("SABESP")
+                .rubricas(rubricas)
+                .build();
+        // 2343.47 + 1401.71 − (1189.09 + 2513.45 + 22.48) = 20.16
+        assertEquals(new BigDecimal("20.16"),
+                ConsolidationAnoTotalsHelper.calcularTotalContracheques(consolidated, "2020").setScale(2));
+    }
+
     private static ConsolidationRow row(String codigo, Map<String, BigDecimal> valores) {
         return ConsolidationRow.builder().codigo(codigo).valores(valores).build();
     }

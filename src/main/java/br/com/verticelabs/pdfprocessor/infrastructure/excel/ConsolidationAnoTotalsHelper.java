@@ -31,7 +31,13 @@ public final class ConsolidationAnoTotalsHelper {
                 String referencia = ano + "-" + mesStr;
                 somaAno = somaAno.add(rubrica.getValores().getOrDefault(referencia, BigDecimal.ZERO));
             }
-            total = total.add(calcularTotalRubricaAno(rubrica, ano, somaAno, origem));
+            BigDecimal totalRubrica = calcularTotalRubricaAno(rubrica, ano, somaAno, origem);
+            // Devolução SABESPREV (7404/9100/…) reduz o total também em ano misto holerite+benefício
+            if (SabesprevFichaTotaisHelper.ehCodigoDevolucao(rubrica.getCodigo())) {
+                total = total.subtract(totalRubrica);
+            } else {
+                total = total.add(totalRubrica);
+            }
         }
 
         log.debug("Total contracheques para ano {}: {}", ano, total);

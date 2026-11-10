@@ -27,6 +27,11 @@ public final class SabesprevFichaTotaisHelper {
     public static final Set<String> CODIGOS_SUBTRAI = Set.of(
             "7404", "9100", "9102", "9112", "9115");
 
+    /** True se o código é devolução e deve reduzir totais (não só no rodapé de ficha). */
+    public static boolean ehCodigoDevolucao(String codigo) {
+        return codigo != null && CODIGOS_SUBTRAI.contains(codigo.trim());
+    }
+
     private static final Set<String> CODIGOS_RODAPE;
 
     static {
