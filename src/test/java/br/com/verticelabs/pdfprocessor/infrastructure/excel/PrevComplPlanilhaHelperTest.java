@@ -261,9 +261,9 @@ class PrevComplPlanilhaHelperTest {
                         ConsolidationRow.builder().codigo("7404").valores(valores7404).build()))
                 .build();
 
-        // Soma bruta (caminho APCEF) seria 3763.05 — não usar
+        // Devolução 7404 também reduz calcularTotalContracheques (não só o rodapé de ficha)
         assertEquals(
-                new BigDecimal("3763.05"),
+                new BigDecimal("3637.19"),
                 ConsolidationAnoTotalsHelper.calcularTotalContracheques(consolidated, "2017")
                         .setScale(2));
 

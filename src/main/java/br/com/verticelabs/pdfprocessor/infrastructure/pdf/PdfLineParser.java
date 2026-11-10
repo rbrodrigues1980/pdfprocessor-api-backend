@@ -261,12 +261,28 @@ public class PdfLineParser {
             "(?i)(?<=\\d,\\d{2})\\s*(?=Documento\\s+emitido)");
 
     /**
+     * SABESP Antares — {@code código desc unitário vencimentos+qtde} colados pelo PDFBox.
+     * Ex.: {@code 4412 13 SAL.INTEGRAL 2.549,72 30.596,7012,00} → valor {@code 30.596,70}.
+     */
+    private static final Pattern SABESP_ANTARES_UNIT_VENC_PATTERN = Pattern.compile(
+            "^([0-9]{3,4})\\s+(.+?)\\s+([0-9]{1,3}(?:\\.[0-9]{3})*,[0-9]{2})\\s+"
+                    + "([0-9]{1,3}(?:\\.[0-9]{3})*,[0-9]{2})(\\d{1,2},\\d{2})\\s*$");
+
+    /**
+     * PDFBox Antares cola várias rubricas: {@code …12,004414 SU.AP…}.
+     * Corta após {@code ,dd} quando o próximo token é código 3–4 dígitos.
+     */
+    private static final Pattern SABESP_GLUED_NEXT_CODE = Pattern.compile("(?<=\\d,\\d{2})(?=\\d{3,4}\\s)");
+
+    /**
      * SABESP — layout {@code CONTA DESCRIÇÃO … valor} (último valor monetário da linha).
      * Código qualquer 3–4 dígitos; a whitelist é a tabela {@code rubricas} ({@code RubricaValidator}).
+     * Aceita sinal de desconto (benefício sem competência na linha, jan–abr/2021 Antonio):
+     * {@code 7400 CONTRIBUIÇÃO DEFICIT -1.401,71} → valor positivo; mês vem da REFERÊNCIA da página.
      * Ex.: {@code 3347 Supl.Apos.Sabesprev 700,39}
      */
     private static final Pattern SABESP_LINE_PATTERN = Pattern.compile(
-            "^([0-9]{3,4})\\s+(.+)\\s+([0-9]{1,3}(?:\\.[0-9]{3})*,[0-9]{2})\\s*$");
+            "^([0-9]{3,4})\\s+(.+)\\s+(-?[0-9]{1,3}(?:\\.[0-9]{3})*,[0-9]{2})\\s*$");
 
     /**
      * Benefício SABESPREV — {@code código descrição DD/MM/AAAA valor}.
@@ -393,6 +409,7 @@ public class PdfLineParser {
             patternsToTry.add(FUNCEF_DEMONSTRATIVO_PATTERN_GLUED);
         } else if (documentType == DocumentType.SABESP) {
             patternsToTry.add(SABESPREV_BENEFICIO_LINE_PATTERN);
+            patternsToTry.add(SABESP_ANTARES_UNIT_VENC_PATTERN);
             patternsToTry.add(SABESP_LINE_PATTERN);
         }
 
@@ -413,24 +430,28 @@ public class PdfLineParser {
 
         // Processar cada linha e extrair rubricas diretamente
         for (int i = 0; i < lines.length; i++) {
-            String line = lines[i].trim();
-            if (line.isEmpty()) {
+            String rawLine = lines[i].trim();
+            if (rawLine.isEmpty()) {
                 continue;
             }
-            if (documentType == DocumentType.FUNCEF && FUNCEF_TOTAL_LABEL.matcher(line).matches()) {
-                log.debug("Ignorando linha de total/rodapé Funcef: [{}]", line);
+            if (documentType == DocumentType.FUNCEF && FUNCEF_TOTAL_LABEL.matcher(rawLine).matches()) {
+                log.debug("Ignorando linha de total/rodapé Funcef: [{}]", rawLine);
                 continue;
             }
             if (documentType == DocumentType.CAIXA || documentType == DocumentType.CAIXA_FUNCEF) {
-                line = CAIXA_RS_ANTES_VALOR.matcher(line).replaceFirst(" ");
+                rawLine = CAIXA_RS_ANTES_VALOR.matcher(rawLine).replaceFirst(" ");
             }
 
+            List<String> segments = documentType == DocumentType.SABESP
+                    ? splitSabespGluedRubricas(rawLine)
+                    : List.of(rawLine);
+
+            for (String line : segments) {
             // Tentar cada padrão até encontrar um match
             for (Pattern pattern : patternsToTry) {
                 Matcher lineMatcher = pattern.matcher(line);
                 if (lineMatcher.matches()) {
                     log.info("✅ LINHA[{}] MATCH com padrão! [{}]", String.format("%3d", i + 1), line);
-
                     // Extrair dados do match
                     String codigo = normalizeCodigo(lineMatcher.group(1));
                     String descricao = null;
@@ -612,9 +633,16 @@ public class PdfLineParser {
                             valorStr = lineMatcher.group(6) != null
                                     ? lineMatcher.group(6).trim().replaceFirst("^-", "")
                                     : "";
+                        } else if (pattern == SABESP_ANTARES_UNIT_VENC_PATTERN) {
+                            // código(1), descrição(2), unitário(3), vencimentos(4), qtde(5)
+                            valorStr = lineMatcher.group(4) != null ? lineMatcher.group(4).trim() : "";
+                            referencia = null;
                         } else {
-                            // SABESP ativo: código(1), descrição(2), valor(3) — mês vem do PERÍODO da página
-                            valorStr = lineMatcher.group(3) != null ? lineMatcher.group(3).trim() : "";
+                            // SABESP ativo / benefício sem data: código(1), descrição(2), valor(3)
+                            // Mês vem do PERÍODO/REFERÊNCIA da página; desconto (−) entra positivo
+                            valorStr = lineMatcher.group(3) != null
+                                    ? lineMatcher.group(3).trim().replaceFirst("^-", "")
+                                    : "";
                             referencia = null;
                         }
 
@@ -647,10 +675,11 @@ public class PdfLineParser {
                         parsedLines.add(new ParsedLine(codigo, descricao, referencia, valorStr));
                     }
 
-                    // Match encontrado, passar para próxima linha
+                    // Match encontrado, passar para o próximo segmento/linha
                     break;
                 }
             }
+            } // segments
         }
 
         log.info("════════════════════════════════════════════════════════════════════════════════");
@@ -695,6 +724,28 @@ public class PdfLineParser {
                     demonstrativo.size());
         }
         return demonstrativo;
+    }
+
+    /**
+     * Separa rubricas Antares coladas pelo PDFBox após {@code ,dd} + código.
+     * Ex.: {@code …12,004414 SU.AP…} → duas linhas.
+     */
+    static List<String> splitSabespGluedRubricas(String line) {
+        if (line == null || line.isBlank()) {
+            return List.of();
+        }
+        String[] parts = SABESP_GLUED_NEXT_CODE.split(line);
+        if (parts.length <= 1) {
+            return List.of(line.trim());
+        }
+        List<String> out = new ArrayList<>(parts.length);
+        for (String part : parts) {
+            String t = part.trim();
+            if (!t.isEmpty()) {
+                out.add(t);
+            }
+        }
+        return out;
     }
 
     /**

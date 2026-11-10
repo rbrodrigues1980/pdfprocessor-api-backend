@@ -54,6 +54,29 @@ class SabesprevFichaFinanceiraParsingTest {
             TOTAIS 0,00 0,00 8644,91
             """;
 
+    /**
+     * Flávio 2019 — PDFBox sem ponto de milhar; TOTAL/DEZ/código colados.
+     * Valores reais: 1030 JAN=16026,66 DEZ=16839,96; 7400 JAN=1322,12 DEZ=1389,68.
+     */
+    private static final String FIXTURE_FLAVIO_2019 = """
+            FUNDACAO SABESP DE SEGURIDADE SOCIAL - SABESPREV
+            FICHA FINANCEIRA DE PAGAMENTOS
+            ANO: 2019DISTRIBUIÇÃO NOS MESES: POR REFERÊNCIA
+            MATRÍCULA:
+            000051971
+            NOME:
+            FLAVIO DE FRAIA E SOUZA
+            APOSENTADORIA NORMAL 16026,66 16026,66 16026,66 16026,66 16026,66 16839,96 16839,96 16839,96 16839,96 16839,96 16839,96198013,0216839,961030 P
+            ABONO ANUAL
+            APOSENTADORIA NORMAL
+            0,00 0,00 0,00 0,00 0,00 0,00 0,00 0,00 0,00 0,00 16839,96 16839,960,004030 P
+            CONTRIBUIÇÃO DEFICIT 1322,12 1322,12 1322,12 1322,12 1322,12 1389,68 1389,68 1389,68 1389,68 1389,68 1389,68 16338,361389,687400 D
+            CONTRIBUIÇÃO DEFICIT
+            ABONO
+            0,00 0,00 0,00 0,00 0,00 0,00 0,00 0,00 0,00 0,00 1389,68 1389,680,007401 D
+            TOTAIS 11620,29 11620,29
+            """;
+
     private final DocumentTypeDetectionServiceImpl typeDetection = new DocumentTypeDetectionServiceImpl();
     private final SabesprevFichaFinanceiraParser parser = new SabesprevFichaFinanceiraParser(new PdfNormalizer());
 
@@ -103,6 +126,59 @@ class SabesprevFichaFinanceiraParsingTest {
                 "9102".equals(l.getCodigo()) && "2021-09".equals(l.getReferencia()) && "4,09".equals(l.getValorStr())));
         assertTrue(lines.stream().anyMatch(l ->
                 "9111".equals(l.getCodigo()) && "2021-09".equals(l.getReferencia()) && "2,96".equals(l.getValorStr())));
+        assertTrue(lines.stream().anyMatch(l ->
+                "1030".equals(l.getCodigo()) && "2021-03".equals(l.getReferencia()) && "8727,71".equals(l.getValorStr())),
+                "Valor sem ponto de milhar não pode truncar 8727,71 → 727,71");
+    }
+
+    @Test
+    @DisplayName("extractTwelveMonths: valores ≥1000 sem milhar e TOTAL/DEZ colados (Flávio)")
+    void extractTwelveMonths_semMilharColado() {
+        String body = "APOSENTADORIA NORMAL 16026,66 16026,66 16026,66 16026,66 16026,66 "
+                + "16839,96 16839,96 16839,96 16839,96 16839,96 16839,96198013,0216839,96";
+        List<String> months = SabesprevFichaFinanceiraParser.extractTwelveMonths(body);
+        assertEquals(12, months.size());
+        assertEquals("16026,66", months.get(0));
+        assertEquals("16026,66", months.get(4));
+        assertEquals("16839,96", months.get(5));
+        assertEquals("16839,96", months.get(10));
+        assertEquals("16839,96", months.get(11));
+    }
+
+    @Test
+    @DisplayName("Flávio 2019: 7400/1030 sem truncar milhar")
+    void parse_flavio2019_semTruncarMilhar() {
+        List<ParsedLine> lines = parser.parse(FIXTURE_FLAVIO_2019, "2019");
+
+        assertTrue(lines.stream().anyMatch(l ->
+                "7400".equals(l.getCodigo()) && "2019-01".equals(l.getReferencia()) && "1322,12".equals(l.getValorStr())));
+        assertTrue(lines.stream().anyMatch(l ->
+                "7400".equals(l.getCodigo()) && "2019-12".equals(l.getReferencia()) && "1389,68".equals(l.getValorStr())));
+        assertTrue(lines.stream().anyMatch(l ->
+                "1030".equals(l.getCodigo()) && "2019-01".equals(l.getReferencia()) && "16026,66".equals(l.getValorStr())));
+        assertTrue(lines.stream().anyMatch(l ->
+                "1030".equals(l.getCodigo()) && "2019-12".equals(l.getReferencia()) && "16839,96".equals(l.getValorStr())));
+    }
+
+    @Test
+    @DisplayName("PDF real Flávio 2019: extrai 7400 e 1030 sem truncar milhar")
+    void extract_pdfRealFlavio2019_quandoDisponivel() throws Exception {
+        Path pdf = Path.of(
+                "temp/PASTADOCUMENTOS/FLAVIO DE FRAIA E SOUZA",
+                "FICHA FINANCEIRA 2019.pdf");
+        assumeTrue(Files.isRegularFile(pdf), "PDF Flávio 2019 não está no workspace");
+
+        PdfServiceImpl pdfService = new PdfServiceImpl();
+        String text = pdfService.extractText(Files.newInputStream(pdf)).block();
+        assertEquals(DocumentType.SABESPREV_FICHA, typeDetection.detectType(text).block());
+
+        List<ParsedLine> lines = parser.parse(text, "2019");
+        assertTrue(lines.stream().anyMatch(l ->
+                "7400".equals(l.getCodigo()) && "2019-01".equals(l.getReferencia()) && "1322,12".equals(l.getValorStr())));
+        assertTrue(lines.stream().anyMatch(l ->
+                "1030".equals(l.getCodigo()) && "2019-01".equals(l.getReferencia()) && "16026,66".equals(l.getValorStr())));
+        assertTrue(lines.stream().anyMatch(l ->
+                "1030".equals(l.getCodigo()) && "2019-12".equals(l.getReferencia()) && "16839,96".equals(l.getValorStr())));
     }
 
     @Test
