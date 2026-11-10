@@ -81,6 +81,10 @@ public class UpdateUserUseCase {
         user.setEmail(email);
         // Garantir que roles seja um HashSet mutável
         user.setRoles(roles != null ? new HashSet<>(roles) : new HashSet<>());
+        // SUPER_ADMIN/EVALUATOR não pertencem a tenant (igual CreateUserUseCase)
+        if (roles != null && (roles.contains("SUPER_ADMIN") || roles.contains("EVALUATOR"))) {
+            user.setTenantId(null);
+        }
         // Allowlist de clientes: aplicável a EVALUATOR; limpa quando deixa de ser avaliador
         if (roles != null && roles.contains("EVALUATOR")) {
             if (allowedPersonIds != null) {

@@ -37,23 +37,14 @@ public class DeleteDocumentUseCase {
         return ReactiveSecurityContextHelper.isSuperAdmin()
                 .flatMap(isSuperAdmin -> {
                     if (Boolean.TRUE.equals(isSuperAdmin)) {
-                        // SUPER_ADMIN pode buscar qualquer documento
-                        // Primeiro tentar buscar pelo tenantId do contexto, se não houver, buscar em todos
-                        return ReactiveSecurityContextHelper.getTenantId()
-                                .flatMap(tenantId -> documentRepository.findByTenantIdAndId(tenantId, documentId))
-                                .onErrorResume(IllegalStateException.class, e -> {
-                                    // Se não houver tenantId no contexto (SUPER_ADMIN sem tenant específico),
-                                    // usar método deprecated findById para buscar em qualquer tenant
-                                    // Nota: Este é o único caso onde usamos o método deprecated, necessário para SUPER_ADMIN
-                                    @SuppressWarnings("deprecation")
-                                    var result = documentRepository.findById(documentId);
-                                    return result;
-                                });
-                    } else {
-                        // Outros usuários só podem buscar documentos do seu tenant
-                        return ReactiveSecurityContextHelper.getTenantId()
-                                .flatMap(tenantId -> documentRepository.findByTenantIdAndId(tenantId, documentId));
+                        // SUPER_ADMIN: sempre cross-tenant (JWT pode ter tenantId legado)
+                        @SuppressWarnings("deprecation")
+                        var result = documentRepository.findById(documentId);
+                        return result;
                     }
+                    // Outros usuários só podem buscar documentos do seu tenant
+                    return ReactiveSecurityContextHelper.getTenantId()
+                            .flatMap(tenantId -> documentRepository.findByTenantIdAndId(tenantId, documentId));
                 })
                 .switchIfEmpty(Mono.error(new IllegalArgumentException("Documento não encontrado: " + documentId)))
                 .flatMap(document -> {
