@@ -64,6 +64,7 @@ public class EvaluatorAuthorizationFilter implements WebFilter {
             new AllowedRule(HttpMethod.POST, "^/api/v1/conversations/?$"),
             new AllowedRule(HttpMethod.GET, "^/api/v1/conversations/[^/]+/messages/?$"),
             new AllowedRule(HttpMethod.POST, "^/api/v1/conversations/[^/]+/messages/?$"),
+            new AllowedRule(HttpMethod.POST, "^/api/v1/conversations/[^/]+/messages/[^/]+/reactions/?$"),
             new AllowedRule(HttpMethod.POST, "^/api/v1/conversations/[^/]+/read/?$"),
             new AllowedRule(HttpMethod.PATCH, "^/api/v1/conversations/[^/]+/replies-allowed/?$"),
             new AllowedRule(HttpMethod.GET,

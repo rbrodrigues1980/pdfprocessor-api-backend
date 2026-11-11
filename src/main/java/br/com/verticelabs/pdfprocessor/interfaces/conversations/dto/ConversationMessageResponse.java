@@ -25,10 +25,17 @@ public class ConversationMessageResponse {
     private Instant createdAt;
     @Builder.Default
     private List<ConversationAttachmentResponse> attachments = new ArrayList<>();
+    @Builder.Default
+    private List<ConversationReactionResponse> reactions = new ArrayList<>();
     private boolean mine;
 
     @JsonGetter("attachments")
     public List<ConversationAttachmentResponse> getAttachments() {
         return attachments != null ? new ArrayList<>(attachments) : new ArrayList<>();
+    }
+
+    @JsonGetter("reactions")
+    public List<ConversationReactionResponse> getReactions() {
+        return reactions != null ? new ArrayList<>(reactions) : new ArrayList<>();
     }
 }

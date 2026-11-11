@@ -4,12 +4,15 @@ import br.com.verticelabs.pdfprocessor.domain.model.Conversation;
 import br.com.verticelabs.pdfprocessor.domain.model.ConversationMessage;
 import br.com.verticelabs.pdfprocessor.interfaces.conversations.dto.ConversationAttachmentResponse;
 import br.com.verticelabs.pdfprocessor.interfaces.conversations.dto.ConversationMessageResponse;
+import br.com.verticelabs.pdfprocessor.interfaces.conversations.dto.ConversationReactionResponse;
 import br.com.verticelabs.pdfprocessor.interfaces.conversations.dto.ConversationResponse;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Component
@@ -57,7 +60,33 @@ public class ConversationMapper {
                 .body(m.getBody())
                 .createdAt(m.getCreatedAt())
                 .attachments(attachments)
+                .reactions(aggregateReactions(m.getReactions(), currentUserId))
                 .mine(currentUserId != null && currentUserId.equals(m.getSenderUserId()))
                 .build();
+    }
+
+    static List<ConversationReactionResponse> aggregateReactions(
+            List<ConversationMessage.Reaction> reactions,
+            String currentUserId) {
+        if (reactions == null || reactions.isEmpty()) {
+            return new ArrayList<>();
+        }
+        Map<String, ConversationReactionResponse> byEmoji = new LinkedHashMap<>();
+        for (ConversationMessage.Reaction r : reactions) {
+            if (r == null || r.getEmoji() == null) {
+                continue;
+            }
+            ConversationReactionResponse agg = byEmoji.computeIfAbsent(r.getEmoji(), emoji ->
+                    ConversationReactionResponse.builder()
+                            .emoji(emoji)
+                            .count(0)
+                            .mine(false)
+                            .build());
+            agg.setCount(agg.getCount() + 1);
+            if (currentUserId != null && currentUserId.equals(r.getUserId())) {
+                agg.setMine(true);
+            }
+        }
+        return new ArrayList<>(byEmoji.values());
     }
 }
