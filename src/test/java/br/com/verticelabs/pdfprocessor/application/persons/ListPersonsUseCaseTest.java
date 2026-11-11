@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("ListPersonsUseCase - filtros empresa e cadastro")
+@DisplayName("ListPersonsUseCase - filtros empresa, cadastro e atualizacao")
 class ListPersonsUseCaseTest {
 
     private static final ZoneId ZONE_BR = ZoneId.of("America/Sao_Paulo");
@@ -58,7 +58,7 @@ class ListPersonsUseCaseTest {
     @DisplayName("filtra por empresaId")
     void filtraPorEmpresaId() {
         Query query = useCase.buildQuery(null, new ListPersonsFilters(
-                null, null, null, null, "emp-123", null, null, null));
+                null, null, null, null, "emp-123", null, null, null, null, null));
 
         String queryStr = query.toString();
         assertTrue(queryStr.contains("empresaId"));
@@ -98,6 +98,8 @@ class ListPersonsUseCaseTest {
                 "emp-1",
                 LocalDate.of(2026, 6, 1),
                 LocalDate.of(2026, 7, 14),
+                null,
+                null,
                 null));
 
         String queryStr = query.toString();
@@ -109,10 +111,54 @@ class ListPersonsUseCaseTest {
     }
 
     @Test
+    @DisplayName("filtra apenas atualizacaoDe (aberto)")
+    void filtraApenasAtualizacaoDe() {
+        Query query = new Query();
+        ListPersonsUseCase.applyUpdatedAtRange(query, LocalDate.of(2026, 6, 1), null);
+
+        String queryStr = query.toString();
+        assertTrue(queryStr.contains("updatedAt"));
+        assertTrue(queryStr.contains("$gte"));
+    }
+
+    @Test
+    @DisplayName("filtra apenas atualizacaoAte (aberto e inclusivo)")
+    void filtraApenasAtualizacaoAte() {
+        Query query = new Query();
+        ListPersonsUseCase.applyUpdatedAtRange(query, null, LocalDate.of(2026, 7, 14));
+
+        String queryStr = query.toString();
+        assertTrue(queryStr.contains("updatedAt"));
+        assertTrue(queryStr.contains("$lt"));
+    }
+
+    @Test
+    @DisplayName("filtra intervalo completo de atualizacao")
+    void filtraIntervaloCompletoAtualizacao() {
+        Query query = useCase.buildQuery("tenant-1", new ListPersonsFilters(
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                LocalDate.of(2026, 6, 1),
+                LocalDate.of(2026, 7, 14),
+                null));
+
+        String queryStr = query.toString();
+        assertTrue(queryStr.contains("tenantId"));
+        assertTrue(queryStr.contains("updatedAt"));
+        assertTrue(queryStr.contains("$gte"));
+        assertTrue(queryStr.contains("$lt"));
+    }
+
+    @Test
     @DisplayName("combina empresaId com validado=false")
     void combinaEmpresaComValidado() {
         Query query = useCase.buildQuery("tenant-1", new ListPersonsFilters(
-                null, null, null, false, "emp-9", null, null, null));
+                null, null, null, false, "emp-9", null, null, null, null, null));
 
         String queryStr = query.toString();
         assertTrue(queryStr.contains("empresaId"));
@@ -123,7 +169,7 @@ class ListPersonsUseCaseTest {
     @DisplayName("filtra por status FINALIZADO")
     void filtraPorStatusFinalizado() {
         Query query = useCase.buildQuery(null, new ListPersonsFilters(
-                null, null, null, null, null, null, null, PersonStatus.FINALIZADO));
+                null, null, null, null, null, null, null, null, null, PersonStatus.FINALIZADO));
 
         String queryStr = query.toString();
         assertTrue(queryStr.contains("status"));
@@ -135,7 +181,7 @@ class ListPersonsUseCaseTest {
     @DisplayName("filtra EM_PROCESSAMENTO incluindo status nulo/ausente via $nin")
     void filtraEmProcessamentoIncluiNulo() {
         Query query = useCase.buildQuery(null, new ListPersonsFilters(
-                null, null, null, null, null, null, null, PersonStatus.EM_PROCESSAMENTO));
+                null, null, null, null, null, null, null, null, null, PersonStatus.EM_PROCESSAMENTO));
 
         String queryStr = query.toString();
         assertTrue(queryStr.contains("status"));
@@ -148,7 +194,7 @@ class ListPersonsUseCaseTest {
     @DisplayName("combina validado=false com status EM_PROCESSAMENTO sem conflito de $or")
     void combinaValidadoFalseComEmProcessamento() {
         Query query = useCase.buildQuery(null, new ListPersonsFilters(
-                null, null, null, false, null, null, null, PersonStatus.EM_PROCESSAMENTO));
+                null, null, null, false, null, null, null, null, null, PersonStatus.EM_PROCESSAMENTO));
 
         String queryStr = query.toString();
         assertTrue(queryStr.contains("validado"));
@@ -161,11 +207,12 @@ class ListPersonsUseCaseTest {
     @DisplayName("buildQuery sem filtros não aplica status nem validado")
     void buildQuerySemFiltros() {
         Query query = useCase.buildQuery(null, new ListPersonsFilters(
-                null, null, null, null, null, null, null, null));
+                null, null, null, null, null, null, null, null, null, null));
 
         String queryStr = query.toString();
         assertFalse(queryStr.contains("validado"));
         assertFalse(queryStr.contains("status"));
         assertFalse(queryStr.contains("empresaId"));
+        assertFalse(queryStr.contains("updatedAt"));
     }
 }

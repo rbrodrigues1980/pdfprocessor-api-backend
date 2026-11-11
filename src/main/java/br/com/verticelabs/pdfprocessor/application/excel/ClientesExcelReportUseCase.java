@@ -35,7 +35,7 @@ public class ClientesExcelReportUseCase {
     public Mono<ExcelExportResult> execute(ListPersonsFilters filters) {
         ListPersonsFilters safeFilters = filters != null
                 ? filters
-                : new ListPersonsFilters(null, null, null, null, null, null, null, null);
+                : new ListPersonsFilters(null, null, null, null, null, null, null, null, null, null);
 
         if (!safeFilters.hasAnyFilter()) {
             return Mono.error(new IllegalArgumentException(

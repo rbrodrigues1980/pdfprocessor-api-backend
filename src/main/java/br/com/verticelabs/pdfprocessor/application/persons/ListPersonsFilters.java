@@ -15,6 +15,8 @@ public record ListPersonsFilters(
         String empresaId,
         LocalDate cadastroDe,
         LocalDate cadastroAte,
+        LocalDate atualizacaoDe,
+        LocalDate atualizacaoAte,
         PersonStatus status
 ) {
     /**
@@ -28,6 +30,8 @@ public record ListPersonsFilters(
                 || (empresaId != null && !empresaId.isBlank())
                 || cadastroDe != null
                 || cadastroAte != null
+                || atualizacaoDe != null
+                || atualizacaoAte != null
                 || status != null;
     }
 }

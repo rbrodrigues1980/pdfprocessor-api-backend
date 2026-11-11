@@ -99,7 +99,7 @@ public class ListPersonsUseCase {
     private static ListPersonsFilters safeFilters(ListPersonsFilters filters) {
         return filters != null
                 ? filters
-                : new ListPersonsFilters(null, null, null, null, null, null, null, null);
+                : new ListPersonsFilters(null, null, null, null, null, null, null, null, null, null);
     }
 
     private Mono<ListPersonsResult> listAllowlistedPersons(
@@ -246,6 +246,7 @@ public class ListPersonsUseCase {
         }
 
         applyCreatedAtRange(query, filters.cadastroDe(), filters.cadastroAte());
+        applyUpdatedAtRange(query, filters.atualizacaoDe(), filters.atualizacaoAte());
         applyStatusFilter(query, filters.status());
 
         return query;
@@ -276,15 +277,27 @@ public class ListPersonsUseCase {
      * {@code cadastroAte} é inclusivo (limite exclusivo no início do dia seguinte).
      */
     static void applyCreatedAtRange(Query query, LocalDate cadastroDe, LocalDate cadastroAte) {
-        Instant de = startOfDay(cadastroDe);
-        Instant ateExclusivo = startOfNextDay(cadastroAte);
+        applyInstantRange(query, "createdAt", cadastroDe, cadastroAte);
+    }
+
+    /**
+     * Aplica intervalo aberto/fechado sobre {@code updatedAt}.
+     * {@code atualizacaoAte} é inclusivo (limite exclusivo no início do dia seguinte).
+     */
+    static void applyUpdatedAtRange(Query query, LocalDate atualizacaoDe, LocalDate atualizacaoAte) {
+        applyInstantRange(query, "updatedAt", atualizacaoDe, atualizacaoAte);
+    }
+
+    private static void applyInstantRange(Query query, String field, LocalDate deDate, LocalDate ateDate) {
+        Instant de = startOfDay(deDate);
+        Instant ateExclusivo = startOfNextDay(ateDate);
 
         if (de != null && ateExclusivo != null) {
-            query.addCriteria(Criteria.where("createdAt").gte(de).lt(ateExclusivo));
+            query.addCriteria(Criteria.where(field).gte(de).lt(ateExclusivo));
         } else if (de != null) {
-            query.addCriteria(Criteria.where("createdAt").gte(de));
+            query.addCriteria(Criteria.where(field).gte(de));
         } else if (ateExclusivo != null) {
-            query.addCriteria(Criteria.where("createdAt").lt(ateExclusivo));
+            query.addCriteria(Criteria.where(field).lt(ateExclusivo));
         }
     }
 

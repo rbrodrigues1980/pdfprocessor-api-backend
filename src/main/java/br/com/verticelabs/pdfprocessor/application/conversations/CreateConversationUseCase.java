@@ -45,8 +45,9 @@ public class CreateConversationUseCase {
         if (title == null || title.isBlank()) {
             return Mono.error(new IllegalArgumentException("Título é obrigatório"));
         }
-        if (body == null || body.isBlank()) {
-            return Mono.error(new IllegalArgumentException("Mensagem é obrigatória"));
+        boolean hasFiles = files != null && !files.isEmpty();
+        if ((body == null || body.isBlank()) && !hasFiles) {
+            return Mono.error(new IllegalArgumentException("Mensagem ou anexo é obrigatório"));
         }
 
         return ReactiveSecurityContextHelper.getUserId()
@@ -66,7 +67,9 @@ public class CreateConversationUseCase {
                                                             "Nenhum destinatário válido encontrado"));
                                                 }
                                                 String trimmedTitle = title.trim();
-                                                String trimmedBody = body.trim();
+                                                String trimmedBody = (body == null || body.isBlank())
+                                                        ? "(anexo)"
+                                                        : body.trim();
                                                 String preview = previewOf(trimmedBody);
                                                 Instant now = Instant.now();
                                                 Instant dedupeStart = now.minusSeconds(DUPLICATE_WINDOW_SECONDS);

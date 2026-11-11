@@ -188,14 +188,20 @@ public class DatabaseInitializer implements CommandLineRunner {
                             Index tenantValidadoIndex = new Index()
                                     .on("tenantId", org.springframework.data.domain.Sort.Direction.ASC)
                                     .on("validado", org.springframework.data.domain.Sort.Direction.ASC);
+
+                            // Listagem/ordenação e filtro De–Até por atualização
+                            Index tenantUpdatedAtIndex = new Index()
+                                    .on("tenantId", org.springframework.data.domain.Sort.Direction.ASC)
+                                    .on("updatedAt", org.springframework.data.domain.Sort.Direction.DESC);
                             
                             return Mono.when(
                                     indexOps.ensureIndex(tenantCpfIndex),
                                     indexOps.ensureIndex(tenantIdIndex),
-                                    indexOps.ensureIndex(tenantValidadoIndex)
+                                    indexOps.ensureIndex(tenantValidadoIndex),
+                                    indexOps.ensureIndex(tenantUpdatedAtIndex)
                             )
                             .doOnSuccess(v -> log.info(
-                                    "Collection '{}' inicializada. Índices: (tenantId, cpf) único, tenantId, (tenantId, validado)",
+                                    "Collection '{}' inicializada. Índices: (tenantId, cpf) único, tenantId, (tenantId, validado), (tenantId, updatedAt)",
                                     collectionName))
                             .doOnError(error -> {
                                 if (error.getMessage() != null && error.getMessage().contains("duplicate")) {
@@ -220,14 +226,19 @@ public class DatabaseInitializer implements CommandLineRunner {
                             Index tenantValidadoIndex = new Index()
                                     .on("tenantId", org.springframework.data.domain.Sort.Direction.ASC)
                                     .on("validado", org.springframework.data.domain.Sort.Direction.ASC);
+
+                            Index tenantUpdatedAtIndex = new Index()
+                                    .on("tenantId", org.springframework.data.domain.Sort.Direction.ASC)
+                                    .on("updatedAt", org.springframework.data.domain.Sort.Direction.DESC);
                             
                             return Mono.when(
                                     indexOps.ensureIndex(tenantCpfIndex),
                                     indexOps.ensureIndex(tenantIdIndex),
-                                    indexOps.ensureIndex(tenantValidadoIndex)
+                                    indexOps.ensureIndex(tenantValidadoIndex),
+                                    indexOps.ensureIndex(tenantUpdatedAtIndex)
                             )
                             .doOnSuccess(v -> log.info(
-                                    "Collection '{}' inicializada. Índices: (tenantId, cpf) único, tenantId, (tenantId, validado)",
+                                    "Collection '{}' inicializada. Índices: (tenantId, cpf) único, tenantId, (tenantId, validado), (tenantId, updatedAt)",
                                     collectionName))
                             .doOnError(error -> {
                                 if (error.getMessage() != null && error.getMessage().contains("duplicate")) {

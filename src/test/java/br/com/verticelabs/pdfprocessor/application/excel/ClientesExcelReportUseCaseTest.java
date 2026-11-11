@@ -77,7 +77,7 @@ class ClientesExcelReportUseCaseTest {
                 });
 
         StepVerifier.create(useCase.execute(new ListPersonsFilters(
-                        null, null, null, null, "emp-1", null, null, null)))
+                        null, null, null, null, "emp-1", null, null, null, null, null)))
                 .assertNext(result -> {
                     assertEquals(3, result.getBytes().length);
                     assertEquals(true, result.getFilename().startsWith("relatorio_clientes_"));
@@ -92,7 +92,7 @@ class ClientesExcelReportUseCaseTest {
     @DisplayName("rejeita geração sem nenhum filtro")
     void rejeitaSemFiltro() {
         StepVerifier.create(useCase.execute(new ListPersonsFilters(
-                        null, null, null, null, null, null, null, null)))
+                        null, null, null, null, null, null, null, null, null, null)))
                 .expectErrorMatches(err ->
                         err instanceof IllegalArgumentException
                                 && err.getMessage() != null
@@ -142,7 +142,7 @@ class ClientesExcelReportUseCaseTest {
                 });
 
         StepVerifier.create(useCase.execute(new ListPersonsFilters(
-                        "CLIENTE", null, null, null, null, null, null, null)))
+                        "CLIENTE", null, null, null, null, null, null, null, null, null)))
                 .assertNext(result -> assertEquals(1, result.getBytes().length))
                 .verifyComplete();
     }
