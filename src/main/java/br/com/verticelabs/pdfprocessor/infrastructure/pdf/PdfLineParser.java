@@ -245,6 +245,13 @@ public class PdfLineParser {
     private static final Pattern FUNCEF_LINE_START = Pattern.compile(
             "^([0-9]\\s*[0-9]\\s*[0-9]\\s*[0-9]?)\\s+([0-9]{4}/[0-9]{1,2})\\b");
 
+    /**
+     * Código Funcef portal sozinho na linha (layout vertical aposentadoria).
+     * Ex.: {@code 4 309}, {@code 4309}, {@code 2 409}.
+     */
+    private static final Pattern FUNCEF_CODE_ONLY = Pattern.compile(
+            "^([0-9]\\s+[0-9]{3}|[0-9]{4})$");
+
     private static final Pattern FUNCEF_VALUE_ONLY = Pattern.compile(
             "^(?:R\\$\\s*)?([0-9]{1,3}(?:\\.[0-9]{3})*,[0-9]{2})\\s*$");
 
@@ -751,6 +758,8 @@ public class PdfLineParser {
     /**
      * Junta linhas Funcef quebradas pelo PDF (descrição em várias linhas / valor isolado).
      * Ex.: {@code 2 033 2017/11 SUPL...} + {@code SALD.} + {@code R$ 11.622,86}
+     * Também remonta layout vertical (código / YYYY/MM / desc / valor em linhas separadas):
+     * {@code 4 309} + {@code 2017/05} + {@code FUNCEF CONTRIBUICAO} + {@code 447,88}
      */
     String[] joinBrokenFuncefLines(String[] rawLines) {
         List<String> joined = new ArrayList<>();
@@ -775,11 +784,16 @@ public class PdfLineParser {
             }
 
             if (pending != null) {
-                if (FUNCEF_LINE_START.matcher(line).find()) {
+                if (FUNCEF_LINE_START.matcher(line).find() || FUNCEF_CODE_ONLY.matcher(line).matches()) {
                     // Nova rubrica — descarta fragmento incompleto
                     log.warn("Descartando fragmento Funcef sem valor: [{}]", pending);
                     pending = null;
                     // cai no fluxo normal abaixo
+                } else if (FUNCEF_TOTAL_LABEL.matcher(line).matches()) {
+                    log.warn("Descartando fragmento Funcef sem valor: [{}]", pending);
+                    pending = null;
+                    joined.add(line);
+                    continue;
                 } else {
                     pending.append(' ').append(line);
                     if (FUNCEF_PATTERN.matcher(pending.toString()).matches()) {
@@ -793,6 +807,8 @@ public class PdfLineParser {
             if (FUNCEF_PATTERN.matcher(line).matches()) {
                 joined.add(line);
             } else if (FUNCEF_LINE_START.matcher(line).find()) {
+                pending = new StringBuilder(line);
+            } else if (FUNCEF_CODE_ONLY.matcher(line).matches()) {
                 pending = new StringBuilder(line);
             } else if (FUNCEF_VALUE_ONLY.matcher(line).matches()) {
                 // valor órfão sem cabeçalho — ignora
