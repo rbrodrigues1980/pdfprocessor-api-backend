@@ -231,6 +231,8 @@ public class PersonController {
          * @param empresaId  filtra pela empresa vinculada
          * @param cadastroDe data inicial inclusiva do cadastro (yyyy-MM-dd)
          * @param cadastroAte data final inclusiva do cadastro (yyyy-MM-dd)
+         * @param atualizacaoDe data inicial inclusiva da última atualização (yyyy-MM-dd)
+         * @param atualizacaoAte data final inclusiva da última atualização (yyyy-MM-dd)
          * @param status     filtra pelo status operacional do cliente
          */
         @GetMapping
@@ -242,15 +244,18 @@ public class PersonController {
                         @RequestParam(required = false) String empresaId,
                         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate cadastroDe,
                         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate cadastroAte,
+                        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate atualizacaoDe,
+                        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate atualizacaoAte,
                         @RequestParam(required = false) PersonStatus status,
                         @RequestParam(defaultValue = "0") int page,
                         @RequestParam(defaultValue = "100") int size) {
                 log.debug(
-                                "📥 GET /api/v1/persons - Listar pessoas (page={}, size={}, validado={}, empresaId={}, cadastroDe={}, cadastroAte={}, status={})",
-                                page, size, validado, empresaId, cadastroDe, cadastroAte, status);
+                                "📥 GET /api/v1/persons - Listar pessoas (page={}, size={}, validado={}, empresaId={}, cadastroDe={}, cadastroAte={}, atualizacaoDe={}, atualizacaoAte={}, status={})",
+                                page, size, validado, empresaId, cadastroDe, cadastroAte, atualizacaoDe, atualizacaoAte, status);
 
                 ListPersonsFilters filters = new ListPersonsFilters(
-                                nome, cpf, matricula, validado, empresaId, cadastroDe, cadastroAte, status);
+                                nome, cpf, matricula, validado, empresaId, cadastroDe, cadastroAte,
+                                atualizacaoDe, atualizacaoAte, status);
 
                 return listPersonsUseCase.execute(filters, page, size)
                                 .flatMap(result -> personResponseEnricher.enrichAll(result.persons())

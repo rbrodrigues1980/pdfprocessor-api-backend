@@ -44,11 +44,14 @@ public class ExcelController {
             @RequestParam(required = false) String empresaId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate cadastroDe,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate cadastroAte,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate atualizacaoDe,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate atualizacaoAte,
             @RequestParam(required = false) PersonStatus status) {
 
         log.info("=== INÍCIO: GET /api/v1/persons/reports/clientes/excel ===");
         ListPersonsFilters filters = new ListPersonsFilters(
-                nome, cpf, matricula, validado, empresaId, cadastroDe, cadastroAte, status);
+                nome, cpf, matricula, validado, empresaId, cadastroDe, cadastroAte,
+                atualizacaoDe, atualizacaoAte, status);
 
         return clientesExcelReportUseCase.execute(filters)
                 .map(result -> {
