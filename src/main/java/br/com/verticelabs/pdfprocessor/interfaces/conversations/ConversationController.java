@@ -6,6 +6,7 @@ import br.com.verticelabs.pdfprocessor.application.conversations.GetConversation
 import br.com.verticelabs.pdfprocessor.application.conversations.ListConversationMessagesUseCase;
 import br.com.verticelabs.pdfprocessor.application.conversations.ListConversationsUseCase;
 import br.com.verticelabs.pdfprocessor.application.conversations.MarkConversationReadUseCase;
+import br.com.verticelabs.pdfprocessor.application.conversations.ReactToConversationMessageUseCase;
 import br.com.verticelabs.pdfprocessor.application.conversations.ReplyConversationUseCase;
 import br.com.verticelabs.pdfprocessor.application.conversations.UpdateConversationRepliesAllowedUseCase;
 import br.com.verticelabs.pdfprocessor.infrastructure.security.ReactiveSecurityContextHelper;
@@ -53,6 +54,7 @@ public class ConversationController {
     private final GetConversationUnreadCountUseCase getConversationUnreadCountUseCase;
     private final ListConversationMessagesUseCase listConversationMessagesUseCase;
     private final ReplyConversationUseCase replyConversationUseCase;
+    private final ReactToConversationMessageUseCase reactToConversationMessageUseCase;
     private final MarkConversationReadUseCase markConversationReadUseCase;
     private final UpdateConversationRepliesAllowedUseCase updateConversationRepliesAllowedUseCase;
     private final DownloadConversationAttachmentUseCase downloadConversationAttachmentUseCase;
@@ -163,6 +165,20 @@ public class ConversationController {
                 .flatMap(userId -> replyConversationUseCase.execute(id, body, fileParts)
                         .map(msg -> ResponseEntity.status(HttpStatus.CREATED)
                                 .body((Object) conversationMapper.toMessageResponse(msg, userId))))
+                .onErrorResume(e -> errorResponse(e, statusFor(e)));
+    }
+
+    @PostMapping("/{id}/messages/{messageId}/reactions")
+    public Mono<ResponseEntity<Object>> react(
+            @PathVariable String id,
+            @PathVariable String messageId,
+            @RequestBody Map<String, Object> body) {
+        Object raw = body != null ? body.get("emoji") : null;
+        String emoji = raw instanceof String ? ((String) raw).trim() : null;
+        return ReactiveSecurityContextHelper.getUserId()
+                .flatMap(userId -> reactToConversationMessageUseCase.execute(id, messageId, emoji)
+                        .map(msg -> ResponseEntity.ok(
+                                (Object) conversationMapper.toMessageResponse(msg, userId))))
                 .onErrorResume(e -> errorResponse(e, statusFor(e)));
     }
 

@@ -69,6 +69,11 @@ public class MongoConversationMessageRepositoryAdapter implements ConversationMe
         } else {
             m.setAttachments(new ArrayList<>());
         }
+        if (m.getReactions() != null) {
+            m.setReactions(new ArrayList<>(m.getReactions()));
+        } else {
+            m.setReactions(new ArrayList<>());
+        }
         return m;
     }
 }

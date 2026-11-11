@@ -39,6 +39,10 @@ public class ConversationMessage {
     @Builder.Default
     private List<Attachment> attachments = new ArrayList<>();
 
+    /** Reações estilo WhatsApp (1 emoji por usuário). */
+    @Builder.Default
+    private List<Reaction> reactions = new ArrayList<>();
+
     @Getter
     @Setter
     @Builder
@@ -49,5 +53,16 @@ public class ConversationMessage {
         private String fileName;
         private String contentType;
         private Long sizeBytes;
+    }
+
+    @Getter
+    @Setter
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class Reaction {
+        private String emoji;
+        private String userId;
+        private Instant createdAt;
     }
 }
