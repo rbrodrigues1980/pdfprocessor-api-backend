@@ -1146,12 +1146,13 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
             pagamentos.add(buildPagamentoFromMatch(m, resolverNomePessoaVinculada(section, m.start())));
         }
 
-        // Fallback: linha inline (layout SERPRO comum em PDFs 2016+)
-        if (pagamentos.isEmpty()) {
-            Matcher inline = PAGAMENTO_INLINE_PATTERN.matcher(section);
-            while (inline.find()) {
-                pagamentos.add(buildPagamentoFromMatch(inline, resolverNomePessoaVinculada(section, inline.start())));
-            }
+        // Inline (SERPRO / nome juntado): sempre complementar — ENTRY parcial
+        // (só algumas clínicas) não pode bloquear linhas já normalizadas numa só.
+        Matcher inline = PAGAMENTO_INLINE_PATTERN.matcher(section);
+        while (inline.find()) {
+            PagamentoEfetuado p = buildPagamentoFromMatch(inline,
+                    resolverNomePessoaVinculada(section, inline.start()));
+            mesclarPagamento(pagamentos, p);
         }
 
         // Fallback: extração posicional linha a linha
@@ -1160,6 +1161,41 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
         }
 
         return pagamentos;
+    }
+
+    /**
+     * Inclui pagamento se novo; se já existe mesmo código+doc+valor, troca pelo nome mais longo
+     * (INLINE após juntarNomeQuebrado costuma ser mais completo que ENTRY).
+     */
+    private static void mesclarPagamento(List<PagamentoEfetuado> existentes, PagamentoEfetuado candidato) {
+        if (candidato == null) {
+            return;
+        }
+        String cod = candidato.getCodigo();
+        String doc = candidato.getCpfCnpj();
+        BigDecimal valor = candidato.getValorPago();
+        for (int i = 0; i < existentes.size(); i++) {
+            PagamentoEfetuado e = existentes.get(i);
+            if (e == null) {
+                continue;
+            }
+            boolean mesmoCod = cod == null ? e.getCodigo() == null : cod.equals(e.getCodigo());
+            boolean mesmoDoc = doc == null ? e.getCpfCnpj() == null : doc.equals(e.getCpfCnpj());
+            boolean mesmoValor = valor == null
+                    ? e.getValorPago() == null
+                    : e.getValorPago() != null && valor.compareTo(e.getValorPago()) == 0;
+            if (mesmoCod && mesmoDoc && mesmoValor) {
+                String nomeNovo = candidato.getNomeBeneficiario();
+                String nomeAntigo = e.getNomeBeneficiario();
+                int lenNovo = nomeNovo == null ? 0 : nomeNovo.length();
+                int lenAntigo = nomeAntigo == null ? 0 : nomeAntigo.length();
+                if (lenNovo > lenAntigo) {
+                    existentes.set(i, candidato);
+                }
+                return;
+            }
+        }
+        existentes.add(candidato);
     }
 
     private PagamentoEfetuado buildPagamentoFromMatch(Matcher m, String nomePessoaVinculada) {
@@ -1208,9 +1244,107 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
                     + "(\\d{3}\\.\\d{3}\\.\\d{3}-\\d{2})\\s*$",
             Pattern.UNICODE_CASE | Pattern.MULTILINE);
 
-    /** CPF/CNPJ quebrado e valor BR com espaço ({@code 3.453, 11}) na seção de pagamentos. */
+    /**
+     * Ordem: espaços em doc/valor → separar códigos colados → juntar nome multilinha.
+     * Separar depois de juntar valor evita que {@code 2024,\\n21} seja recolado como monetário.
+     */
     static String normalizarSecaoPagamentos(String section) {
-        return juntarEspacosValorPagamento(juntarEspacosDocumentoPagamento(section));
+        return juntarNomeQuebradoPagamento(
+                separarPagamentosColados(
+                        juntarEspacosValorPagamento(
+                                juntarEspacosDocumentoPagamento(section))));
+    }
+
+    /**
+     * iText às vezes cola o próximo código na mesma linha da descrição anterior:
+     * {@code ...NF 3789, DE 14/10/2024,21 CR CLINICA MEDICA...}
+     * Insere quebra antes do código para o INLINE ancorado em {@code ^} casar.
+     * Lookbehinds de largura fixa (Java não aceita {@code {3,}} variável).
+     */
+    static String separarPagamentosColados(String section) {
+        if (section == null || section.isEmpty()) {
+            return section;
+        }
+        String step1 = PAGAMENTO_COLADO_APOS_PALAVRA.matcher(section).replaceAll("\n$1 ");
+        return PAGAMENTO_COLADO_APOS_ANO.matcher(step1).replaceAll("\n$1 ");
+    }
+
+    /** Ex.: {@code 2024,21 CR} — ano + vírgula + código. */
+    private static final Pattern PAGAMENTO_COLADO_APOS_ANO = Pattern.compile(
+            "(?<=\\d{4}[,.:;])(\\d{1,3})\\s+(?=[A-ZÁÉÍÓÚÀÈÌÒÙÂÊÎÔÛÃÕÇ]{2})",
+            Pattern.UNICODE_CASE);
+
+    /** Ex.: {@code LTDA,21 CR} / {@code Descrição:21 NOME} — 3 letras + pontuação + código. */
+    private static final Pattern PAGAMENTO_COLADO_APOS_PALAVRA = Pattern.compile(
+            "(?<=[A-Za-zÀ-úÁÉÍÓÚÂÊÔÃÕÇáéíóúâêôãõç]{3}[,.:;])(\\d{1,3})\\s+"
+                    + "(?=[A-ZÁÉÍÓÚÀÈÌÒÙÂÊÎÔÛÃÕÇ]{2})",
+            Pattern.UNICODE_CASE);
+
+    /**
+     * Junta nome quebrado em várias linhas com a linha de CNPJ/CPF + valores,
+     * para o {@link #PAGAMENTO_INLINE_PATTERN} casar.
+     * Ex.: {@code 21 CR CLINICA MEDICA DE GINECOLOGIA E} + {@code OSTETRICIA LTDA}
+     * + {@code 45.127.670/0001-01 800,00 0,00}
+     */
+    static String juntarNomeQuebradoPagamento(String section) {
+        if (section == null || section.isEmpty()) {
+            return section;
+        }
+        String[] lines = section.split("\\r?\\n", -1);
+        List<String> out = new ArrayList<>(lines.length);
+        Pattern startIncomplete = Pattern.compile("^(\\s*)(\\d{1,3})\\s+(.+?)\\s*$");
+        Pattern hasDocumento = Pattern.compile(
+                "[\\d]{2,3}\\.[\\d]{3}\\.[\\d]{3}(?:/[\\d]{4}-[\\d]{2}|-[\\d]{2})");
+        Pattern docValorLine = Pattern.compile(
+                "^\\s*([\\d]{2,3}\\.[\\d]{3}\\.[\\d]{3}/[\\d]{4}-[\\d]{2}|[\\d]{3}\\.[\\d]{3}\\.[\\d]{3}-[\\d]{2})\\s+"
+                        + "([\\d]{1,3}(?:[.]\\d{3})*,\\d{2})(?:\\s+([\\d]{1,3}(?:[.]\\d{3})*,\\d{2}))?\\s*$");
+        Pattern novoCodigo = Pattern.compile("^\\s*\\d{1,3}(?:\\s+|$)");
+
+        int i = 0;
+        while (i < lines.length) {
+            String line = lines[i];
+            Matcher start = startIncomplete.matcher(line);
+            if (start.matches() && !hasDocumento.matcher(line).find()) {
+                String indent = start.group(1);
+                String codigo = start.group(2);
+                StringBuilder nome = new StringBuilder(start.group(3).trim());
+                int j = i + 1;
+                boolean joined = false;
+                while (j < lines.length && (j - i) <= 6) {
+                    String next = lines[j];
+                    String trimmed = next == null ? "" : next.trim();
+                    if (trimmed.isEmpty()) {
+                        j++;
+                        continue;
+                    }
+                    if (docValorLine.matcher(trimmed).matches()) {
+                        out.add(indent + codigo + " " + nome + " " + trimmed);
+                        i = j + 1;
+                        joined = true;
+                        break;
+                    }
+                    String lower = trimmed.toLowerCase();
+                    if (lower.startsWith("descri")
+                            || lower.startsWith("titular")
+                            || lower.startsWith("dependente")
+                            || lower.startsWith("alimentando")
+                            || lower.startsWith("página")
+                            || lower.startsWith("pagina")
+                            || hasDocumento.matcher(trimmed).find()
+                            || novoCodigo.matcher(trimmed).find()) {
+                        break;
+                    }
+                    nome.append(' ').append(trimmed);
+                    j++;
+                }
+                if (joined) {
+                    continue;
+                }
+            }
+            out.add(line);
+            i++;
+        }
+        return String.join("\n", out);
     }
 
     /**
@@ -1255,8 +1389,13 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
 
     private static final Pattern CPF_LIMPO = Pattern.compile("\\d{3}\\.\\d{3}\\.\\d{3}-\\d{2}");
     private static final Pattern CNPJ_LIMPO = Pattern.compile("\\d{2}\\.\\d{3}\\.\\d{3}/\\d{4}-\\d{2}");
+    /**
+     * Valor BR com espaço após a vírgula ({@code 3.453, 11}).
+     * Não cola {@code 2024,\\n21 CR...} (código de pagamento após data) — exige que
+     * após os 2 dígitos não venha nome em letras.
+     */
     private static final Pattern VALOR_BR_COM_ESPACO = Pattern.compile(
-            "(\\d{1,3}(?:\\.\\d{3})*),\\s+(\\d{2})");
+            "(\\d{1,3}(?:\\.\\d{3})*),\\s+(\\d{2})(?!\\s*[A-Za-zÀ-úÁÉÍÓÚÂÊÔÃÕÇáéíóúâêôãõç])");
 
     /**
      * Extração posicional de pagamentos quando o regex estruturado falha.
