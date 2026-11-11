@@ -525,6 +525,43 @@ public class GeminiResponseParser {
     }
 
     /**
+     * Parseia resposta do prompt {@code IR_FONTES_EXTRACTION}.
+     *
+     * @return lista de fontes (nunca null; vazia se ausente/inválido)
+     */
+    public static List<FontePagadora> parseFontesResponse(String jsonResponse) {
+        List<FontePagadora> result = new ArrayList<>();
+        if (jsonResponse == null || jsonResponse.trim().isEmpty()) {
+            return result;
+        }
+        try {
+            JsonNode root = mapper.readTree(jsonResponse.trim());
+            JsonNode arr = root.get("fontes");
+            if (arr == null || !arr.isArray()) {
+                return result;
+            }
+            for (JsonNode item : arr) {
+                String nome = getTextOrNull(item, "nome");
+                if (nome == null || nome.isBlank()) {
+                    continue;
+                }
+                result.add(new FontePagadora(
+                        nome.trim(),
+                        getTextOrNull(item, "cnpjCpf"),
+                        getDecimalOrNull(item, "rendimentoTributavel"),
+                        getDecimalOrNull(item, "contribuicaoPrevOficial"),
+                        getDecimalOrNull(item, "impostoRetidoFonte"),
+                        getDecimalOrNull(item, "decimoTerceiro"),
+                        getDecimalOrNull(item, "irrfDecimoTerceiro")));
+            }
+            log.info("Gemini fontes parse — {} item(ns)", result.size());
+        } catch (Exception e) {
+            log.error("Erro ao parsear JSON de fontes Gemini: {}", e.getMessage());
+        }
+        return result;
+    }
+
+    /**
      * Parseia resposta do prompt {@code IR_PAGAMENTOS_EXTRACTION}.
      *
      * @return lista de pagamentos (nunca null; vazia se ausente/inválido)

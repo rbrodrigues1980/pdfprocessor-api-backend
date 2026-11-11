@@ -192,6 +192,12 @@ public class GeminiPdfServiceImpl implements AiPdfExtractionService {
     }
 
     @Override
+    public Mono<String> extractIncomeTaxFontesWithPro(byte[] pdfBytes, int pageNumber) {
+        return processWithModel(fallbackModel, config.getFallbackModel(), pdfBytes, pageNumber,
+                GeminiPrompts.IR_FONTES_EXTRACTION, IR_EXTRACTION_DPI);
+    }
+
+    @Override
     public Mono<String> extractIncomeTaxDependentesWithPro(byte[] pdfBytes, int pageNumber) {
         return processWithModel(fallbackModel, config.getFallbackModel(), pdfBytes, pageNumber,
                 GeminiPrompts.IR_DEPENDENTES_EXTRACTION, IR_EXTRACTION_DPI);

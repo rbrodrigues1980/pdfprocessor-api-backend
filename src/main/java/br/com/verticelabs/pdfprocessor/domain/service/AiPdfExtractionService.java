@@ -61,6 +61,11 @@ public interface AiPdfExtractionService {
     Mono<String> extractIncomeTaxPagamentosWithPro(byte[] pdfBytes, int pageNumber);
 
     /**
+     * Extrai a tabela de fontes pagadoras PJ do titular (tipicamente página 1; Gemini Pro).
+     */
+    Mono<String> extractIncomeTaxFontesWithPro(byte[] pdfBytes, int pageNumber);
+
+    /**
      * Extrai a seção DEPENDENTES de uma página (tipicamente página 1; Gemini Pro).
      */
     Mono<String> extractIncomeTaxDependentesWithPro(byte[] pdfBytes, int pageNumber);

@@ -136,8 +136,8 @@ class Carmen2024DespesasMedicasTest {
         SimuladorIrpfRequest request = new ExcelIrpfSimulacaoMapper(new IrPagamentosDeducaoAggregator())
                 .fromDeclaracao(data, data.getContribuicaoPrevidenciaPrivada(), true);
 
-        // 450 + 7050 + 800 + 1760 + 800 + 8739,40 = 19.599,40
-        assertEquals(0, new BigDecimal("19599.40").compareTo(request.getDespesasMedicas()),
+        // RESUMO 45.381,40 prevalece sobre soma parcial da seção de teste (lista incompleta).
+        assertEquals(0, new BigDecimal("45381.40").compareTo(request.getDespesasMedicas()),
                 "simulação médicas; era=" + request.getDespesasMedicas());
     }
 
