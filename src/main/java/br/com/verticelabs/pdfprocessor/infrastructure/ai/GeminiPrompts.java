@@ -425,6 +425,42 @@ public final class GeminiPrompts {
             """;
 
     /**
+     * Extração da tabela de fontes pagadoras PJ do titular (geralmente página 1).
+     * Essencial para Contr. Prev. Oficial na simulação Completa quando a DIRPF
+     * foi entregue no Desconto Simplificado (RESUMO sem linha de previdência oficial).
+     */
+    public static final String IR_FONTES_EXTRACTION = """
+            Você é um sistema de extração de dados de alta precisão especializado em declarações de Imposto de Renda brasileiras (IRPF).
+            Analise esta imagem e extraia a seção RENDIMENTOS TRIBUTÁVEIS RECEBIDOS DE PESSOA JURÍDICA PELO TITULAR
+            (tabela de fontes pagadoras), se existir nesta página.
+
+            REGRAS:
+            - Se a página NÃO contém essa tabela (ou estiver "Sem Informações"), retorne {"fontes": []}.
+            - Extraia CADA linha da tabela (não a linha TOTAL): nome da fonte, CNPJ/CPF, rendimento recebido,
+              contribuição previdência oficial, imposto retido na fonte, 13º salário e IRRF sobre 13º.
+            - Valores monetários: PONTO como decimal, SEM separador de milhar (ex: 1038.14).
+            - NUNCA invente linhas. Se um campo monetário estiver ilegível, use null nesse campo.
+            - Inclua fontes com contribuicaoPrevOficial = 0.00 quando o valor zero estiver legível.
+
+            FORMATO JSON OBRIGATÓRIO:
+            {
+              "fontes": [
+                {
+                  "nome": "FUNCEF",
+                  "cnpjCpf": "00.436.923/0001-90",
+                  "rendimentoTributavel": 129765.72,
+                  "contribuicaoPrevOficial": 1038.14,
+                  "impostoRetidoFonte": 23716.43,
+                  "decimoTerceiro": 16797.92,
+                  "irrfDecimoTerceiro": 1537.09
+                }
+              ]
+            }
+
+            Retorne APENAS o JSON. Sem markdown, sem explicações.
+            """;
+
+    /**
      * Extração da lista de DEPENDENTES (geralmente página 1) + total de dedução.
      */
     public static final String IR_DEPENDENTES_EXTRACTION = """

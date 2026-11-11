@@ -87,8 +87,12 @@ public class ExcelIrpfSimulacaoMapper {
             builder.previdenciaPrivadaSemTeto(true);
         }
         if (agg.isFonteGranular()) {
+            // Lista parcial de pagamentos não pode reduzir médicas/prev. compl. do RESUMO.
+            BigDecimal medicas = preferirMaiorPositivo(data.getDespesasMedicas(), agg.getDespesasMedicas());
+            BigDecimal prevComplDeclaracao = preferirMaiorPositivo(
+                    data.getContribuicaoPrevidenciaPrivada(), agg.getPrevidenciaPrivada());
             builder
-                    .despesasMedicas(nvl(agg.getDespesasMedicas()))
+                    .despesasMedicas(medicas)
                     .despesasInstrucaoTitular(nvl(agg.getDespesasInstrucaoTitular()))
                     .despesasInstrucaoDependentes(agg.getDespesasInstrucaoDependentes())
                     .despesasInstrucaoAlimentandos(agg.getDespesasInstrucaoAlimentandos())
@@ -97,7 +101,7 @@ public class ExcelIrpfSimulacaoMapper {
                     .previdenciaPrivada(previdenciaPrivada != null
                             ? previdenciaPrivada
                             : resolverPrevidenciaPrivada(
-                                    previdenciaPrivadaParam, agg.getPrevidenciaPrivada(), preferirPrevidenciaPlanilha));
+                                    previdenciaPrivadaParam, prevComplDeclaracao, preferirPrevidenciaPlanilha));
         } else {
             builder
                     .despesasMedicas(nvl(data.getDespesasMedicas()))
@@ -112,6 +116,16 @@ public class ExcelIrpfSimulacaoMapper {
                                     data.getContribuicaoPrevidenciaPrivada(),
                                     preferirPrevidenciaPlanilha));
         }
+    }
+
+    /**
+     * Quando RESUMO e pagamentos divergem, usa o maior valor positivo
+     * (lista granular incompleta não deve subestimar a dedução do RESUMO).
+     */
+    static BigDecimal preferirMaiorPositivo(BigDecimal resumo, BigDecimal granular) {
+        BigDecimal a = resumo != null ? resumo : BigDecimal.ZERO;
+        BigDecimal b = granular != null ? granular : BigDecimal.ZERO;
+        return a.compareTo(b) >= 0 ? a : b;
     }
 
     /** Ajuste manual substitui a prev. oficial; o RRA manual soma na base, em linha própria na planilha. */

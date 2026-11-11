@@ -1,5 +1,7 @@
 package br.com.verticelabs.pdfprocessor.application.incometax;
 
+import br.com.verticelabs.pdfprocessor.application.tributacao.IrPagamentosDeducaoAggregator;
+import br.com.verticelabs.pdfprocessor.application.tributacao.dto.DeducoesPagamentosDTO;
 import br.com.verticelabs.pdfprocessor.domain.model.IrpfDeclaracaoData;
 import br.com.verticelabs.pdfprocessor.domain.model.IrpfDeclaracaoData.DoacaoEfetuadaIrpf;
 import br.com.verticelabs.pdfprocessor.domain.model.IrpfDeclaracaoData.FontePagadoraIrpf;
@@ -105,6 +107,19 @@ public class IrpfDeclaracaoDataMapper {
                 info.getRendimentosAcumuladosDependentes(),
                 info.getResultadoAtividadeRural());
 
+        // RESUMO vazio/OCR falhou: preenche médicas e prev. compl. a partir dos pagamentos.
+        BigDecimal prevCompl = info.getDeducoesContribPrevCompl();
+        BigDecimal medicas = info.getDeducoesMedicas();
+        if ((!isPositive(prevCompl) || !isPositive(medicas)) && !pagamentos.isEmpty()) {
+            DeducoesPagamentosDTO agg = new IrPagamentosDeducaoAggregator().aggregate(pagamentos, null);
+            if (!isPositive(prevCompl) && isPositive(agg.getPrevidenciaPrivada())) {
+                prevCompl = agg.getPrevidenciaPrivada();
+            }
+            if (!isPositive(medicas) && isPositive(agg.getDespesasMedicas())) {
+                medicas = agg.getDespesasMedicas();
+            }
+        }
+
         return IrpfDeclaracaoConsistencia.aplicar(IrpfDeclaracaoData.builder()
                 .nomeTitular(info.getNome())
                 .cpfTitular(info.getCpf())
@@ -123,11 +138,11 @@ public class IrpfDeclaracaoDataMapper {
                 .contribuicaoPrevidenciaOficialRra(info.getDeducoesContribPrevRRA())
                 .contribuicaoPrevidenciaSocial(IrpfPrevidenciaOficialResolver.resolver(
                         fontes, info.getDeducoesContribPrevOficial(), null))
-                .contribuicaoPrevidenciaPrivada(info.getDeducoesContribPrevCompl())
+                .contribuicaoPrevidenciaPrivada(prevCompl)
                 // Prioridade: total página 1 (iText) > linha Dependentes do RESUMO (Gemini/iText)
                 .deducaoDependentes(resolverDeducaoDependentes(info))
                 .despesasInstrucao(info.getDeducoesInstrucao())
-                .despesasMedicas(info.getDeducoesMedicas())
+                .despesasMedicas(medicas)
                 .pensaoAlimenticiaJudicial(info.getDeducoesPensaoJudicial())
                 .pensaoAlimenticiaJudicialRra(info.getDeducoesPensaoRRA())
                 .pensaoAlimenticiaEscrituraPublica(info.getDeducoesPensaoEscritura())

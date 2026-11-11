@@ -1485,8 +1485,8 @@ public class DocumentProcessUseCase {
     }
 
     /**
-     * Após o RESUMO: em PDF digitalizado (ou quando listas vazias), extrai PAGAMENTOS EFETUADOS
-     * e DEPENDENTES via Gemini para alimentar a simulação Completa.
+     * Após o RESUMO: em PDF digitalizado (ou quando listas vazias), extrai PAGAMENTOS EFETUADOS,
+     * FONTES PAGADORAS PJ e DEPENDENTES via Gemini para alimentar a simulação Completa.
      */
     private Mono<br.com.verticelabs.pdfprocessor.domain.service.IncomeTaxDeclarationService.IncomeTaxInfo>
             enrichIrWithPagamentosAndDependentes(
@@ -1498,12 +1498,15 @@ public class DocumentProcessUseCase {
         boolean needsPagamentos = scannedPdf
                 || irInfo.getPagamentosEfetuados() == null
                 || irInfo.getPagamentosEfetuados().isEmpty();
+        boolean needsFontes = scannedPdf
+                || irInfo.getFontesPagadoras() == null
+                || irInfo.getFontesPagadoras().isEmpty();
         boolean needsDependentes = scannedPdf
                 || irInfo.getDependentes() == null
                 || irInfo.getDependentes().isEmpty()
                 || irInfo.getTotalDeducaoDependentes() == null;
 
-        if (!needsPagamentos && !needsDependentes) {
+        if (!needsPagamentos && !needsFontes && !needsDependentes) {
             return Mono.just(irInfo);
         }
 
@@ -1512,9 +1515,45 @@ public class DocumentProcessUseCase {
                         ? extractPagamentosViaGemini(document, pdfBytes, irInfo)
                         : Mono.just(irInfo);
 
-        return base.flatMap(withPag -> needsDependentes
-                ? extractDependentesViaGemini(document, pdfBytes, withPag)
-                : Mono.just(withPag));
+        return base
+                .flatMap(withPag -> needsFontes
+                        ? extractFontesViaGemini(document, pdfBytes, withPag)
+                        : Mono.just(withPag))
+                .flatMap(withFontes -> needsDependentes
+                        ? extractDependentesViaGemini(document, pdfBytes, withFontes)
+                        : Mono.just(withFontes));
+    }
+
+    private Mono<br.com.verticelabs.pdfprocessor.domain.service.IncomeTaxDeclarationService.IncomeTaxInfo>
+            extractFontesViaGemini(
+                    PayrollDocument document,
+                    byte[] pdfBytes,
+                    br.com.verticelabs.pdfprocessor.domain.service.IncomeTaxDeclarationService.IncomeTaxInfo irInfo) {
+
+        // Tabela de fontes costuma estar na página 1; tenta página 2 se a 1 falhar
+        return Flux.just(1, 2)
+                .concatMap(page -> aiPdfExtractionService
+                        .extractIncomeTaxFontesWithPro(pdfBytes, page)
+                        .map(GeminiResponseParser::parseFontesResponse)
+                        .filter(list -> list != null && !list.isEmpty())
+                        .doOnNext(list -> log.info(
+                                "✅ Gemini FONTES pág. {}: {} fonte(s)", page, list.size()))
+                        .onErrorResume(e -> {
+                            log.warn("⚠️ Gemini FONTES pág. {}: {}", page, e.getMessage());
+                            return Mono.empty();
+                        }))
+                .next()
+                .map(fontes -> {
+                    addInfoEvent(document, 1, ProcessingEventType.GEMINI_EXTRACTION_COMPLETED,
+                            String.format("Gemini extraiu %d fonte(s) pagadora(s) PJ.", fontes.size()),
+                            Map.of("fontesCount", fontes.size()));
+                    return IncomeTaxGeminiHelper.withFontes(irInfo, fontes);
+                })
+                .defaultIfEmpty(irInfo)
+                .onErrorResume(e -> {
+                    log.warn("⚠️ Falha ao extrair FONTES via Gemini: {}", e.getMessage());
+                    return Mono.just(irInfo);
+                });
     }
 
     private Mono<br.com.verticelabs.pdfprocessor.domain.service.IncomeTaxDeclarationService.IncomeTaxInfo>

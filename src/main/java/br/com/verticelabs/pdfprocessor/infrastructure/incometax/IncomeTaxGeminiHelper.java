@@ -276,6 +276,24 @@ public final class IncomeTaxGeminiHelper {
         return copyWith(
                 source,
                 pagamentos != null ? pagamentos : List.of(),
+                source.getFontesPagadoras(),
+                source.getDependentes(),
+                source.getTotalDeducaoDependentes());
+    }
+
+    /**
+     * Substitui a lista de fontes pagadoras PJ do titular.
+     * Quando o RESUMO não tem prev. oficial (Simplificado), a soma de
+     * {@code contribuicaoPrevOficial} das fontes alimenta a simulação Completa.
+     */
+    public static IncomeTaxInfo withFontes(IncomeTaxInfo source, List<IncomeTaxInfo.FontePagadora> fontes) {
+        if (source == null) {
+            return null;
+        }
+        return copyWith(
+                source,
+                source.getPagamentosEfetuados(),
+                fontes != null ? fontes : List.of(),
                 source.getDependentes(),
                 source.getTotalDeducaoDependentes());
     }
@@ -309,8 +327,8 @@ public final class IncomeTaxGeminiHelper {
             prevCompl = ajustarPrevComplAposPreencherDependentes(source, prevCompl, deducoesDependentes);
         }
 
-        return copyWith(source, source.getPagamentosEfetuados(), mergedList, mergedTotal,
-                prevCompl, deducoesDependentes);
+        return copyWith(source, source.getPagamentosEfetuados(), source.getFontesPagadoras(),
+                mergedList, mergedTotal, prevCompl, deducoesDependentes);
     }
 
     /**
@@ -352,15 +370,17 @@ public final class IncomeTaxGeminiHelper {
     private static IncomeTaxInfo copyWith(
             IncomeTaxInfo source,
             List<IncomeTaxInfo.PagamentoEfetuado> pagamentos,
+            List<IncomeTaxInfo.FontePagadora> fontes,
             List<IncomeTaxInfo.DependenteInfo> dependentes,
             BigDecimal totalDeducaoDependentes) {
-        return copyWith(source, pagamentos, dependentes, totalDeducaoDependentes,
+        return copyWith(source, pagamentos, fontes, dependentes, totalDeducaoDependentes,
                 source.getDeducoesContribPrevCompl(), source.getDeducoesDependentes());
     }
 
     private static IncomeTaxInfo copyWith(
             IncomeTaxInfo source,
             List<IncomeTaxInfo.PagamentoEfetuado> pagamentos,
+            List<IncomeTaxInfo.FontePagadora> fontes,
             List<IncomeTaxInfo.DependenteInfo> dependentes,
             BigDecimal totalDeducaoDependentes,
             BigDecimal prevCompl,
@@ -389,7 +409,7 @@ public final class IncomeTaxGeminiHelper {
                 source.getBensAnterior(), source.getBensAtual(),
                 source.getDividasAnterior(), source.getDividasAtual(),
                 source.getRendimentosIsentos(), source.getRendimentosTributacaoExclusiva(),
-                pagamentos, source.getFontesPagadoras(),
+                pagamentos, fontes != null ? fontes : source.getFontesPagadoras(),
                 source.getControle(), dependentes, totalDeducaoDependentes,
                 source.getAlimentandos(),
                 source.getRendimentosTributaveisTitularPJ(), source.getRendimentosTributaveisDependentesPJ(),
