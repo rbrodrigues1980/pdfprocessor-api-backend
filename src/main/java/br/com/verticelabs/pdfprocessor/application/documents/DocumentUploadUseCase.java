@@ -43,7 +43,7 @@ public class DocumentUploadUseCase {
     private final DocumentProcessUseCase documentProcessUseCase;
     private final DeleteDocumentUseCase deleteDocumentUseCase;
 
-    private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+    private static final long MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
     private static final String PDF_CONTENT_TYPE = "application/pdf";
 
     public Mono<UploadDocumentResponse> upload(FilePart filePart, String cpf, String nome) {
@@ -186,7 +186,7 @@ public class DocumentUploadUseCase {
                     log.info("Arquivo lido em memória. Tamanho: {} bytes", fileBytes.length);
                     if (fileBytes.length > MAX_FILE_SIZE) {
                         return Mono.error(new InvalidPdfException(
-                                "Arquivo excede o limite de 10 MB."));
+                                "Arquivo excede o limite de 20 MB."));
                     }
                     // Calcular hash dos bytes
                     log.info("Calculando hash SHA-256 do arquivo...");

@@ -41,7 +41,7 @@ public class IncomeTaxUploadUseCase {
         private final DocumentProcessUseCase documentProcessUseCase;
         private final GetPersonByIdUseCase getPersonByIdUseCase;
 
-        private static final long MAX_FILE_SIZE = 10 * 1024 * 1024;
+        private static final long MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
         private static final String PDF_CONTENT_TYPE = "application/pdf";
 
         /**
@@ -112,7 +112,7 @@ public class IncomeTaxUploadUseCase {
 
                                                                                         if (fileBytes.length > MAX_FILE_SIZE) {
                                                                                                 return Mono.error(new InvalidPdfException(
-                                                                                                                "Arquivo excede o limite de 10 MB."));
+                                                                                                                "Arquivo excede o limite de 20 MB."));
                                                                                         }
 
                                                                                         // 4. Calcular hash do arquivo

@@ -238,7 +238,7 @@ Dados consolidados dependem totalmente da extração iniciada por esta API.
 # 9. Considerações Técnicas de Implementação
 
 - Validar CPF com algoritmo `mod11` conforme regras da Receita Federal.
-- Limitar tamanho máximo (default: 10MB).
+- Limitar tamanho máximo (default: 20MB).
 - Criar índices em:
   - cpf
   - status
