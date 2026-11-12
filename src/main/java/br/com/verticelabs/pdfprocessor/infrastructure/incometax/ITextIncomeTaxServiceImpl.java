@@ -472,21 +472,56 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
             return pdfBytes;
         })
                 .subscribeOn(Schedulers.boundedElastic())
-                .flatMap(pdfBytes -> Mono.zip(
-                        findLastPageContaining(new ByteArrayInputStream(pdfBytes), "RESUMO"),
-                        findLastPaginaIdentificacaoContribuinte(new ByteArrayInputStream(pdfBytes))
-                                .onErrorReturn(1),
-                        extractAllPagesText(new ByteArrayInputStream(pdfBytes)))
-                        .flatMap(tuple -> {
-                            int resumoPage = tuple.getT1();
-                            int identPage = tuple.getT2() != null && tuple.getT2() > 0 ? tuple.getT2() : 1;
-                            String allPagesText = recortarUltimaDeclaracao(tuple.getT3());
-                            log.info("📄 Página RESUMO vigente: {}, identificação: {}", resumoPage, identPage);
+                .flatMap(pdfBytes -> extractAllPagesText(new ByteArrayInputStream(pdfBytes))
+                        .flatMap(allPagesRaw -> {
+                            var vigenteOpt = IrpfEntregaVigenteSelector.selecionarVigente(allPagesRaw);
+                            int identPage;
+                            int resumoPage;
+                            String allPagesText;
+                            if (vigenteOpt.isPresent()) {
+                                var vigente = vigenteOpt.get();
+                                identPage = vigente.identPage();
+                                resumoPage = vigente.resumoPage() != null
+                                        ? vigente.resumoPage()
+                                        : vigente.endPage();
+                                allPagesText = vigente.text();
+                                log.info(
+                                        "📄 Entrega vigente: tipo={}, data={}, páginas {}-{}, RESUMO={}, ident={}",
+                                        vigente.tipoDeclaracao(), vigente.dataEntrega(),
+                                        vigente.startPage(), vigente.endPage(),
+                                        resumoPage, identPage);
+                            } else {
+                                // Fallback legado: último RESUMO / última IDENTIFICAÇÃO
+                                return Mono.zip(
+                                        findLastPageContaining(new ByteArrayInputStream(pdfBytes), "RESUMO"),
+                                        findLastPaginaIdentificacaoContribuinte(
+                                                new ByteArrayInputStream(pdfBytes)).onErrorReturn(1))
+                                        .flatMap(tuple -> {
+                                            int r = tuple.getT1();
+                                            int id = tuple.getT2() != null && tuple.getT2() > 0
+                                                    ? tuple.getT2() : 1;
+                                            String cropped = IrpfEntregaVigenteSelector
+                                                    .recortarDeclaracaoVigente(allPagesRaw);
+                                            log.info("📄 Página RESUMO vigente (fallback): {}, identificação: {}",
+                                                    r, id);
+                                            return Mono.zip(
+                                                    extractRawTextFromPage(
+                                                            new ByteArrayInputStream(pdfBytes), id),
+                                                    extractRawTextFromPage(
+                                                            new ByteArrayInputStream(pdfBytes), r))
+                                                    .map(pages -> parseIncomeTaxInfo(
+                                                            pages.getT1(), pages.getT2(), cropped));
+                                        });
+                            }
 
+                            final int identFinal = identPage;
+                            final int resumoFinal = resumoPage;
+                            final String croppedFinal = allPagesText;
                             return Mono.zip(
-                                    extractRawTextFromPage(new ByteArrayInputStream(pdfBytes), identPage),
-                                    extractRawTextFromPage(new ByteArrayInputStream(pdfBytes), resumoPage))
-                                    .map(pages -> parseIncomeTaxInfo(pages.getT1(), pages.getT2(), allPagesText));
+                                    extractRawTextFromPage(new ByteArrayInputStream(pdfBytes), identFinal),
+                                    extractRawTextFromPage(new ByteArrayInputStream(pdfBytes), resumoFinal))
+                                    .map(pages -> parseIncomeTaxInfo(
+                                            pages.getT1(), pages.getT2(), croppedFinal));
                         }))
                 .doOnSuccess(info -> log.info("✅ Extração concluída com sucesso"))
                 .doOnError(e -> log.error("❌ Erro na extração: {}", e.getMessage(), e));
@@ -621,26 +656,11 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
     }
 
     /**
-     * PDFs da e-CAC às vezes concatenam a entrega original e a retificadora.
-     * Mantém só o texto a partir da última identificação do contribuinte.
+     * PDFs da e-CAC às vezes concatenam Original e Retificadora (qualquer ordem/tamanho).
+     * Mantém só o bloco da entrega vigente (Retificadora → data mais recente → último).
      */
     static String recortarUltimaDeclaracao(String allPagesText) {
-        if (allPagesText == null || allPagesText.isBlank()) {
-            return allPagesText;
-        }
-        String upper = allPagesText.toUpperCase();
-        int identA = upper.lastIndexOf("IDENTIFICAÇÃO DO CONTRIBUINTE");
-        int identB = upper.lastIndexOf("IDENTIFICACAO DO CONTRIBUINTE");
-        int ident = Math.max(identA, identB);
-        if (ident <= 0) {
-            return allPagesText;
-        }
-        int marker = allPagesText.lastIndexOf("=== PAGINA", ident);
-        int start = marker >= 0 ? marker : ident;
-        if (start <= 0) {
-            return allPagesText;
-        }
-        return allPagesText.substring(start);
+        return IrpfEntregaVigenteSelector.recortarDeclaracaoVigente(allPagesText);
     }
 
     /**

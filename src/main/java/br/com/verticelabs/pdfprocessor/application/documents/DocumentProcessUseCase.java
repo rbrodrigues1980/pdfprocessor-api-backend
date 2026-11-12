@@ -17,6 +17,7 @@ import br.com.verticelabs.pdfprocessor.domain.service.MonthYearDetectionService;
 import br.com.verticelabs.pdfprocessor.domain.service.PdfService;
 import br.com.verticelabs.pdfprocessor.infrastructure.ai.GeminiResponseParser;
 import br.com.verticelabs.pdfprocessor.infrastructure.incometax.IncomeTaxGeminiHelper;
+import br.com.verticelabs.pdfprocessor.infrastructure.incometax.IrpfEntregaVigenteSelector;
 import br.com.verticelabs.pdfprocessor.infrastructure.pdf.*;
 import br.com.verticelabs.pdfprocessor.interfaces.documents.dto.ProcessDocumentResponse;
 import lombok.RequiredArgsConstructor;
@@ -1356,26 +1357,51 @@ public class DocumentProcessUseCase {
     }
 
     private Mono<List<Integer>> resolveCandidateResumoPages(byte[] pdfBytes, boolean scannedPdf) {
-        return pdfService.getTotalPages(new ByteArrayInputStream(pdfBytes))
-                .flatMap(totalPages -> {
-                    if (scannedPdf) {
+        return extractAllPagesTextForIrSelector(pdfBytes)
+                .flatMap(allPagesText -> {
+                    var vigente = IrpfEntregaVigenteSelector.selecionarVigente(allPagesText);
+                    if (vigente.isPresent() && vigente.get().resumoPage() != null) {
+                        int resumo = vigente.get().resumoPage();
                         List<Integer> pages = new ArrayList<>();
-                        int start = Math.max(1, totalPages - SCANNED_IR_RESUMO_PAGE_LOOKBACK + 1);
-                        for (int p = totalPages; p >= start; p--) {
-                            pages.add(p);
+                        pages.add(resumo);
+                        // Fallback vizinho útil em layouts em que RESUMO começa na página anterior
+                        if (resumo > 1) {
+                            pages.add(resumo - 1);
                         }
-                        log.info("📄 PDF digitalizado: candidatas RESUMO = {} (de {} páginas)", pages, totalPages);
+                        log.info(
+                                "📄 Candidatas RESUMO pela entrega vigente (tipo={}, págs {}-{}): {}",
+                                vigente.get().tipoDeclaracao(),
+                                vigente.get().startPage(),
+                                vigente.get().endPage(),
+                                pages);
                         return Mono.just(pages);
                     }
-                    return Flux.range(1, totalPages)
-                            .concatMap(page -> pdfService
-                                    .extractTextFromPage(new ByteArrayInputStream(pdfBytes), page)
-                                    .filter(text -> text != null && text.toUpperCase().contains("RESUMO"))
-                                    .map(text -> page))
-                            .next()
-                            .map(page -> List.of(page))
-                            .defaultIfEmpty(List.of(Math.max(1, totalPages)));
+                    return pdfService.getTotalPages(new ByteArrayInputStream(pdfBytes))
+                            .map(totalPages -> {
+                                if (scannedPdf) {
+                                    List<Integer> pages = new ArrayList<>();
+                                    int start = Math.max(1, totalPages - SCANNED_IR_RESUMO_PAGE_LOOKBACK + 1);
+                                    for (int p = totalPages; p >= start; p--) {
+                                        pages.add(p);
+                                    }
+                                    log.info("📄 PDF digitalizado: candidatas RESUMO = {} (de {} páginas)",
+                                            pages, totalPages);
+                                    return pages;
+                                }
+                                return List.of(Math.max(1, totalPages));
+                            });
                 });
+    }
+
+    private Mono<String> extractAllPagesTextForIrSelector(byte[] pdfBytes) {
+        return pdfService.getTotalPages(new ByteArrayInputStream(pdfBytes))
+                .flatMap(totalPages -> Flux.range(1, totalPages)
+                        .concatMap(page -> pdfService
+                                .extractTextFromPage(new ByteArrayInputStream(pdfBytes), page)
+                                .defaultIfEmpty("")
+                                .map(text -> "=== PAGINA " + page + " ===\n" + text + "\n"))
+                        .collectList()
+                        .map(parts -> String.join("", parts)));
     }
 
     private Mono<br.com.verticelabs.pdfprocessor.domain.service.IncomeTaxDeclarationService.IncomeTaxInfo>

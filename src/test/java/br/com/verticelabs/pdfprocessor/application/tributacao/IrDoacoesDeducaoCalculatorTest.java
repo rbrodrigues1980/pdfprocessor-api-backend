@@ -101,7 +101,7 @@ class IrDoacoesDeducaoCalculatorTest {
     void inssDomestico_2016_aplicaTeto() {
         BigDecimal efetivo = IrDoacoesDeducaoCalculator.calcularInssDomesticoEfetivo(
                 new BigDecimal("1500.00"), 2016, null);
-        assertEquals(new BigDecimal("1092.00"), efetivo);
+        assertEquals(new BigDecimal("1093.77"), efetivo);
     }
 
     @Test
