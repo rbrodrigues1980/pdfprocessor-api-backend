@@ -5,6 +5,7 @@ import br.com.verticelabs.pdfprocessor.application.incometax.AjusteSimulacaoIrpf
 import br.com.verticelabs.pdfprocessor.application.incometax.IrpfPrevidenciaOficialResolver;
 import br.com.verticelabs.pdfprocessor.application.incometax.IrpfDeclaracaoConsistencia;
 import br.com.verticelabs.pdfprocessor.application.incometax.IrpfDeclaracaoDataMapper;
+import br.com.verticelabs.pdfprocessor.infrastructure.incometax.IrpfEntregaVigenteSelector;
 import br.com.verticelabs.pdfprocessor.application.tributacao.IrCalculoProgressivoService;
 import br.com.verticelabs.pdfprocessor.application.tributacao.IrDoacoesDeducaoCalculator;
 import br.com.verticelabs.pdfprocessor.application.tributacao.IrSimuladorMotorService;
@@ -1156,10 +1157,21 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
                     for (var doc : docs) {
                         IrpfDeclaracaoData data = IrpfDeclaracaoConsistencia.aplicar(doc.getIrpfData());
                         String anoCalendario = data.getAnoCalendario();
-                        if (anoCalendario != null && !anoCalendario.isBlank()) {
-                            map.put(anoCalendario.trim(), data);
-                            log.debug("Declaração IRPF encontrada: exercício={}, anoCalendario={}",
-                                    data.getExercicio(), anoCalendario);
+                        if (anoCalendario == null || anoCalendario.isBlank()) {
+                            continue;
+                        }
+                        String ano = anoCalendario.trim();
+                        IrpfDeclaracaoData atual = map.get(ano);
+                        if (atual == null
+                                || IrpfEntregaVigenteSelector.devePreferir(
+                                        data.getTipoDeclaracao(),
+                                        data.getDataHoraEntrega(),
+                                        atual.getTipoDeclaracao(),
+                                        atual.getDataHoraEntrega())) {
+                            map.put(ano, data);
+                            log.debug(
+                                    "Declaração IRPF vigente: exercício={}, anoCalendario={}, tipo={}",
+                                    data.getExercicio(), ano, data.getTipoDeclaracao());
                         }
                     }
                     log.info("Declarações IRPF mapeadas para anos-calendário: {}", map.keySet());

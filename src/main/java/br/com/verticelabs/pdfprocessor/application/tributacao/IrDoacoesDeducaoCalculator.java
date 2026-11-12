@@ -75,7 +75,7 @@ public class IrDoacoesDeducaoCalculator {
             Integer anoCalendario,
             IrParametrosAnuais params) {
         if (anoCalendario == null || anoCalendario > 2018) {
-            return BigDecimal.ZERO;
+            return BigDecimal.ZERO.setScale(2, RM);
         }
         BigDecimal limite = params != null && params.getLimiteInssDomestico() != null
                 ? params.getLimiteInssDomestico()

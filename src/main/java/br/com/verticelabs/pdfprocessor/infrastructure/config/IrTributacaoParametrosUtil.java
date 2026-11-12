@@ -14,7 +14,7 @@ public final class IrTributacaoParametrosUtil {
      */
     public static BigDecimal limiteInssDomestico(int anoCalendario) {
         return switch (anoCalendario) {
-            case 2016 -> new BigDecimal("1092.00");
+            case 2016 -> new BigDecimal("1093.77");
             case 2017 -> new BigDecimal("1171.84");
             case 2018 -> new BigDecimal("1200.32");
             default -> BigDecimal.ZERO;
