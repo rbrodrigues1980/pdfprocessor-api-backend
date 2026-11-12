@@ -329,7 +329,9 @@ public class ExcelResumoGeralHelper {
                 : modelo.getImpostoDevidoFinal();
         BigDecimal totalDevido = modelo.getResumo() != null && modelo.getResumo().getTotalImpostoDevido() != null
                 ? modelo.getResumo().getTotalImpostoDevido()
-                : nvl(impostoProgressivoTotal).add(nvl(data.getImpostoSobreRRA()));
+                : nvl(impostoProgressivoTotal)
+                        .add(nvl(data.getImpostoSobreRRA()))
+                        .add(nvl(data.getImpostoSobreLei14754()));
         BigDecimal totalPago = AjusteSimulacaoIrpf.somarImpostoDepositoJudicialCivel(
                         calcularTotalImpostoPagoDeclaracao(data), data)
                 .add(somarIrrfDepositoJudicial(informeRendimentos));

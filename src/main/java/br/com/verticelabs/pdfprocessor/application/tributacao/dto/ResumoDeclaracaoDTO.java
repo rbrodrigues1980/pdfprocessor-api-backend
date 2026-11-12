@@ -19,6 +19,7 @@ public class ResumoDeclaracaoDTO {
     private BigDecimal deducaoIncentivo;
     private BigDecimal impostoDevidoI;
     private BigDecimal impostoDevidoRRA;
+    private BigDecimal impostoDevidoLei14754;
     private BigDecimal aliquotaEfetiva;
     private BigDecimal totalImpostoDevido;
 

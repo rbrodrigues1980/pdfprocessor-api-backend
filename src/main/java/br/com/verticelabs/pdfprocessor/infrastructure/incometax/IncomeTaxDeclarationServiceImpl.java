@@ -625,6 +625,7 @@ public class IncomeTaxDeclarationServiceImpl implements IncomeTaxDeclarationServ
                                                                                                         contribuicaoPrevEmpregadorDomestico,
                                                                                                         impostoDevidoII,
                                                                                                         impostoDevidoRRA,
+                                                                                                        null,
                                                                                                         totalImpostoDevido,
                                                                                                         saldoImpostoPagar,
                                                                                                         rendimentosTributaveis,

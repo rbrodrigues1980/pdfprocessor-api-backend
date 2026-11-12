@@ -56,6 +56,7 @@ public class ExcelIrpfSimulacaoMapper {
                 .deducaoDependentesDeclarada(
                         isPositive(data.getDeducaoDependentes()) ? data.getDeducaoDependentes() : null)
                 .impostoDevidoRRA(nvl(data.getImpostoSobreRRA()))
+                .impostoDevidoLei14754(nvl(data.getImpostoSobreLei14754()))
                 .impostoRetidoFonteTitular(nvl(data.getImpostoRetidoFonteTitular()))
                 .impostoRetidoFonteDependentes(nvl(data.getImpostoRetidoDependentes()))
                 .carneLeaoTitular(nvl(data.getCarneLeaoTitular()))

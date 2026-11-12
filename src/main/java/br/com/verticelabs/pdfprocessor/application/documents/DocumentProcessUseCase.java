@@ -1802,11 +1802,12 @@ public class DocumentProcessUseCase {
                             incomeTaxInfo.getNome(), incomeTaxInfo.getCpf(),
                             incomeTaxInfo.getExercicio(), incomeTaxInfo.getAnoCalendario());
                     log.info(
-                            "  Base Cálculo: {}, Devido: {}, Dedução: {}, Devido I: {}, Contribuição: {}, Devido II: {}, RRA: {}, Total: {}, Saldo a Pagar: {}",
+                            "  Base Cálculo: {}, Devido: {}, Dedução: {}, Devido I: {}, Contribuição: {}, Devido II: {}, RRA: {}, Lei14754: {}, Total: {}, Saldo a Pagar: {}",
                             incomeTaxInfo.getBaseCalculoImposto(), incomeTaxInfo.getImpostoDevido(),
                             incomeTaxInfo.getDeducaoIncentivo(), incomeTaxInfo.getImpostoDevidoI(),
                             incomeTaxInfo.getContribuicaoPrevEmpregadorDomestico(), incomeTaxInfo.getImpostoDevidoII(),
-                            incomeTaxInfo.getImpostoDevidoRRA(), incomeTaxInfo.getTotalImpostoDevido(),
+                            incomeTaxInfo.getImpostoDevidoRRA(), incomeTaxInfo.getImpostoDevidoLei14754(),
+                            incomeTaxInfo.getTotalImpostoDevido(),
                             incomeTaxInfo.getSaldoImpostoPagar());
 
                     // Criar entries para cada informação
@@ -1884,6 +1885,12 @@ public class DocumentProcessUseCase {
                     if (incomeTaxInfo.getImpostoDevidoRRA() != null) {
                         entries.add(createEntry(tenantId, document.getId(), "IR_IMPOSTO_DEVIDO_RRA",
                                 "Imposto devido RRA", incomeTaxInfo.getImpostoDevidoRRA(), referencia));
+                    }
+
+                    if (incomeTaxInfo.getImpostoDevidoLei14754() != null) {
+                        entries.add(createEntry(tenantId, document.getId(), "IR_IMPOSTO_DEVIDO_LEI_14754",
+                                "Imposto Lei 14.754/2023", incomeTaxInfo.getImpostoDevidoLei14754(),
+                                referencia));
                     }
 
                     if (incomeTaxInfo.getTotalImpostoDevido() != null) {

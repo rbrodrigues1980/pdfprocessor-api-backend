@@ -187,14 +187,17 @@ public final class GeminiPrompts {
             3. DEDUÇÕES: lista de tipos + TOTAL (layout varia conforme o tipo de tributação acima)
             4. IMPOSTO DEVIDO: base de cálculo, imposto devido, dedução de incentivo,
                imposto devido I, imposto devido II (se houver), Imposto devido RRA (se houver),
-               alíquota efetiva, total do imposto devido
+               Imposto Lei 14.754/2023 (se houver), alíquota efetiva, total do imposto devido
             5. IMPOSTO PAGO: retido na fonte, carnê-leão, complementar, etc. + TOTAL
             6. RESULTADO: saldo a pagar OU imposto a restituir
 
-            CRÍTICO — Imposto devido RRA:
+            CRÍTICO — Imposto devido RRA e Lei 14.754/2023:
             - Se existir a linha "Imposto devido RRA" com valor > 0, preencha "impostoDevidoRRA"
               com o valor EXATO (nunca omita nem use null).
-            - "totalImpostoDevido" = Imposto devido I (+ Imposto devido II se houver) + Imposto devido RRA.
+            - Se existir a linha "Imposto Lei 14.754/2023" (ou "Imposto devido Lei 14.754/2023")
+              com valor > 0, preencha "impostoDevidoLei14754" com o valor EXATO.
+            - "totalImpostoDevido" = Imposto devido I (+ II se houver) + Imposto devido RRA
+              + Imposto Lei 14.754/2023.
 
             FORMATO JSON OBRIGATÓRIO:
             {
@@ -235,6 +238,7 @@ public final class GeminiPrompts {
               "contribuicaoPrevEmpregadorDomestico": null,
               "impostoDevidoII": null,
               "impostoDevidoRRA": null,
+              "impostoDevidoLei14754": null,
               "totalImpostoDevido": null,
               "impostoPago": {
                 "retidoFonteTitular": null,
@@ -290,10 +294,13 @@ public final class GeminiPrompts {
             com os valores das linhas correspondentes quando > 0 (nunca omita).
             Em declaração SIMPLIFICADA: campos individuais de deduções = null; use "descontoSimplificado".
 
-            CRÍTICO — Imposto devido RRA:
+            CRÍTICO — Imposto devido RRA e Lei 14.754/2023:
             - Se existir a linha "Imposto devido RRA" com valor > 0, preencha "impostoDevidoRRA"
               com o valor EXATO (nunca omita nem use null).
-            - "totalImpostoDevido" = Imposto devido I (+ Imposto devido II se houver) + Imposto devido RRA.
+            - Se existir a linha "Imposto Lei 14.754/2023" (ou "Imposto devido Lei 14.754/2023")
+              com valor > 0, preencha "impostoDevidoLei14754" com o valor EXATO.
+            - "totalImpostoDevido" = Imposto devido I (+ II se houver) + Imposto devido RRA
+              + Imposto Lei 14.754/2023.
 
             FORMATO JSON OBRIGATÓRIO (mesmo schema de IR_RESUMO_EXTRACTION):
             {
@@ -334,6 +341,7 @@ public final class GeminiPrompts {
               "contribuicaoPrevEmpregadorDomestico": null,
               "impostoDevidoII": null,
               "impostoDevidoRRA": null,
+              "impostoDevidoLei14754": null,
               "totalImpostoDevido": null,
               "impostoPago": {
                 "retidoFonteTitular": null,

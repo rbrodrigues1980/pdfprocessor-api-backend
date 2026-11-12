@@ -41,6 +41,8 @@ public interface IncomeTaxDeclarationService {
         private final BigDecimal contribuicaoPrevEmpregadorDomestico;
         private final BigDecimal impostoDevidoII;
         private final BigDecimal impostoDevidoRRA;
+        /** Imposto devido pela Lei 14.754/2023 (aplicações/exterior). Soma no total, como o RRA. */
+        private final BigDecimal impostoDevidoLei14754;
         private final BigDecimal totalImpostoDevido;
         private final BigDecimal saldoImpostoPagar;
 

@@ -127,6 +127,7 @@ public final class IncomeTaxGeminiHelper {
         BigDecimal impostoDevidoI = source.getImpostoDevidoI();
         BigDecimal impostoDevidoII = source.getImpostoDevidoII();
         BigDecimal impostoDevidoRRA = source.getImpostoDevidoRRA();
+        BigDecimal impostoDevidoLei14754 = source.getImpostoDevidoLei14754();
         BigDecimal totalImpostoDevido = source.getTotalImpostoDevido();
         BigDecimal contribuicaoPrevEmpregadorDomestico = source.getContribuicaoPrevEmpregadorDomestico();
         BigDecimal impostoRestituir = source.getImpostoRestituir();
@@ -157,23 +158,55 @@ public final class IncomeTaxGeminiHelper {
         if (!isPositive(impostoDevidoI) && isPositive(impostoDevido) && deducaoIncentivo != null) {
             impostoDevidoI = impostoDevido.subtract(nvl(deducaoIncentivo));
         }
-        // Derivar RRA omitido pelo Gemini: Total = (II se houver, senão I) + RRA
+        // Derivar Lei 14.754 omitida: Total = progressivo + RRA + Lei 14.754
+        if (!isPositive(impostoDevidoLei14754)
+                && isPositive(totalImpostoDevido)
+                && isPositive(impostoDevidoI)) {
+            BigDecimal baseProgressivo = isPositive(impostoDevidoII) ? impostoDevidoII : impostoDevidoI;
+            BigDecimal leiDerivada = totalImpostoDevido
+                    .subtract(baseProgressivo)
+                    .subtract(nvl(impostoDevidoRRA))
+                    .setScale(2, RoundingMode.HALF_UP);
+            boolean gapExplicadoPorDomestico = !isPositive(impostoDevidoII)
+                    && isPositive(contribuicaoPrevEmpregadorDomestico)
+                    && leiDerivada.subtract(contribuicaoPrevEmpregadorDomestico).abs()
+                            .compareTo(TOLERANCE) <= 0;
+            // Só atribui à Lei 14.754 se o gap residual for pequeno (tipicamente < R$ 1.000)
+            // — gaps grandes continuam sendo tratados como RRA abaixo.
+            if (leiDerivada.compareTo(TOLERANCE) > 0
+                    && leiDerivada.compareTo(new BigDecimal("1000")) < 0
+                    && !gapExplicadoPorDomestico
+                    && isPositive(impostoDevidoRRA)) {
+                impostoDevidoLei14754 = leiDerivada;
+            }
+        }
+        // Derivar RRA omitido pelo Gemini: Total = (II se houver, senão I) + RRA + Lei 14.754
         if (!isPositive(impostoDevidoRRA)
                 && isPositive(totalImpostoDevido)
                 && isPositive(impostoDevidoI)) {
             BigDecimal baseProgressivo = isPositive(impostoDevidoII) ? impostoDevidoII : impostoDevidoI;
-            BigDecimal rraDerivado = totalImpostoDevido.subtract(baseProgressivo)
+            BigDecimal rraDerivado = totalImpostoDevido
+                    .subtract(baseProgressivo)
+                    .subtract(nvl(impostoDevidoLei14754))
                     .setScale(2, RoundingMode.HALF_UP);
             boolean gapExplicadoPorDomestico = !isPositive(impostoDevidoII)
                     && isPositive(contribuicaoPrevEmpregadorDomestico)
                     && rraDerivado.subtract(contribuicaoPrevEmpregadorDomestico).abs()
                             .compareTo(TOLERANCE) <= 0;
             if (rraDerivado.compareTo(TOLERANCE) > 0 && !gapExplicadoPorDomestico) {
-                impostoDevidoRRA = rraDerivado;
+                // Se o gap residual for típico da Lei 14.754 (pequeno) e Lei ainda vazia, atribui à Lei.
+                if (!isPositive(impostoDevidoLei14754)
+                        && rraDerivado.compareTo(new BigDecimal("1000")) < 0) {
+                    impostoDevidoLei14754 = rraDerivado;
+                } else {
+                    impostoDevidoRRA = rraDerivado;
+                }
             }
         }
         if (isPositive(totalImpostoDevido)) {
-            BigDecimal impostoIEsperado = totalImpostoDevido.subtract(nvl(impostoDevidoRRA))
+            BigDecimal impostoIEsperado = totalImpostoDevido
+                    .subtract(nvl(impostoDevidoRRA))
+                    .subtract(nvl(impostoDevidoLei14754))
                     .setScale(2, RoundingMode.HALF_UP);
             if (!isPositive(impostoDevidoI)) {
                 impostoDevidoI = impostoIEsperado;
@@ -187,9 +220,9 @@ public final class IncomeTaxGeminiHelper {
             impostoDevido = impostoDevidoI.add(deducaoIncentivo);
         }
         if (totalImpostoDevido == null && isPositive(impostoDevidoI)) {
-            totalImpostoDevido = isPositive(impostoDevidoRRA)
-                    ? impostoDevidoI.add(impostoDevidoRRA)
-                    : impostoDevidoI;
+            totalImpostoDevido = impostoDevidoI
+                    .add(nvl(impostoDevidoRRA))
+                    .add(nvl(impostoDevidoLei14754));
         }
         // Gemini às vezes copia o INSS doméstico em "Dedução de incentivo".
         if (isCopiaContribuicaoDomestico(deducaoIncentivo, contribuicaoPrevEmpregadorDomestico)) {
@@ -232,6 +265,7 @@ public final class IncomeTaxGeminiHelper {
                 source.getNome(), source.getCpf(), source.getAnoCalendario(), source.getExercicio(),
                 baseCalculoImposto, impostoDevido, deducaoIncentivo, impostoDevidoI,
                 contribuicaoPrevEmpregadorDomestico, impostoDevidoII, impostoDevidoRRA,
+                impostoDevidoLei14754,
                 totalImpostoDevido, source.getSaldoImpostoPagar(),
                 rendimentosTributaveis, deducoesTotal,
                 source.getImpostoRetidoFonteTitular(), impostoPagoTotal, impostoRestituir,
@@ -391,6 +425,7 @@ public final class IncomeTaxGeminiHelper {
                 source.getImpostoDevidoI(),
                 source.getContribuicaoPrevEmpregadorDomestico(), source.getImpostoDevidoII(),
                 source.getImpostoDevidoRRA(),
+                source.getImpostoDevidoLei14754(),
                 source.getTotalImpostoDevido(), source.getSaldoImpostoPagar(),
                 source.getRendimentosTributaveis(), source.getDeducoes(),
                 source.getImpostoRetidoFonteTitular(), source.getImpostoPagoTotal(), source.getImpostoRestituir(),

@@ -420,6 +420,7 @@ public class GeminiResponseParser {
             BigDecimal contribuicaoPrevEmpregadorDomestico = getDecimalOrNull(root, "contribuicaoPrevEmpregadorDomestico");
             BigDecimal impostoDevidoII                    = getDecimalOrNull(root, "impostoDevidoII");
             BigDecimal impostoDevidoRRA                   = getDecimalOrNull(root, "impostoDevidoRRA");
+            BigDecimal impostoDevidoLei14754              = getDecimalOrNull(root, "impostoDevidoLei14754");
             BigDecimal totalImpostoDevido                 = getDecimalOrNull(root, "totalImpostoDevido");
 
             // RESULTADO
@@ -491,6 +492,7 @@ public class GeminiResponseParser {
                     nome, cpf, anoCalendario, exercicio,
                     baseCalculoImposto, impostoDevido, deducaoIncentivo, impostoDevidoI,
                     contribuicaoPrevEmpregadorDomestico, impostoDevidoII, impostoDevidoRRA,
+                    impostoDevidoLei14754,
                     totalImpostoDevido, saldoImpostoPagar,
                     rendimentosTributaveis, deducoesTotal,
                     impostoRetidoFonteTitular, impostoPagoTotal, impostoRestituir,

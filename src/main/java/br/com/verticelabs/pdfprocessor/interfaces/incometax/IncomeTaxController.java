@@ -364,6 +364,7 @@ public class IncomeTaxController {
                 info.getContribuicaoPrevEmpregadorDomestico(),
                 info.getImpostoDevidoII(),
                 info.getImpostoDevidoRRA(),
+                info.getImpostoDevidoLei14754(),
                 info.getTotalImpostoDevido(),
                 info.getSaldoImpostoPagar(),
                 // Rendimentos e Deduções
@@ -450,6 +451,8 @@ public class IncomeTaxController {
         private BigDecimal impostoDevidoII;
         @Schema(description = "Imposto devido RRA")
         private BigDecimal impostoDevidoRRA;
+        @Schema(description = "Imposto devido Lei 14.754/2023")
+        private BigDecimal impostoDevidoLei14754;
         @Schema(description = "Total do imposto devido")
         private BigDecimal totalImpostoDevido;
         @Schema(description = "Saldo de imposto a pagar")
