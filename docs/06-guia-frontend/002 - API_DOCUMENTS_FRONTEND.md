@@ -140,7 +140,7 @@ Content-Type: multipart/form-data
 - `nome` (opcional): Nome da pessoa
 
 **Limitações:**
-- Tamanho máximo: 10MB
+- Tamanho máximo: 20MB
 - Formato: PDF válido
 
 #### Response
@@ -1802,7 +1802,7 @@ async function gerenciarDocumento(
 ### 1. Upload de Arquivos
 
 - **Formato**: Use `FormData` para uploads
-- **Tamanho máximo**: 10MB por arquivo
+- **Tamanho máximo**: 20MB por arquivo
 - **Tipo**: Apenas PDFs válidos
 - **Content-Type**: Não defina manualmente - o browser define automaticamente com boundary
 

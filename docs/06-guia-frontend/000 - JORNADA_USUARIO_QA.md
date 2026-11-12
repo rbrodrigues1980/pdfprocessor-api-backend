@@ -187,7 +187,7 @@ Enviar arquivos PDF de contracheques (CAIXA e/ou FUNCEF) para uma pessoa cadastr
 ### Regras de negócio
 
 - **Formato aceito:** Apenas PDF
-- **Tamanho máximo:** 10 MB por arquivo
+- **Tamanho máximo:** 20 MB por arquivo
 - **Detecção automática:** O sistema identifica se o contracheque é CAIXA, FUNCEF ou MISTO
 - **Prevenção de duplicatas:** O sistema calcula hash SHA-256 de cada arquivo. Se o mesmo arquivo for enviado novamente, retorna erro **409 Conflict**
 - **Upload múltiplo:** É possível enviar vários arquivos de uma vez (bulk upload)
@@ -201,7 +201,7 @@ Enviar arquivos PDF de contracheques (CAIXA e/ou FUNCEF) para uma pessoa cadastr
 ### Validações de QA
 
 - [ ] Arquivo não-PDF é rejeitado com mensagem de erro
-- [ ] Arquivo maior que 10 MB é rejeitado
+- [ ] Arquivo maior que 20 MB é rejeitado
 - [ ] Arquivo PDF corrompido/inválido é rejeitado
 - [ ] Enviar o mesmo arquivo duas vezes retorna erro "Este arquivo já foi enviado anteriormente"
 - [ ] Upload múltiplo envia todos os arquivos e reporta sucesso/falha individual

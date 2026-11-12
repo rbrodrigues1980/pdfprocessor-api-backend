@@ -614,10 +614,10 @@ function validatePDFFile(file: File): { valid: boolean; error?: string } {
     return { valid: false, error: 'Arquivo deve ser um PDF' };
   }
   
-  // Verificar tamanho (ex: máximo 10MB)
-  const maxSize = 10 * 1024 * 1024; // 10MB
+  // Verificar tamanho (ex: máximo 20MB)
+  const maxSize = 20 * 1024 * 1024; // 20MB
   if (file.size > maxSize) {
-    return { valid: false, error: 'Arquivo muito grande. Máximo: 10MB' };
+    return { valid: false, error: 'Arquivo muito grande. Máximo: 20MB' };
   }
   
   // Verificar tipo MIME
@@ -635,7 +635,7 @@ function validatePDFFile(file: File): { valid: boolean; error?: string } {
 
 1. **Formato do CPF**: O backend aceita CPF com ou sem formatação. Recomenda-se enviar sem formatação para evitar problemas.
 
-2. **Tamanho do Arquivo**: Não há limite explícito documentado, mas recomenda-se arquivos menores que 10MB.
+2. **Tamanho do Arquivo**: Limite de **20MB** por arquivo no upload.
 
 3. **Formato do PDF**: Deve ser um PDF válido com texto extraível (não apenas imagens escaneadas, a menos que o sistema tenha OCR configurado).
 

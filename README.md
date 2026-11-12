@@ -375,7 +375,7 @@ O projeto possui um sistema de logs configurado com **Logback**:
 *   **Localização**: Os logs são salvos em `logs/fulllog.log`
 *   **Formato**: Mesmo formato do console (ISO 8601 com timezone)
 *   **Rotação Automática**: 
-    *   Cada arquivo tem no máximo **10MB**
+    *   Cada arquivo tem no máximo **20MB**
     *   Mantém até **5 arquivos** históricos
     *   Quando o 6º arquivo é criado, o mais antigo é removido automaticamente
 *   **Estrutura dos arquivos**:
