@@ -59,6 +59,7 @@ class IncomeTaxGeminiHelperTest {
                 "ADRIANA MARIA QUEIROZ FREITAS", "459.445.986-20", "2019", "2020",
                 new BigDecimal("245616.27"), new BigDecimal("57112.15"), new BigDecimal("1713.36"), null,
                 null, null, null,
+                null,
                 new BigDecimal("55398.79"), new BigDecimal("9653.02"),
                 new BigDecimal("291368.16"), new BigDecimal("45751.89"),
                 new BigDecimal("45745.77"), null, BigDecimal.ZERO,
@@ -89,6 +90,7 @@ class IncomeTaxGeminiHelperTest {
                 "ADRIANA MARIA QUEIROZ FREITAS", "459.445.986-20", "2019", "2020",
                 new BigDecimal("245616.27"), null, null, null,
                 null, null, null,
+                null,
                 null, null,
                 new BigDecimal("291368.16"), new BigDecimal("49137.81"),
                 null, null, null,
@@ -117,6 +119,7 @@ class IncomeTaxGeminiHelperTest {
                 "ADRIANA MARIA QUEIROZ FREITAS", "459.445.986-20", "2019", "2020",
                 new BigDecimal("242230.35"), null, null, null,
                 null, null, null,
+                null,
                 null, null,
                 new BigDecimal("291368.16"), new BigDecimal("45751.89"),
                 null, null, null,
@@ -189,6 +192,7 @@ class IncomeTaxGeminiHelperTest {
                 "EURIPEDES MESSIAS RODRIGUES", "350.443.906-82", "2019", "2020",
                 new BigDecimal("151048.72"), null, null, null,
                 null, null, null,
+                null,
                 null, null,
                 new BigDecimal("170373.24"), new BigDecimal("19324.52"),
                 null, null, null,
@@ -221,6 +225,7 @@ class IncomeTaxGeminiHelperTest {
                 "EURIPEDES MESSIAS RODRIGUES", "350.443.906-82", "2019", "2020",
                 new BigDecimal("151048.72"), null, null, null,
                 null, null, null,
+                null,
                 null, null,
                 new BigDecimal("170373.24"), new BigDecimal("19324.52"),
                 null, null, null,
@@ -256,6 +261,7 @@ class IncomeTaxGeminiHelperTest {
                 new BigDecimal("227615.37"), new BigDecimal("52161.90"), BigDecimal.ZERO,
                 new BigDecimal("52161.90"),
                 null, null, null,
+                null,
                 new BigDecimal("80195.26"), null,
                 new BigDecimal("300000.00"), null,
                 null, null, null,
@@ -285,6 +291,7 @@ class IncomeTaxGeminiHelperTest {
                 new BigDecimal("100000.00"), new BigDecimal("10000.00"), BigDecimal.ZERO,
                 new BigDecimal("10000.00"),
                 null, null, null,
+                null,
                 new BigDecimal("10000.00"), null,
                 new BigDecimal("120000.00"), null,
                 null, null, null,
@@ -313,6 +320,7 @@ class IncomeTaxGeminiHelperTest {
                 new BigDecimal("227615.37"), new BigDecimal("52161.90"), BigDecimal.ZERO,
                 new BigDecimal("52161.90"),
                 null, null, new BigDecimal("28033.36"),
+                null,
                 new BigDecimal("80195.26"), null,
                 new BigDecimal("300000.00"), null,
                 null, null, null,
@@ -361,12 +369,68 @@ class IncomeTaxGeminiHelperTest {
     }
 
     @Test
+    void parseJsonComImpostoDevidoLei14754() {
+        String json = """
+                {
+                  "exercicio": "2025",
+                  "anoCalendario": "2024",
+                  "nome": "ERTON BIRK TEIXEIRA",
+                  "cpf": "265.176.710-72",
+                  "modeloDeclaracao": "COMPLETA",
+                  "rendimentosTributaveis": 400579.56,
+                  "impostoDevido": 74799.93,
+                  "impostoDevidoI": 74799.93,
+                  "impostoDevidoLei14754": 86.59,
+                  "totalImpostoDevido": 74886.52
+                }
+                """;
+
+        var info = GeminiResponseParser.parseIncomeTaxResponse(json);
+
+        assertTrue(IncomeTaxGeminiHelper.isIncomeTaxInfoSufficient(info));
+        assertEquals(0, new BigDecimal("86.59").compareTo(info.getImpostoDevidoLei14754()));
+        assertEquals(0, new BigDecimal("74886.52").compareTo(info.getTotalImpostoDevido()));
+    }
+
+    @Test
+    void enrichDerivaLei14754QuandoGapPequenoEntreTotalEI() {
+        IncomeTaxInfo parcial = new IncomeTaxInfo(
+                "ERTON BIRK TEIXEIRA", "265.176.710-72", "2024", "2025",
+                new BigDecimal("311057.87"), new BigDecimal("74799.93"), BigDecimal.ZERO,
+                new BigDecimal("74799.93"),
+                null, null, null,
+                null,
+                new BigDecimal("74886.52"), null,
+                new BigDecimal("400579.56"), null,
+                null, null, null,
+                null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null,
+                null, null,
+                "COMPLETO", null, null, null, null,
+                null, null, null, null,
+                null, null,
+                Collections.emptyList(), Collections.emptyList(),
+                null, Collections.emptyList(), null, Collections.emptyList(),
+                null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null, null, null,
+                Collections.emptyList());
+
+        IncomeTaxInfo enriched = IncomeTaxGeminiHelper.enrich(parcial);
+
+        assertEquals(0, new BigDecimal("86.59").compareTo(enriched.getImpostoDevidoLei14754()),
+                "gap total−I deve virar Lei 14.754, não RRA");
+        assertEquals(0, BigDecimal.ZERO.compareTo(
+                enriched.getImpostoDevidoRRA() == null ? BigDecimal.ZERO : enriched.getImpostoDevidoRRA()));
+    }
+
+    @Test
     void enrichDerivaIncentivoEImpostoDevidoIQuandoGeminiZeraAsLinhas_ilka2017() {
         IncomeTaxInfo parcial = new IncomeTaxInfo(
                 "ILKA ELIANE GONCALVES CAMPELO", "341.535.784-87", "2017", "2018",
                 new BigDecimal("104232.27"), new BigDecimal("18231.55"), BigDecimal.ZERO,
                 BigDecimal.ZERO,
                 null, new BigDecimal("17684.61"), BigDecimal.ZERO,
+                null,
                 new BigDecimal("17684.61"), new BigDecimal("4954.17"),
                 new BigDecimal("121205.83"), new BigDecimal("16973.56"),
                 new BigDecimal("12730.44"), new BigDecimal("12730.44"), BigDecimal.ZERO,
@@ -398,6 +462,7 @@ class IncomeTaxGeminiHelperTest {
                 new BigDecimal("74635.62"), new BigDecimal("10092.47"), BigDecimal.ZERO,
                 new BigDecimal("10092.47"),
                 new BigDecimal("1093.77"), new BigDecimal("8998.70"), BigDecimal.ZERO,
+                null,
                 new BigDecimal("8998.70"), null,
                 new BigDecimal("89224.33"), new BigDecimal("14588.71"),
                 null, null, null,
@@ -430,6 +495,7 @@ class IncomeTaxGeminiHelperTest {
                 new BigDecimal("74635.62"), new BigDecimal("10092.47"), new BigDecimal("1093.77"),
                 new BigDecimal("10092.47"),
                 new BigDecimal("1093.77"), new BigDecimal("8998.70"), BigDecimal.ZERO,
+                null,
                 new BigDecimal("8998.70"), null,
                 new BigDecimal("89224.33"), new BigDecimal("14588.71"),
                 null, null, null,
@@ -460,6 +526,7 @@ class IncomeTaxGeminiHelperTest {
                 "CELIA DONOLA CARVALHO E CASTRO", "000.000.000-00", "2016", "2017",
                 new BigDecimal("53147.04"), null, null, null,
                 null, null, null,
+                null,
                 null, null,
                 new BigDecimal("67963.80"), null,
                 null, null, null,
@@ -492,6 +559,7 @@ class IncomeTaxGeminiHelperTest {
                 new BigDecimal("200000.00"), new BigDecimal("3746.44"), BigDecimal.ZERO,
                 new BigDecimal("3746.44"),
                 null, null, null,
+                null,
                 new BigDecimal("29586.27"), null,
                 new BigDecimal("250000.00"), null,
                 null, null, new BigDecimal("3746.44"),

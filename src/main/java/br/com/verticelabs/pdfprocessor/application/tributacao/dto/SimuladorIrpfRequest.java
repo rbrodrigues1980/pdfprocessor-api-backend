@@ -68,6 +68,9 @@ public class SimuladorIrpfRequest {
     /** Imposto devido sobre RRA. Soma apenas no total do item 7 (não entra na progressiva). */
     private BigDecimal impostoDevidoRRA;
 
+    /** Imposto Lei 14.754/2023. Soma apenas no total do item 7 (não entra na progressiva). */
+    private BigDecimal impostoDevidoLei14754;
+
     // Imposto pago (item 8)
     private BigDecimal impostoRetidoFonteTitular;
     private BigDecimal impostoRetidoFonteDependentes;

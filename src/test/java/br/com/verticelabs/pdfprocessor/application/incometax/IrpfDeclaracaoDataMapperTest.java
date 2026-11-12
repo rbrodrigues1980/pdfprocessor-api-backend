@@ -62,6 +62,36 @@ class IrpfDeclaracaoDataMapperTest {
     }
 
     @Test
+    @DisplayName("impostoDevidoLei14754 → impostoSobreLei14754")
+    void mapeiaImpostoDevidoLei14754() {
+        IncomeTaxInfo info = new IncomeTaxInfo(
+                "ERTON BIRK TEIXEIRA", "265.176.710-72", "2024", "2025",
+                new BigDecimal("311057.87"), new BigDecimal("74799.93"), BigDecimal.ZERO,
+                new BigDecimal("74799.93"),
+                null, null, null,
+                new BigDecimal("86.59"),
+                new BigDecimal("74886.52"), null,
+                new BigDecimal("400579.56"), null,
+                null, null, null,
+                null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null,
+                null, null,
+                "COMPLETO", null, null, null, null,
+                null, null, null, null,
+                null, null,
+                Collections.emptyList(), Collections.emptyList(),
+                null, Collections.emptyList(), null, Collections.emptyList(),
+                null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null, null, null,
+                Collections.emptyList());
+
+        IrpfDeclaracaoData data = mapper.fromIncomeTaxInfo(info);
+
+        assertEquals(0, new BigDecimal("86.59").compareTo(data.getImpostoSobreLei14754()));
+        assertEquals(0, new BigDecimal("74886.52").compareTo(data.getTotalImpostoDevido()));
+    }
+
+    @Test
     @DisplayName("impostoDevidoRRA → impostoSobreRRA")
     void mapeiaImpostoDevidoRRA() {
         IncomeTaxInfo info = new IncomeTaxInfo(
@@ -69,6 +99,7 @@ class IrpfDeclaracaoDataMapperTest {
                 new BigDecimal("227615.37"), new BigDecimal("52161.90"), BigDecimal.ZERO,
                 new BigDecimal("52161.90"),
                 null, null, new BigDecimal("28033.36"),
+                null,
                 new BigDecimal("80195.26"), null,
                 new BigDecimal("300000.00"), null,
                 null, null, null,
@@ -95,6 +126,7 @@ class IrpfDeclaracaoDataMapperTest {
                 "MARIA TERESA BADDINI", "596.545.387-68", "2016", "2017",
                 null, null, null, null,
                 null, null, null,
+                null,
                 null, null,
                 new BigDecimal("100000.00"), null,
                 null, null, null,

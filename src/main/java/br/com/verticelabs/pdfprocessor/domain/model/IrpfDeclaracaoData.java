@@ -109,6 +109,8 @@ public class IrpfDeclaracaoData {
     private BigDecimal impostoDevidoI;
     private BigDecimal impostoDevidoII;
     private BigDecimal impostoSobreRRA;
+    /** Imposto devido pela Lei 14.754/2023 (soma no total do imposto devido). */
+    private BigDecimal impostoSobreLei14754;
     private BigDecimal totalImpostoDevido;
 
     // ==========================================

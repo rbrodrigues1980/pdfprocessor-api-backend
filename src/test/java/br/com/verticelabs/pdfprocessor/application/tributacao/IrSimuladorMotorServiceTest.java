@@ -390,6 +390,25 @@ class IrSimuladorMotorServiceTest {
 
 
     @Test
+    void lei14754_somaNoTotalSemEntrarNaProgressiva() {
+        SimuladorIrpfRequest req = SimuladorIrpfRequest.builder()
+                .anoCalendario(2020)
+                .rendimentosTributaveis(new BigDecimal("50000.00"))
+                .impostoDevidoLei14754(new BigDecimal("86.59"))
+                .build();
+
+        SimuladorIrpfResponse resp = motor.simular(req, faixas2020, params2020);
+
+        BigDecimal progressivo = resp.getModeloCompleto().getImpostoDevidoFinal();
+        BigDecimal totalEsperado = progressivo.add(new BigDecimal("86.59")).setScale(2);
+        assertEquals(new BigDecimal("86.59"),
+                resp.getModeloCompleto().getResumo().getImpostoDevidoLei14754());
+        assertEquals(totalEsperado, resp.getModeloCompleto().getResumo().getTotalImpostoDevido());
+    }
+
+
+
+    @Test
 
     void rra_naoEntraNaProgressiva() {
 

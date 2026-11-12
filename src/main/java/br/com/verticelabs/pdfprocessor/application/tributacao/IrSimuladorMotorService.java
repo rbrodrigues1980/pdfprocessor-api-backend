@@ -47,6 +47,7 @@ public class IrSimuladorMotorService {
 
         BigDecimal impostoPagoTotal = calcularImpostoPagoTotal(request);
         BigDecimal impostoDevidoRRA = nvl(request.getImpostoDevidoRRA());
+        BigDecimal impostoDevidoLei14754 = nvl(request.getImpostoDevidoLei14754());
 
         DeducoesCompleto dedCompleto = calcularDeducoesCompleto(request, parametros, rendimentosProgressivos);
 
@@ -59,6 +60,7 @@ public class IrSimuladorMotorService {
                 parametros,
                 doacoesBrutas,
                 impostoDevidoRRA,
+                impostoDevidoLei14754,
                 impostoPagoTotal,
                 request,
                 dedCompleto.inssDomesticoCredito());
@@ -74,6 +76,7 @@ public class IrSimuladorMotorService {
                 parametros,
                 doacoesBrutas,
                 impostoDevidoRRA,
+                impostoDevidoLei14754,
                 impostoPagoTotal,
                 request,
                 BigDecimal.ZERO);
@@ -202,6 +205,7 @@ public class IrSimuladorMotorService {
             IrParametrosAnuais parametros,
             DoacoesBrutasDTO doacoesBrutas,
             BigDecimal impostoDevidoRRA,
+            BigDecimal impostoDevidoLei14754,
             BigDecimal impostoPagoTotal,
             SimuladorIrpfRequest request,
             BigDecimal creditoInssDomestico) {
@@ -235,7 +239,10 @@ public class IrSimuladorMotorService {
 
         BigDecimal impostoParaTotal = impostoDevidoII != null ? impostoDevidoII : impostoDevidoFinal;
 
-        BigDecimal totalImpostoDevido = impostoParaTotal.add(impostoDevidoRRA).setScale(2, RM);
+        BigDecimal totalImpostoDevido = impostoParaTotal
+                .add(impostoDevidoRRA)
+                .add(impostoDevidoLei14754)
+                .setScale(2, RM);
 
         BigDecimal aliquotaTotal = BigDecimal.ZERO;
         if (rendimentosProgressivos.compareTo(BigDecimal.ZERO) > 0) {
@@ -263,6 +270,7 @@ public class IrSimuladorMotorService {
                 doacoesEfetivas.getDeducaoIncentivoEfetiva(),
                 impostoDevidoFinal,
                 impostoDevidoRRA,
+                impostoDevidoLei14754,
                 aliquotaTotal,
                 totalImpostoDevido,
                 impostoPagoTotal,
@@ -312,6 +320,7 @@ public class IrSimuladorMotorService {
             BigDecimal deducaoIncentivo,
             BigDecimal impostoDevidoI,
             BigDecimal impostoDevidoRRA,
+            BigDecimal impostoDevidoLei14754,
             BigDecimal aliquotaEfetiva,
             BigDecimal totalImpostoDevido,
             BigDecimal impostoPagoTotal,
@@ -325,6 +334,7 @@ public class IrSimuladorMotorService {
                 .deducaoIncentivo(deducaoIncentivo)
                 .impostoDevidoI(impostoDevidoI)
                 .impostoDevidoRRA(impostoDevidoRRA)
+                .impostoDevidoLei14754(impostoDevidoLei14754)
                 .aliquotaEfetiva(aliquotaEfetiva)
                 .totalImpostoDevido(totalImpostoDevido)
                 .impostoRetidoFonteTitular(nvl(request.getImpostoRetidoFonteTitular()))

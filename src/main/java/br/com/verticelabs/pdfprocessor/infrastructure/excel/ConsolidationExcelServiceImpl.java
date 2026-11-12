@@ -1259,6 +1259,8 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
                 baseCalculoEspelho(data), subLabelStyle, valueStyle);
         row = addSimDetalhe(sheet, row, "Imposto devido", data.getImpostoDevido(), subLabelStyle, valueStyle);
         row = addSimDetalhe(sheet, row, "Imposto devido RRA", data.getImpostoSobreRRA(), subLabelStyle, valueStyle);
+        row = addSimDetalhe(sheet, row, "Imposto Lei 14.754/2023", data.getImpostoSobreLei14754(),
+                subLabelStyle, valueStyle);
         row = addSimAliquotaDeclaracaoRow(sheet, row, "Aliquota efetiva (%)", data.getAliquotaEfetiva(),
                 subLabelStyle, valueStyle);
         row = addSimDestaqueRow(sheet, row, "Total do imposto devido", data.getTotalImpostoDevido(),
@@ -1324,6 +1326,8 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
             row = addSimDetalhe(sheet, row, "Imposto devido II", data.getImpostoDevidoII(), subLabelStyle, valueStyle);
         }
         row = addSimDetalhe(sheet, row, "Imposto devido RRA", data.getImpostoSobreRRA(), subLabelStyle, valueStyle);
+        row = addSimDetalhe(sheet, row, "Imposto Lei 14.754/2023", data.getImpostoSobreLei14754(),
+                subLabelStyle, valueStyle);
         row = addSimAliquotaDeclaracaoRow(sheet, row, "Aliquota efetiva (%)", data.getAliquotaEfetiva(),
                 subLabelStyle, valueStyle);
         row = addSimDestaqueRow(sheet, row, "Total do imposto devido", data.getTotalImpostoDevido(),
@@ -1432,11 +1436,15 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
         row = addSimDetalhe(sheet, row, "Imposto devido II",
                 impostoIISim != null ? impostoIISim : BigDecimal.ZERO, subLabelStyle, valueStyle);
         row = addSimDetalhe(sheet, row, "Imposto devido RRA", nvl(data.getImpostoSobreRRA()), subLabelStyle, valueStyle);
+        row = addSimDetalhe(sheet, row, "Imposto Lei 14.754/2023", nvl(data.getImpostoSobreLei14754()),
+                subLabelStyle, valueStyle);
         row = addSimAliquotaDeclaracaoRow(sheet, row, "Aliquota efetiva (%)", modelo.getAliquotaEfetiva(),
                 subLabelStyle, valueStyle);
 
         BigDecimal impostoProgressivoTotal = impostoIISim != null ? impostoIISim : impostoISim;
-        BigDecimal totalDevido = nvl(impostoProgressivoTotal).add(nvl(data.getImpostoSobreRRA()));
+        BigDecimal totalDevido = nvl(impostoProgressivoTotal)
+                .add(nvl(data.getImpostoSobreRRA()))
+                .add(nvl(data.getImpostoSobreLei14754()));
         row = addSimDestaqueRow(sheet, row, "Total do imposto devido", totalDevido, totalStyle, totalLabelStyle);
 
         sheet.createRow(row++);
@@ -2676,6 +2684,8 @@ public class ConsolidationExcelServiceImpl implements ExcelExportService {
             row = addSimDetalhe(sheet, row, "Imposto devido II", data.getImpostoDevidoII(), subLabelStyle, valueStyle);
         }
         row = addSimDetalhe(sheet, row, "Imposto devido RRA", data.getImpostoSobreRRA(), subLabelStyle, valueStyle);
+        row = addSimDetalhe(sheet, row, "Imposto Lei 14.754/2023", data.getImpostoSobreLei14754(),
+                subLabelStyle, valueStyle);
         row = addSimAliquotaDeclaracaoRow(sheet, row, "Alíquota efetiva (%)", data.getAliquotaEfetiva(),
                 subLabelStyle, aliquotaStyle);
         row = addSimDestaqueRow(sheet, row, "Total do imposto devido", data.getTotalImpostoDevido(), totalStyle, totalLabelStyle);

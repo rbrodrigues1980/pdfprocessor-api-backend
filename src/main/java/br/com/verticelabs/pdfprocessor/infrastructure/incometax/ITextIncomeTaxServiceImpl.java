@@ -97,6 +97,11 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
             "(?i)imposto\\s+devido\\s+RRA[\\s\\S]*?([\\d]{1,3}(?:[.]\\d{3})*,\\d{2})",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
+    /** Ex.: "Imposto Lei 14.754/2023 86,59" ou "Imposto devido Lei 14.754/2023". */
+    private static final Pattern IMPOSTO_DEVIDO_LEI_14754_PATTERN = Pattern.compile(
+            "(?i)imposto\\s+(?:devido\\s+)?Lei\\s*14[.,]?754(?:/2023)?[\\s\\S]*?([\\d]{1,3}(?:[.]\\d{3})*,\\d{2})",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+
     private static final Pattern TOTAL_IMPOSTO_DEVIDO_PATTERN = Pattern.compile(
             "(?i)total\\s+do\\s+imposto\\s+devido[\\s\\S]*?([\\d]{1,3}(?:[.]\\d{3})*,\\d{2})",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
@@ -681,6 +686,7 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
                 CONTRIBUICAO_PREV_EMPREGADOR_DOMESTICO_PATTERN);
         BigDecimal impostoDevidoII = extractValorMonetario(resumoPageText, IMPOSTO_DEVIDO_II_PATTERN);
         BigDecimal impostoDevidoRRA = extractValorMonetario(resumoPageText, IMPOSTO_DEVIDO_RRA_PATTERN);
+        BigDecimal impostoDevidoLei14754 = extractValorMonetario(resumoPageText, IMPOSTO_DEVIDO_LEI_14754_PATTERN);
         BigDecimal totalImpostoDevido = extractValorMonetario(resumoPageText, TOTAL_IMPOSTO_DEVIDO_PATTERN);
         BigDecimal saldoImpostoPagar = extractValorMonetario(resumoPageText, SALDO_IMPOSTO_PAGAR_PATTERN);
 
@@ -935,7 +941,8 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
 
         CamposImpostoDevidoCorrigidos impostoDevidoCorrigido = corrigirCamposImpostoDevidoResumo(
                 resumoPageText, tipoTributacao, baseCalculoImposto, impostoDevido, deducaoIncentivo,
-                impostoDevidoI, impostoDevidoRRA, contribuicaoPrevEmpregadorDomestico, impostoDevidoII,
+                impostoDevidoI, impostoDevidoRRA, impostoDevidoLei14754,
+                contribuicaoPrevEmpregadorDomestico, impostoDevidoII,
                 saldoImpostoPagar, totalImpostoDevido, rendimentosTributaveis, deducoes, descontoSimplificado);
         baseCalculoImposto = impostoDevidoCorrigido.baseCalculoImposto();
         deducaoIncentivo = impostoDevidoCorrigido.deducaoIncentivo();
@@ -1017,6 +1024,7 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
                 .impostoDevidoI(impostoDevidoI)
                 .contribuicaoPatronalPrevidenciaSocial(contribuicaoPrevEmpregadorDomestico)
                 .impostoSobreRRA(impostoDevidoRRA)
+                .impostoSobreLei14754(impostoDevidoLei14754)
                 .totalImpostoDevido(totalImpostoDevido)
                 .impostoPagoTotal(impostoPagoTotal)
                 .impostoRestituir(impostoRestituir)
@@ -1034,6 +1042,7 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
                 nome, cpf, anoCalendario, exercicio,
                 baseCalculoImposto, impostoDevido, deducaoIncentivo, impostoDevidoI,
                 contribuicaoPrevEmpregadorDomestico, impostoDevidoII, impostoDevidoRRA,
+                impostoDevidoLei14754,
                 totalImpostoDevido, saldoImpostoPagar,
                 rendimentosTributaveis, deducoes, impostoRetidoFonteTitular, impostoPagoTotal, impostoRestituir,
                 deducoesContribPrevOficial, deducoesContribPrevRRA, deducoesContribPrevCompl,
@@ -2417,6 +2426,7 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
             BigDecimal deducaoIncentivoExtraido,
             BigDecimal impostoDevidoIExtraido,
             BigDecimal impostoDevidoRRA,
+            BigDecimal impostoDevidoLei14754,
             BigDecimal contribuicaoPrevEmpregadorDomestico,
             BigDecimal impostoDevidoII,
             BigDecimal saldoImpostoPagarExtraido,
@@ -2494,6 +2504,7 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
 
         impostoDevidoI = sanitizarImpostoDevidoI(
                 impostoDevidoI, impostoDevido, deducaoIncentivo, impostoDevidoRRA,
+                impostoDevidoLei14754,
                 contribuicaoPrevEmpregadorDomestico, impostoDevidoII, totalImpostoDevido);
 
         // Se total ≈ imposto devido, não há dedução de incentivo real — não inventar a partir de I errado.
@@ -2503,16 +2514,17 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
                 log.warn("⚠️ Dedução de incentivo descartada (total ≈ imposto devido): era {}", deducaoIncentivo);
             }
             deducaoIncentivo = BigDecimal.ZERO;
-            BigDecimal rra = nvlBigDecimal(impostoDevidoRRA);
-            BigDecimal impostoIEsperado = totalImpostoDevido.subtract(rra).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal extras = nvlBigDecimal(impostoDevidoRRA).add(nvlBigDecimal(impostoDevidoLei14754));
+            BigDecimal impostoIEsperado = totalImpostoDevido.subtract(extras).setScale(2, RoundingMode.HALF_UP);
             if (impostoDevidoI == null || !withinOneCent(impostoDevidoI, impostoIEsperado)) {
-                log.info("✅ Imposto devido I alinhado ao total − RRA: {}", impostoIEsperado);
+                log.info("✅ Imposto devido I alinhado ao total − RRA − Lei 14.754: {}", impostoIEsperado);
                 impostoDevidoI = impostoIEsperado;
             }
         } else {
             // Reconstrução aritmética para layouts com colunas embaralhadas: quando a dedução
             // de incentivo não foi capturada (0) mas o imposto devido bruto supera o total,
-            // deriva deducaoIncentivo = impostoDevido − (total − RRA) e impostoDevidoI = total − RRA.
+            // deriva deducaoIncentivo = impostoDevido − (total − RRA − Lei14.754)
+            // e impostoDevidoI = total − RRA − Lei14.754.
             // Ex.: doações ECA/Idoso que abatem o "Total do imposto devido".
             // II igual ao total (cópia de I sem INSS doméstico) não bloqueia a derivação — Ilka 2017.
             // Alice 2016: devido − total = INSS doméstico (I − II), não incentivo.
@@ -2520,8 +2532,8 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
                     || impostoDevidoII.compareTo(BigDecimal.ZERO) == 0
                     || (totalImpostoDevido != null && withinOneCent(impostoDevidoII, totalImpostoDevido));
             if (impostoDevido != null && totalImpostoDevido != null && iiNaoBloqueia) {
-                BigDecimal rra = nvlBigDecimal(impostoDevidoRRA);
-                BigDecimal impostoIDerivado = totalImpostoDevido.subtract(rra);
+                BigDecimal extras = nvlBigDecimal(impostoDevidoRRA).add(nvlBigDecimal(impostoDevidoLei14754));
+                BigDecimal impostoIDerivado = totalImpostoDevido.subtract(extras);
                 BigDecimal incentivoDerivado = impostoDevido.subtract(impostoIDerivado);
                 boolean plausivel = incentivoDerivado.compareTo(BigDecimal.ZERO) > 0
                         && incentivoDerivado.compareTo(impostoDevido) < 0
@@ -2533,11 +2545,12 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
                 }
             }
 
-            // Derivação via impostoDevido e impostoDevidoI somente se I for consistente com total − RRA
-            // (evita inventar dedução quando I capturou "Imposto a restituir" por falso positivo).
+            // Derivação via impostoDevido e impostoDevidoI somente se I for consistente com
+            // total − RRA − Lei 14.754 (evita inventar dedução quando I capturou "Imposto a restituir").
             if (impostoDevido != null && impostoDevidoI != null
                     && nvlBigDecimal(deducaoIncentivo).compareTo(BigDecimal.ZERO) == 0
-                    && isImpostoDevidoIConsistenteComTotal(impostoDevidoI, totalImpostoDevido, impostoDevidoRRA)) {
+                    && isImpostoDevidoIConsistenteComTotal(
+                            impostoDevidoI, totalImpostoDevido, impostoDevidoRRA, impostoDevidoLei14754)) {
                 BigDecimal incentivoDerivado = impostoDevido.subtract(impostoDevidoI);
                 if (incentivoDerivado.compareTo(BigDecimal.ZERO) > 0
                         && incentivoDerivado.compareTo(impostoDevido) < 0
@@ -2637,11 +2650,13 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
     private boolean isImpostoDevidoIConsistenteComTotal(
             BigDecimal impostoDevidoI,
             BigDecimal totalImpostoDevido,
-            BigDecimal impostoDevidoRRA) {
+            BigDecimal impostoDevidoRRA,
+            BigDecimal impostoDevidoLei14754) {
         if (impostoDevidoI == null || totalImpostoDevido == null) {
             return false;
         }
-        BigDecimal esperado = totalImpostoDevido.subtract(nvlBigDecimal(impostoDevidoRRA));
+        BigDecimal extras = nvlBigDecimal(impostoDevidoRRA).add(nvlBigDecimal(impostoDevidoLei14754));
+        BigDecimal esperado = totalImpostoDevido.subtract(extras);
         return withinOneCent(impostoDevidoI, esperado);
     }
 
@@ -2674,6 +2689,7 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
             BigDecimal impostoDevido,
             BigDecimal deducaoIncentivo,
             BigDecimal impostoDevidoRRA,
+            BigDecimal impostoDevidoLei14754,
             BigDecimal contribuicaoPrevEmpregadorDomestico,
             BigDecimal impostoDevidoII,
             BigDecimal totalImpostoDevido) {
@@ -2692,6 +2708,9 @@ public class ITextIncomeTaxServiceImpl implements ITextIncomeTaxService {
             return impostoDevidoI;
         }
         if (nvlBigDecimal(impostoDevidoRRA).compareTo(BigDecimal.ZERO) > 0) {
+            return impostoDevidoI;
+        }
+        if (nvlBigDecimal(impostoDevidoLei14754).compareTo(BigDecimal.ZERO) > 0) {
             return impostoDevidoI;
         }
         if (nvlBigDecimal(contribuicaoPrevEmpregadorDomestico).compareTo(BigDecimal.ZERO) > 0) {

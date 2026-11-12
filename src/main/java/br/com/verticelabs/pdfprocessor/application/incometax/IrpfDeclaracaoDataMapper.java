@@ -156,6 +156,7 @@ public class IrpfDeclaracaoDataMapper {
                 .impostoDevidoI(info.getImpostoDevidoI())
                 .impostoDevidoII(info.getImpostoDevidoII())
                 .impostoSobreRRA(info.getImpostoDevidoRRA())
+                .impostoSobreLei14754(info.getImpostoDevidoLei14754())
                 .totalImpostoDevido(info.getTotalImpostoDevido())
                 .impostoRetidoFonteTitular(info.getImpostoRetidoFonteTitular())
                 .impostoRetidoDependentes(info.getImpostoRetidoFonteDependentes())
